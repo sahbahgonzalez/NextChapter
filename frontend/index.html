@@ -39,7 +39,6 @@
 
         body.dark-mode .section,
         body.dark-mode header,
-        body.dark-mode nav,
         body.dark-mode .stat-card {
             background-color: var(--dark-card-color);
             box-shadow: 0 4px 8px rgba(0, 0, 0, 0.5);
@@ -88,8 +87,12 @@
             color: var(--dark-text-color) !important;
             border-color: var(--dark-border-color) !important;
         }
+
+        body.dark-mode #header-logo {
+            filter: brightness(0) invert(1);
+        }
         
-        /* BASE STYLES - NBA Stats Aesthetic */
+        /* BASE STYLES - Aesthetic */
         body {
             font-family: 'Inter', sans-serif;
             margin: 0;
@@ -106,25 +109,37 @@
             padding: 20px;
         }
         
-        /* Header & Toggle/Auth Buttons */
+        /* === MODIFIED HEADER === */
         header {
-            text-align: center;
-            padding: 40px 0 20px 0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 25px; /* Reduced padding */
             margin-bottom: 0; 
             background-color: var(--card-background);
-            border-radius: 0; 
             box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
-            position: relative;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 20px; /* Space between logo and nav */
+        }
+        
+        #header-logo {
+            height: 40px; /* Adjust logo height as needed */
+            width: auto;
+            object-fit: contain;
         }
 
         #header-controls {
-            position: absolute;
-            top: 15px;
-            right: 25px;
+            /* Removed absolute positioning */
             display: flex;
             align-items: center;
             gap: 10px;
         }
+        /* === END MODIFIED HEADER === */
 
         #mode-toggle {
             background: none;
@@ -150,42 +165,24 @@
             transform: translateY(-1px);
         }
 
-        h1 {
-            color: var(--primary-blue); 
-            font-size: 3.5em; 
-            margin-bottom: 0;
-            font-weight: 900;
-            letter-spacing: 2px;
-        }
-
-        .tagline {
-            color: var(--text-muted);
-            font-size: 1em;
-            font-weight: 500;
-            margin-top: 5px;
-        }
-
-        /* Navigation Bar */
+        /* Removed h1 and tagline styles as they are no longer in the header */
+        
+        /* === MODIFIED NAVIGATION === */
         nav {
             display: flex;
-            justify-content: center;
-            margin-bottom: 20px;
-            background-color: var(--card-background);
-            border-radius: 0;
-            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.05);
-            padding: 10px 0;
-            border-bottom: 1px solid var(--border-color);
+            /* Removed all previous styles (margin, bg, shadow, padding) */
         }
 
         nav a {
-            padding: 10px 20px;
+            padding: 10px 15px; /* Adjusted padding */
             color: var(--text-muted);
             text-decoration: none;
             border-bottom: 3px solid transparent;
-            margin: 0 15px;
+            margin: 0 5px; /* Reduced margin */
             font-weight: 600;
-            font-size: 1.05em;
+            font-size: 1.0em; /* Slightly smaller font */
         }
+        /* === END MODIFIED NAVIGATION === */
 
         nav a:hover, nav a.active {
             color: var(--primary-blue); 
@@ -198,6 +195,7 @@
             padding: 30px 40px; 
             border-radius: 10px; 
             margin-bottom: 20px;
+            margin-top: 20px; /* Added margin-top to separate from header */
             box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
             transition: background-color 0.3s, box-shadow 0.3s;
         }
@@ -406,6 +404,103 @@
             fill: var(--light-blue);
         }
         
+        /* Delete Button */
+        .delete-button {
+            padding: 6px 12px;
+            background-color: var(--accent-red);
+            color: var(--button-text);
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.85em;
+            font-weight: 600;
+            transition: background-color 0.2s;
+        }
+
+        .delete-button:hover {
+            background-color: #c41e1e;
+        }
+
+        body.dark-mode .delete-button:hover {
+            background-color: #ff6b6b;
+        }
+        
+        /* ===== Login Modal Styling ===== */
+        .login-modal {
+        display: none; /* Hidden by default */
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.6);
+        justify-content: center;
+        align-items: center;
+        z-index: 9999;
+        }
+
+        .login-content {
+        background: var(--card-background);
+        color: var(--text-dark);
+        padding: 30px 40px;
+        border-radius: 12px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+        display: flex;
+        flex-direction: column;
+        gap: 15px;
+        width: 320px;
+        text-align: center;
+        }
+
+        body.dark-mode .login-content {
+        background: var(--dark-card-color);
+        color: var(--dark-text-color);
+        }
+
+        .login-content input {
+        padding: 10px;
+        border-radius: 6px;
+        border: 1px solid var(--border-color);
+        font-size: 1em;
+        }
+
+        body.dark-mode .login-content input {
+        background-color: var(--dark-background-color);
+        border-color: var(--dark-border-color);
+        color: var(--dark-text-color);
+        }
+
+        .login-buttons {
+        display: flex;
+        justify-content: space-between;
+        margin-top: 10px;
+        }
+
+        .login-buttons button {
+        flex: 1;
+        margin: 0 5px;
+        padding: 10px;
+        border: none;
+        border-radius: 6px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: background 0.2s;
+        }
+
+        #login-submit {
+        background: var(--primary-blue);
+        color: var(--button-text);
+        }
+
+        #login-submit:hover {
+        background: var(--light-blue);
+        }
+
+        #login-cancel {
+        background: #ccc;
+        color: #333;
+        }
+        
         @media (max-width: 768px) {
             .container {
                 padding: 10px;
@@ -413,8 +508,22 @@
             .section {
                 padding: 20px;
             }
-            h1 {
-                font-size: 2.5em;
+            header {
+                padding: 10px;
+                flex-direction: column;
+                gap: 10px;
+            }
+            .header-left {
+                width: 100%;
+                justify-content: space-between;
+            }
+            #header-controls {
+                width: 100%;
+                justify-content: flex-end;
+            }
+            nav {
+                width: 100%;
+                justify-content: center;
             }
             nav a {
                 padding: 8px 10px;
@@ -422,26 +531,57 @@
                 font-size: 0.9em;
             }
         }
+        
+        @media (max-width: 480px) {
+             .header-left {
+                flex-direction: column;
+                gap: 10px;
+            }
+            nav {
+                border-top: 1px solid var(--border-color);
+                padding-top: 10px;
+                margin-top: 10px;
+            }
+            body.dark-mode nav {
+                border-top-color: var(--dark-border-color);
+            }
+            #header-logo {
+                height: 30px;
+            }
+        }
     </style>
 </head>
 <body>
+    <!-- === MODIFIED HEADER STRUCTURE === -->
     <header>
+        <div class="header-left">
+            <img src="./assets/tnc.png" 
+                 alt="TNC Logo" 
+                 id="header-logo"
+                 onerror="this.src='https://placehold.co/120x40/3A478F/FFFFFF?text=TNC+Logo&font=inter'; this.onerror=null;">
+            
+            <nav id="main-nav">
+                <a href="#stats" class="active">📊 Overall Stats</a>
+                <a href="#profiles" class="hidden-nav-link" style="display: none;">👤 Player Management</a> 
+                <!-- JS controls display: none; -->
+            </nav>
+        </div>
+
         <div id="header-controls">
             <button id="sign-in-button" class="auth-button">Sign In</button>
             <button id="mode-toggle" aria-label="Toggle Dark Mode">
                 ☀️
             </button>
         </div>
-        <h1>TheNextChapter</h1>
-        <p class="tagline">Basketball Shot Logger</p>
+        
+        <!-- Removed H1 and Tagline from here -->
     </header>
+    <!-- === END MODIFIED HEADER === -->
+
 
     <div class="container">
         
-        <nav id="main-nav">
-            <a href="#stats" class="active">📊 Overall Stats</a>
-            <a href="#profiles" class="hidden-nav-link">👤 Player Management</a> 
-        </nav>
+        <!-- Navigation bar was here, now it's in the header -->
 
         <!-- STATS SECTION: PUBLIC TABLE VIEW -->
         <div id="stats" class="section">
@@ -517,7 +657,7 @@
 
 
         <!-- PLAYER MANAGEMENT SECTION: HIDDEN UNTIL SIGNED IN -->
-        <div id="profiles" class="section hidden-section">
+        <div id="profiles" class="section hidden-section" style="display: none;">
             <h2>👤 Player Management & History</h2>
             <p class="tagline" style="color: var(--text-muted);">Manage profiles, view game history, and player-specific stats.</p>
             
@@ -527,15 +667,26 @@
             </nav>
 
             <div id="player-manager">
-                <div style="text-align: center; padding: 20px;">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="50" height="50" fill="var(--light-blue)" viewBox="0 0 24 24">
-                        <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
-                    </svg>
-                    <p class="text-muted" style="margin-top: 10px;">
-                        Use this section to add, edit, or delete player profiles.
-                    </p>
+                <div style="margin-bottom: 20px;">
                     <button class="action-button add-player-button">+ Add Player</button>
                     <button class="action-button cta-button" style="margin-left: 15px;">🚀 Log New Game</button>
+                </div>
+                
+                <h3>All Players</h3>
+                <div style="overflow-x: auto;">
+                    <table id="player-management-table">
+                        <thead>
+                            <tr>
+                                <th>Player Name</th>
+                                <th>Position</th>
+                                <th>Games Played</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="player-management-body">
+                            <!-- Players will be listed here -->
+                        </tbody>
+                    </table>
                 </div>
             </div>
 
@@ -572,22 +723,81 @@
         TheNextChapter &copy; 2025 | Public Stats Portal
     </footer>
 
+    <!-- Changed path to reflect uploaded file structure -->
+    <script src="./utils/api.js">
+        // API Section
+    </script>
+
     <script>
-        // --- DATA SECTION: EASILY REMOVABLE DUMMY DATA ---
+        // --- DATA SECTION: FETCHING LIVE PLAYER DATA FROM API ---
         
-        /* * TO REMOVE DUMMY DATA: 
-        * 1. Replace the entire 'playerData' array with your actual data source (e.g., an API call or a database query).
-        * 2. Remove the 'renderStatsTable()' call at the end of the script, 
-        * or modify it to process your new data structure.
-        */
-        const playerData = [
-            { player: 'Azul', gp: 12, pts: 25.4, fg_pct: 48.7, p3_pct: 38.1, ft_pct: 88.5, ast: 6.2, reb: 4.1, blk: 0.5, stl: 1.8 },
-            { player: 'Rhea Sky', gp: 10, pts: 18.9, fg_pct: 44.2, p3_pct: 32.5, ft_pct: 80.0, ast: 4.5, reb: 3.8, blk: 0.2, stl: 1.1 },
-            { player: 'Jasper Stone', gp: 15, pts: 8.5, fg_pct: 55.1, p3_pct: 25.0, ft_pct: 75.2, ast: 1.0, reb: 9.3, blk: 1.4, stl: 0.4 },
-            { player: 'Nova Light', gp: 11, pts: 15.0, fg_pct: 40.5, p3_pct: 41.3, ft_pct: 90.1, ast: 7.1, reb: 2.5, blk: 0.1, stl: 2.0 },
-            { player: 'Ethan King', gp: 14, pts: 5.2, fg_pct: 60.0, p3_pct: 0.0, ft_pct: 65.0, ast: 0.8, reb: 10.5, blk: 2.5, stl: 0.3 },
-            { player: 'Chloe Green', gp: 9, pts: 22.1, fg_pct: 46.5, p3_pct: 35.5, ft_pct: 85.0, ast: 5.5, reb: 5.5, blk: 0.7, stl: 1.5 }
-        ];
+        let playerData = [];
+        
+        /**
+         * Fetch all players from the API and calculate their stats averages
+         */
+        async function fetchPlayerData() {
+            try {
+                console.log('Fetching all players from database...');
+                // Fetch all players - try with empty search first
+                let response;
+                try {
+                    response = await apiClient.searchPlayers('');
+                } catch (e) {
+                    console.warn('Empty search failed, trying with space...');
+                    response = await apiClient.searchPlayers(' ');
+                }
+                
+                console.log('API Response:', response);
+                
+                // Handle both array and paginated response formats
+                const playersList = Array.isArray(response) ? response : (response.players || response || []);
+                
+                if (!playersList || playersList.length === 0) {
+                    console.warn('No players found in response');
+                    playerData = [];
+                    return [];
+                }
+                
+                // Transform API response to match our table format
+                playerData = playersList.map(player => {
+                    const stats = player.overall_stats || {};
+                    const gp = stats.games_played || 0;
+                    
+                    // Calculate averages per game (avoid division by zero)
+                    const pts = gp > 0 ? (stats.total_points || 0) / gp : 0;
+                    const fg_pct = stats.total_fga > 0 ? ((stats.total_fgm || 0) / stats.total_fga) * 100 : 0;
+                    const p3_pct = stats.total_3pa > 0 ? ((stats.total_3pm || 0) / stats.total_3pa) * 100 : 0;
+                    const ft_pct = stats.total_fta > 0 ? ((stats.total_ftm || 0) / stats.total_fta) * 100 : 0;
+                    const ast = gp > 0 ? (stats.total_assists || 0) / gp : 0;
+                    const reb = gp > 0 ? (stats.total_rebounds || 0) / gp : 0;
+                    const blk = gp > 0 ? (stats.total_blocks || 0) / gp : 0;
+                    const stl = gp > 0 ? (stats.total_steals || 0) / gp : 0;
+                    
+                    return {
+                        _id: player._id,
+                        player: player.name,
+                        gp: gp,
+                        pts: pts,
+                        fg_pct: fg_pct,
+                        p3_pct: p3_pct,
+                        ft_pct: ft_pct,
+                        ast: ast,
+                        reb: reb,
+                        blk: blk,
+                        stl: stl
+                    };
+                });
+                
+                console.log('Loaded and transformed player data:', playerData);
+                return playerData;
+                
+            } catch (error) {
+                console.error('Error fetching player data:', error);
+                playerData = [];
+                return [];
+            }
+        }
 
         // Define the stats structure for the detail grid
         const detailStatsMap = {
@@ -669,8 +879,18 @@
 
         // --- 1. DATA RENDERING FUNCTION ---
         function renderStatsTable() {
-            if (!statsTableBody) return;
+            if (!statsTableBody) {
+                console.error('stats-table-body element not found!');
+                return;
+            }
+            console.log('Rendering stats table with playerData:', playerData);
             statsTableBody.innerHTML = ''; // Clear existing content
+            
+            if (playerData.length === 0) {
+                console.warn('No player data to render');
+                statsTableBody.innerHTML = '<tr><td colspan="10" style="text-align: center; padding: 20px; color: var(--text-muted);">No players found. Create a player profile to get started.</td></tr>';
+                return;
+            }
             
             playerData.forEach(player => {
                 const row = document.createElement('tr');
@@ -693,6 +913,7 @@
                     displayPlayerProfile(player);
                 });
             });
+            console.log('Rendered', playerData.length, 'players to the stats table');
         }
 
 
@@ -722,35 +943,76 @@
 
 
         // --- 3. SIGN-IN SIMULATION (REVISED LOGIC for Public Stats) ---
-        const SIGNED_IN_KEY = 'tnc_signed_in';
-        
-        function updateUIState() {
-            const isSignedIn = localStorage.getItem(SIGNED_IN_KEY) === 'true';
-            
-            if (isSignedIn) {
-                hiddenNavLinks.forEach(link => link.style.display = 'inline-block');
-                signInButton.textContent = 'Sign Out';
-            } else {
-                hiddenNavLinks.forEach(link => link.style.display = 'none');
-                hiddenSections.forEach(section => section.style.display = 'none'); 
-                signInButton.textContent = 'Sign In';
+        // --- LOGIN / LOGOUT WITH API ---
+        function showLoginModal() {
+            const modal = document.getElementById('login-modal');
+            modal.style.display = 'flex'; // show modal
 
-                // Ensure Stats is the active section when logging out
-                goToStatsList();
+            const emailInput = document.getElementById('login-email');
+            const passInput = document.getElementById('login-password');
+            const submitBtn = document.getElementById('login-submit');
+            const cancelBtn = document.getElementById('login-cancel');
+
+            // Clear previous values
+            emailInput.value = '';
+            passInput.value = '';
+
+            // Handle login
+            submitBtn.onclick = async () => {
+                const email = emailInput.value.trim();
+                const password = passInput.value.trim();
+                if (!email || !password) return alert('Please enter both fields.');
+
+                try {
+                const data = await apiClient.login(email, password);
+                console.log("Logged in:", data.user);
+                modal.style.display = 'none';
+                updateUIAfterLogin();
+                } catch (err) {
+                alert("Login failed: " + err.message);
+                }
+            };
+
+            // Handle cancel
+            cancelBtn.onclick = () => {
+                modal.style.display = 'none';
+            };
+
+            // Close modal when clicking outside
+            modal.onclick = (e) => {
+                if (e.target === modal) modal.style.display = 'none';
+            };
+        }
+
+        // Step 2: Update UI after login/logout
+        function updateUIAfterLogin() {
+            const user = apiClient.getUser();
+            if (user) {
+                // Show authorized sections
+                document.querySelectorAll('.hidden-nav-link').forEach(link => link.style.display = 'inline-block');
+                // We keep .hidden-section hidden by default, JS navigation will show it
+                signInButton.textContent = `Sign Out`; // Removed email for brevity
+            } else {
+                // Hide authorized sections
+                document.querySelectorAll('.hidden-nav-link').forEach(link => link.style.display = 'none');
+                document.querySelectorAll('.hidden-section').forEach(section => section.style.display = 'none');
+                signInButton.textContent = 'Sign In';
+                goToStatsList(); // Go back to stats if logged out from an admin page
             }
         }
 
-        const handleSignInOut = () => {
-            const isSignedIn = localStorage.getItem(SIGNED_IN_KEY) === 'true';
-            if (isSignedIn) {
-                localStorage.removeItem(SIGNED_IN_KEY); // Sign out
+        // Step 3: Handle sign in/out click
+        signInButton.addEventListener('click', async () => {
+            const token = apiClient.getToken();
+            if (token) {
+                localStorage.removeItem('authToken');
+                localStorage.removeItem('user');
+                console.log('Logged out manually');
+                updateUIAfterLogin();
             } else {
-                localStorage.setItem(SIGNED_IN_KEY, 'true'); // Sign in
+                showLoginModal();
             }
-            updateUIState();
-        };
-
-        signInButton.addEventListener('click', handleSignInOut);
+        });
         
         // --- 4. PLAYER SEARCH FUNCTIONALITY ---
         if (searchInput && statsTable) {
@@ -828,14 +1090,218 @@
                 const targetElement = document.getElementById(targetId);
                 
                 if (targetElement) {
-                   targetElement.style.display = 'block';
+                   // Only show if it's the public stats page OR if it's not a hidden section (i.e., user is logged in)
+                   if (targetId === 'stats' || !targetElement.classList.contains('hidden-section')) {
+                       targetElement.style.display = 'block';
+                   } else if (apiClient.getUser()) {
+                       // Failsafe for logged-in user
+                       targetElement.style.display = 'block';
+                   }
                 }
             });
         });
+
+        // --- 7. ADD PLAYER MODAL HANDLER ---
+        function showAddPlayerModal() {
+            const modal = document.getElementById('add-player-modal');
+            modal.style.display = 'flex'; // show modal
+
+            const nameInput = document.getElementById('player-name-input');
+            const instagramInput = document.getElementById('player-instagram-input');
+            const positionInput = document.getElementById('player-position-input');
+            const heightInput = document.getElementById('player-height-input');
+            const weightInput = document.getElementById('player-weight-input');
+            const bioInput = document.getElementById('player-bio-input');
+            const submitBtn = document.getElementById('add-player-submit');
+            const cancelBtn = document.getElementById('add-player-cancel');
+
+            // Clear previous values
+            nameInput.value = '';
+            instagramInput.value = '';
+            positionInput.value = '';
+            heightInput.value = '';
+            weightInput.value = '';
+            bioInput.value = '';
+
+            // Handle player creation
+            submitBtn.onclick = async () => {
+                const name = nameInput.value.trim();
+                if (!name) return alert('Player name is required.');
+
+                try {
+                    const playerData = {
+                        name: name,
+                        instagram_handle: instagramInput.value.trim() || undefined,
+                        position: positionInput.value.trim() || 'Unknown',
+                        height_inches: heightInput.value ? parseInt(heightInput.value) : undefined,
+                        weight_lbs: weightInput.value ? parseInt(weightInput.value) : undefined,
+                        bio: bioInput.value.trim() || undefined
+                    };
+
+                    // Remove undefined fields
+                    Object.keys(playerData).forEach(key => playerData[key] === undefined && delete playerData[key]);
+
+                    const response = await apiClient.createPlayer(playerData);
+                    console.log("Player created:", response);
+                    alert(`Player "${response.name}" created successfully!`);
+                    modal.style.display = 'none';
+                    
+                    // Refresh the player stats table
+                    fetchPlayerData().then(() => {
+                        renderStatsTable();
+                    });
+                } catch (err) {
+                    alert("Failed to create player: " + err.message);
+                }
+            };
+
+            // Handle cancel
+            cancelBtn.onclick = () => {
+                modal.style.display = 'none';
+            };
+
+            // Close modal when clicking outside
+            modal.onclick = (e) => {
+                if (e.target === modal) modal.style.display = 'none';
+            };
+        }
+
+        // Attach click handler to Add Player button
+        const addPlayerButton = document.querySelector('.add-player-button');
+        if (addPlayerButton) {
+            addPlayerButton.addEventListener('click', showAddPlayerModal);
+        }
+
+        // --- 8. PLAYER MANAGEMENT TABLE ---
+        /**
+         * Fetch all players and populate the management table
+         */
+        async function loadPlayerManagementTable() {
+            try {
+                // Fetch all players - try with empty search first
+                let response;
+                try {
+                    response = await apiClient.searchPlayers('');
+                } catch (e) {
+                    console.warn('Empty search failed, trying with space...');
+                    response = await apiClient.searchPlayers(' ');
+                }
+                
+                // Handle both array and paginated response formats
+                const playersList = Array.isArray(response) ? response : (response.players || response || []);
+                
+                if (!playersList || playersList.length === 0) {
+                    console.warn('No players found');
+                    return;
+                }
+
+                const tableBody = document.getElementById('player-management-body');
+                if (!tableBody) return;
+                
+                tableBody.innerHTML = ''; // Clear existing rows
+
+                playersList.forEach(player => {
+                    const row = document.createElement('tr');
+                    const gp = player.overall_stats?.games_played || 0;
+                    const position = player.position || 'Unknown';
+                    
+                    row.innerHTML = `
+                        <td style="font-weight: bold;">${player.name}</td>
+                        <td>${position}</td>
+                        <td>${gp}</td>
+                        <td>
+                            <button class="delete-button" data-player-id="${player._id}" data-player-name="${player.name}">
+                                🗑️ Delete
+                            </button>
+                        </td>
+                    `;
+                    tableBody.appendChild(row);
+
+                    // Add delete event listener
+                    row.querySelector('.delete-button').addEventListener('click', async (e) => {
+                        const playerId = e.target.getAttribute('data-player-id');
+                        const playerName = e.target.getAttribute('data-player-name');
+                        
+                        if (confirm(`Are you sure you want to delete "${playerName}"? This action cannot be undone.`)) {
+                            try {
+                                await apiClient.deletePlayer(playerId);
+                                alert(`Player "${playerName}" has been deleted.`);
+                                loadPlayerManagementTable(); // Refresh the table
+                                
+                                // Also refresh the stats table
+                                fetchPlayerData().then(() => {
+                                    renderStatsTable();
+                                });
+                            } catch (err) {
+                                alert("Failed to delete player: " + err.message);
+                            }
+                        }
+                    });
+                });
+
+            } catch (error) {
+                console.error('Error loading player management table:', error);
+            }
+        }
+
+        // Load the player management table when the profiles section becomes visible
+        const profilesSection = document.getElementById('profiles');
+        if (profilesSection) {
+            const observer = new MutationObserver((mutations) => {
+                mutations.forEach((mutation) => {
+                    if (mutation.attributeName === 'style') {
+                        const display = window.getComputedStyle(profilesSection).display;
+                        if (display === 'block') {
+                            loadPlayerManagementTable();
+                        }
+                    }
+                });
+            });
+            
+            observer.observe(profilesSection, { attributes: true });
+        }
         
         // --- INITIALIZATION ---
-        renderStatsTable(); // Render player data on load
-        updateUIState(); // Set initial sign-in state
+        // Fetch live player data from API, then render the table
+        fetchPlayerData().then(() => {
+            renderStatsTable(); // Render player data on load
+        }).catch(error => {
+            console.error('Failed to load player data:', error);
+            // Still render table in case of error (will be empty)
+            renderStatsTable();
+        });
+        
+        updateUIAfterLogin(); // Set initial sign-in state
     </script>
+
+    <div id="login-modal" class="login-modal">
+        <div class="login-content">
+            <h2>Admin Login</h2>
+            <input type="email" id="login-email" placeholder="Email" required>
+            <input type="password" id="login-password" placeholder="Password" required>
+            <div class="login-buttons">
+            <button id="login-submit">Sign In</button>
+            <button id="login-cancel">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add Player Modal -->
+    <div id="add-player-modal" class="login-modal">
+        <div class="login-content" style="width: 400px;">
+            <h2>Add New Player</h2>
+            <input type="text" id="player-name-input" placeholder="Player Name" required>
+            <input type="text" id="player-instagram-input" placeholder="Instagram Handle (optional)">
+            <input type="text" id="player-position-input" placeholder="Position (e.g., Guard, Forward, Center)">
+            <input type="number" id="player-height-input" placeholder="Height (inches)">
+            <input type="number" id="player-weight-input" placeholder="Weight (lbs)">
+            <input type="text" id="player-bio-input" placeholder="Bio (optional)">
+            <div class="login-buttons">
+                <button id="add-player-submit">Create Player</button>
+                <button id="add-player-cancel">Cancel</button>
+            </div>
+        </div>
+    </div>
+
 </body>
 </html>
