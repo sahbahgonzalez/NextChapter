@@ -52,3 +52,44 @@ pauseGameBtn.addEventListener("click", () => {
     isPaused = false;
   }
 });
+
+async function loadGameData(gameId) {
+  try {
+    const game = await apiClient.getGameById(gameId);
+    console.log("Game data from API:", game);
+
+    // Scores
+    document.getElementById("teamAScore").textContent = game.final_score?.team_a ?? 0;
+    document.getElementById("teamBScore").textContent = game.final_score?.team_b ?? 0;
+
+    // Helper: find player details by ID
+    function getPlayerName(playerId) {
+      const player = game.all_player_ids.find(p => p._id === playerId);
+      return player ? player.name : "Unknown Player";
+    }
+
+    // Team A players
+    const teamAPlayers = document.getElementById("team_a_players");
+    teamAPlayers.innerHTML = `<h5>Team A</h5>` + game.teams.team_a
+      .map(id => `<p>${getPlayerName(id)}</p>`)
+      .join("");
+
+    // Team B players
+    const teamBPlayers = document.getElementById("team_b_players");
+    teamBPlayers.innerHTML = `<h5>Team B</h5>` + game.teams.team_b
+      .map(id => `<p>${getPlayerName(id)}</p>`)
+      .join("");
+
+    // Optional: show game type
+    document.getElementById("gameType").textContent = `${game.game_type} game`;
+  } catch (error) {
+    console.error("Failed to load game data:", error);
+  }
+}
+
+// Run once on DOM load
+document.addEventListener("DOMContentLoaded", () => {
+  const urlParams = new URLSearchParams(window.location.search);
+  const gameId = urlParams.get("gameId") || "69177809198ba3f3c08868c9"; // fallback test ID
+  loadGameData(gameId);
+});
