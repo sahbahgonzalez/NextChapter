@@ -89,7 +89,7 @@
             border-color: var(--dark-border-color) !important;
         }
         
-        /* BASE STYLES - NBA Stats Aesthetic */
+        /* BASE STYLES - Aesthetic */
         body {
             font-family: 'Inter', sans-serif;
             margin: 0;
@@ -406,6 +406,106 @@
             fill: var(--light-blue);
         }
         
+<<<<<<< Updated upstream
+=======
+        /* Delete Button */
+        .delete-button {
+            padding: 6px 12px;
+            background-color: var(--accent-red);
+            color: var(--button-text);
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.85em;
+            font-weight: 600;
+            transition: background-color 0.2s;
+        }
+
+        .delete-button:hover {
+            background-color: #c41e1e;
+        }
+
+        body.dark-mode .delete-button:hover {
+            background-color: #ff6b6b;
+        }
+        
+        /* ===== Login Modal Styling ===== */
+        .login-modal {
+        display: none; /* Hidden by default */
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.6);
+        justify-content: center;
+        align-items: center;
+        z-index: 9999;
+        }
+
+        .login-content {
+        background: var(--card-background);
+        color: var(--text-dark);
+        padding: 30px 40px;
+        border-radius: 12px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+        display: flex;
+        flex-direction: column;
+        gap: 15px;
+        width: 320px;
+        text-align: center;
+        }
+
+        body.dark-mode .login-content {
+        background: var(--dark-card-color);
+        color: var(--dark-text-color);
+        }
+
+        .login-content input {
+        padding: 10px;
+        border-radius: 6px;
+        border: 1px solid var(--border-color);
+        font-size: 1em;
+        }
+
+        body.dark-mode .login-content input {
+        background-color: var(--dark-background-color);
+        border-color: var(--dark-border-color);
+        color: var(--dark-text-color);
+        }
+
+        .login-buttons {
+        display: flex;
+        justify-content: space-between;
+        margin-top: 10px;
+        }
+
+        .login-buttons button {
+        flex: 1;
+        margin: 0 5px;
+        padding: 10px;
+        border: none;
+        border-radius: 6px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: background 0.2s;
+        }
+
+        #login-submit {
+        background: var(--primary-blue);
+        color: var(--button-text);
+        }
+
+        #login-submit:hover {
+        background: var(--light-blue);
+        }
+
+        #login-cancel {
+        background: #ccc;
+        color: #333;
+        }
+        
+>>>>>>> Stashed changes
         @media (max-width: 768px) {
             .container {
                 padding: 10px;
@@ -527,15 +627,26 @@
             </nav>
 
             <div id="player-manager">
-                <div style="text-align: center; padding: 20px;">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="50" height="50" fill="var(--light-blue)" viewBox="0 0 24 24">
-                        <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
-                    </svg>
-                    <p class="text-muted" style="margin-top: 10px;">
-                        Use this section to add, edit, or delete player profiles.
-                    </p>
+                <div style="margin-bottom: 20px;">
                     <button class="action-button add-player-button">+ Add Player</button>
                     <button class="action-button cta-button" style="margin-left: 15px;">🚀 Log New Game</button>
+                </div>
+                
+                <h3>All Players</h3>
+                <div style="overflow-x: auto;">
+                    <table id="player-management-table">
+                        <thead>
+                            <tr>
+                                <th>Player Name</th>
+                                <th>Hometown</th>
+                                <th>Games Played</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="player-management-body">
+                            <!-- Players will be listed here -->
+                        </tbody>
+                    </table>
                 </div>
             </div>
 
@@ -572,6 +683,7 @@
         TheNextChapter &copy; 2025 | Public Stats Portal
     </footer>
 
+<<<<<<< Updated upstream
     <script>
         // --- DATA SECTION: EASILY REMOVABLE DUMMY DATA ---
         
@@ -837,5 +949,57 @@
         renderStatsTable(); // Render player data on load
         updateUIState(); // Set initial sign-in state
     </script>
+=======
+    <!-- Object-Oriented Application Scripts -->
+    <script src="./utils/api.js"></script>
+    <script src="./utils/app.js"></script>
+
+    <div id="login-modal" class="login-modal">
+        <div class="login-content">
+            <h2>Admin Login</h2>
+            <input type="email" id="login-email" placeholder="Email" required>
+            <input type="password" id="login-password" placeholder="Password" required>
+            <div class="login-buttons">
+            <button id="login-submit">Sign In</button>
+            <button id="login-cancel">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add Player Modal -->
+    <div id="add-player-modal" class="login-modal">
+        <div class="login-content" style="width: 400px;">
+            <h2>Add New Player</h2>
+            <input type="text" id="player-name-input" placeholder="Player Name">
+            <input type="text" id="player-instagram-input" placeholder="Instagram Handle (optional)">
+            <input type="text" id="player-hometown-input" placeholder="Hometown (City)">
+            <input type="number" id="player-height-input" placeholder="Height (inches)">
+            <input type="number" id="player-weight-input" placeholder="Weight (lbs)">
+            <input type="text" id="player-bio-input" placeholder="Bio (optional)">
+            <div class="login-buttons">
+                <button id="add-player-submit">Create Player</button>
+                <button id="add-player-cancel">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Edit Player Modal (protected - requires sign-in) -->
+    <div id="edit-player-modal" class="login-modal" style="display:none;">
+        <div class="login-content" style="width: 400px;">
+            <h2>Edit Player</h2>
+            <input type="text" id="edit-player-name-input" placeholder="Player Name">
+            <input type="text" id="edit-player-instagram-input" placeholder="Instagram Handle (optional)">
+            <input type="text" id="edit-player-hometown-input" placeholder="Hometown (City)">
+            <input type="number" id="edit-player-height-input" placeholder="Height (inches)">
+            <input type="number" id="edit-player-weight-input" placeholder="Weight (lbs)">
+            <input type="text" id="edit-player-bio-input" placeholder="Bio (optional)">
+            <div class="login-buttons">
+                <button id="edit-player-submit">Save Changes</button>
+                <button id="edit-player-cancel">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+>>>>>>> Stashed changes
 </body>
 </html>

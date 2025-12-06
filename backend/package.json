@@ -9,6 +9,7 @@
   "scripts": {
     "start": "node app.js",
     "dev": "nodemon app.js",
+    "migrate:players": "node migrations/migrate_players.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "dependencies": {
