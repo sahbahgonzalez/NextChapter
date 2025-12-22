@@ -36,7 +36,6 @@
             background-color: var(--dark-background-color);
             color: var(--dark-text-color);
         }
-
         body.dark-mode .section,
         body.dark-mode header,
         body.dark-mode nav,
@@ -44,9 +43,43 @@
             background-color: var(--dark-card-color);
             box-shadow: 0 4px 8px rgba(0, 0, 0, 0.5);
         }
-        
         body.dark-mode .stat-card {
             border: 1px solid var(--dark-border-color);
+        }
+        /* Video Grid */
+        .video-section {
+            max-width: 1200px;
+            margin: 24px auto;
+            padding: 0 16px;
+        }
+        .video-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+            gap: 16px;
+        }
+        .video-card {
+            background: var(--card-background);
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 4px 10px rgba(16, 24, 40, 0.18), 0 2px 4px rgba(16, 24, 40, 0.12);
+        }
+        .video-thumb {
+            width: 100%;
+            aspect-ratio: 16/9;
+            background: #0b0b0b;
+            display: block;
+            object-fit: cover;
+        }
+        .video-meta {
+            padding: 10px 12px;
+        }
+        .video-meta h3 {
+            margin: 0 0 6px 0;
+            font-size: 1rem;
+        }
+        .video-meta .duration {
+            color: var(--text-muted);
+            font-size: 0.9rem;
         }
 
         body.dark-mode h2,
@@ -105,6 +138,26 @@
             margin: 0 auto;
             padding: 20px;
         }
+
+        /* TNC-style top nav shared styles */
+        #site-nav {
+            position: sticky;
+            top: 0;
+            z-index: 999;
+            background: #0B0B0B;
+            color: #fff;
+            border-bottom: 1px solid rgba(255,255,255,0.08);
+        }
+        .nav-inner { display:flex; align-items:center; justify-content:space-between; gap:16px; padding:10px 16px; max-width:1200px; margin:0 auto; }
+        .brand-left { display:flex; align-items:center; gap:10px; }
+        .brand-left .brand-text { font-weight:700; letter-spacing:0.5px; color:#fff; }
+        .nav-logo { width:40px; height:40px; display:flex; align-items:center; justify-content:center; border-radius:50%; background:#0b4a9e; }
+        .nav-logo img { width:24px; height:24px; display:block; object-fit:contain; }
+        .nav-links { display:flex; align-items:center; gap:18px; }
+        .nav-links a { color:#e6e6e6; text-decoration:none; font-weight:600; padding:6px 4px; }
+        .nav-actions { display:flex; align-items:center; gap:10px; }
+        .btn-outline-tnc { background:transparent; color:#e6e6e6; border:1px solid rgba(255,255,255,0.25); border-radius:8px; padding:8px 12px; font-weight:600; cursor:pointer; transition: all 0.2s ease; }
+        .btn-outline-tnc:hover { background:rgba(255,255,255,0.08); border-color:rgba(255,255,255,0.5); color:#fff; }
         
         /* Header & Toggle/Auth Buttons */
         header {
@@ -126,6 +179,7 @@
             gap: 10px;
         }
 
+        /* Mode toggle button */
         #mode-toggle {
             background: none;
             border: none;
@@ -406,8 +460,6 @@
             fill: var(--light-blue);
         }
         
-<<<<<<< Updated upstream
-=======
         /* Delete Button */
         .delete-button {
             padding: 6px 12px;
@@ -505,7 +557,6 @@
         color: #333;
         }
         
->>>>>>> Stashed changes
         @media (max-width: 768px) {
             .container {
                 padding: 10px;
@@ -525,24 +576,32 @@
     </style>
 </head>
 <body>
-    <header>
-        <div id="header-controls">
-            <button id="sign-in-button" class="auth-button">Sign In</button>
-            <button id="mode-toggle" aria-label="Toggle Dark Mode">
-                ☀️
-            </button>
+    <!-- TNC-style top nav replicated -->
+    <nav id="site-nav">
+        <div class="nav-inner">
+            <div class="brand-left">
+                <div class="nav-logo"><img src="tnclogo.svg" alt="The Next Chapter" /></div>
+                <span class="brand-text">The Next Chapter</span>
+            </div>
+            <div class="nav-links">
+                <a href="index.html">Home</a>
+                <a href="index.html#stats">Stats</a>
+                <a href="game.html" id="nav-log-game-link" style="font-weight: 600;">Log Game</a>
+            </div>
+            <div class="nav-actions">
+                <button class="btn-outline-tnc" id="nav-sign-in">Sign In</button>
+                <button class="btn-outline-tnc" id="nav-sign-out" style="display:none;">Sign Out</button>
+            </div>
         </div>
-        <h1>TheNextChapter</h1>
-        <p class="tagline">Basketball Shot Logger</p>
-    </header>
+    </nav>
+
+    <!-- Hidden navigation for JavaScript compatibility -->
+    <nav id="main-nav" style="display:none;">
+        <a href="#stats" class="active">Stats</a>
+    </nav>
 
     <div class="container">
         
-        <nav id="main-nav">
-            <a href="#stats" class="active">📊 Overall Stats</a>
-            <a href="#profiles" class="hidden-nav-link">👤 Player Management</a> 
-        </nav>
-
         <!-- STATS SECTION: PUBLIC TABLE VIEW -->
         <div id="stats" class="section">
             <h2>📊 Overall Player Statistics</h2>
@@ -578,6 +637,8 @@
                 </table>
             </div>
         </div>
+
+        
         
         <!-- PLAYER PROFILE DETAIL SECTION: HIDDEN, SHOWN ON NAME CLICK -->
         <div id="player-profile-detail" class="section">
@@ -629,7 +690,7 @@
             <div id="player-manager">
                 <div style="margin-bottom: 20px;">
                     <button class="action-button add-player-button">+ Add Player</button>
-                    <button class="action-button cta-button" style="margin-left: 15px;">🚀 Log New Game</button>
+                    <button id="log-new-game-btn" class="action-button cta-button" style="margin-left: 15px;">🚀 Log New Game</button>
                 </div>
                 
                 <h3>All Players</h3>
@@ -683,8 +744,8 @@
         TheNextChapter &copy; 2025 | Public Stats Portal
     </footer>
 
-<<<<<<< Updated upstream
-    <script>
+<!-- Removed inline script: using utils/app.js -->
+    <!--
         // --- DATA SECTION: EASILY REMOVABLE DUMMY DATA ---
         
         /* * TO REMOVE DUMMY DATA: 
@@ -948,8 +1009,7 @@
         // --- INITIALIZATION ---
         renderStatsTable(); // Render player data on load
         updateUIState(); // Set initial sign-in state
-    </script>
-=======
+    -->
     <!-- Object-Oriented Application Scripts -->
     <script src="./utils/api.js"></script>
     <script src="./utils/app.js"></script>
@@ -1000,6 +1060,6 @@
         </div>
     </div>
 
->>>>>>> Stashed changes
+<!-- merge marker removed: Stashed changes -->
 </body>
 </html>

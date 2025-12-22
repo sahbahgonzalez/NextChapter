@@ -4,6 +4,12 @@
  */
 
 // ==================== DATA MANAGER ====================
+/**
+ * DataManager
+ * Fetches and shapes player data for the UI.
+ * - Retrieves player lists and detailed stats from the API
+ * - Normalizes for table display and pagination
+ */
 class DataManager {
     constructor() {
         this.playerData = [];
@@ -19,6 +25,7 @@ class DataManager {
             const playersList = Array.isArray(response) ? response : (response.players || response || []);
             
             if (!playersList || playersList.length === 0) {
+                console.warn('No players returned from API');
                 this.playerData = [];
                 return [];
             }
@@ -63,7 +70,9 @@ class DataManager {
             return this.playerData;
         } catch (error) {
             console.error('Error fetching player data:', error);
+            console.error('API might be unavailable. Please ensure the backend server is running.');
             this.playerData = [];
+            this.fetchError = error.message || 'Failed to connect to server';
             return [];
         }
     }
@@ -106,57 +115,30 @@ class DataManager {
 }
 
 // ==================== THEME MANAGER ====================
-class ThemeManager {
-    constructor() {
-        this.body = document.body;
-        this.toggleButton = document.getElementById('mode-toggle');
-        this.init();
-    }
-
-    init() {
-        const prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
-        const savedMode = localStorage.getItem('theme');
-
-        if (savedMode === 'dark' || (savedMode === null && prefersDark)) {
-            this.setDarkMode();
-        } else {
-            this.setLightMode();
-        }
-
-        this.toggleButton.addEventListener('click', () => this.toggle());
-    }
-
-    toggle() {
-        if (this.body.classList.contains('dark-mode')) {
-            this.setLightMode();
-        } else {
-            this.setDarkMode();
-        }
-    }
-
-    setDarkMode() {
-        this.body.classList.add('dark-mode');
-        localStorage.setItem('theme', 'dark');
-        this.toggleButton.innerHTML = '🌙';
-    }
-
-    setLightMode() {
-        this.body.classList.remove('dark-mode');
-        localStorage.setItem('theme', 'light');
-        this.toggleButton.innerHTML = '☀️';
-    }
-}
+// ThemeManager removed; single theme for TNC-like aesthetics.
 
 // ==================== AUTH MANAGER ====================
+/**
+ * AuthManager
+ * Handles sign-in/out UI state and login modal interactions.
+ * Notifies listeners on auth changes and toggles header buttons.
+ */
 class AuthManager {
     constructor(onAuthChange) {
-        this.signInButton = document.getElementById('sign-in-button');
+        this.signInButton = document.getElementById('nav-sign-in');
+        this.signOutButton = document.getElementById('nav-sign-out');
+        this.logGameLink = document.getElementById('nav-log-game-link');
         this.onAuthChange = onAuthChange;
         this.init();
     }
 
     init() {
-        this.signInButton.addEventListener('click', () => this.handleAuthClick());
+        if (this.signInButton) {
+            this.signInButton.addEventListener('click', () => this.handleAuthClick());
+        }
+        if (this.signOutButton) {
+            this.signOutButton.addEventListener('click', () => this.logout());
+        }
         this.updateUI();
     }
 
@@ -172,7 +154,7 @@ class AuthManager {
     logout() {
         localStorage.removeItem('authToken');
         localStorage.removeItem('user');
-        console.log('Logged out manually');
+        console.log('Logged out');
         this.updateUI();
         if (this.onAuthChange) {
             this.onAuthChange();
@@ -223,20 +205,18 @@ class AuthManager {
 
     updateUI() {
         const user = apiClient.getUser();
-        
+
         if (user) {
-            document.querySelectorAll('.hidden-nav-link').forEach(link => {
-                link.style.display = 'inline-block';
-            });
-            this.signInButton.textContent = 'Sign Out';
+            if (this.signInButton) this.signInButton.style.display = 'none';
+            if (this.signOutButton) this.signOutButton.style.display = 'inline-block';
         } else {
-            document.querySelectorAll('.hidden-nav-link').forEach(link => {
-                link.style.display = 'none';
-            });
-            document.querySelectorAll('.hidden-section').forEach(section => {
-                section.style.display = 'none';
-            });
-            this.signInButton.textContent = 'Sign In';
+            if (this.signInButton) this.signInButton.style.display = 'inline-block';
+            if (this.signOutButton) this.signOutButton.style.display = 'none';
+        }
+
+        // Always show Log Game link in header regardless of role/auth state
+        if (this.logGameLink) {
+            this.logGameLink.style.display = 'inline-block';
         }
     }
 
@@ -246,6 +226,11 @@ class AuthManager {
 }
 
 // ==================== NAVIGATION MANAGER ====================
+/**
+ * NavigationManager
+ * Controls top-level section visibility and profile sub-navigation.
+ * Keeps links active states in sync with displayed sections.
+ */
 class NavigationManager {
     constructor() {
         this.mainNav = document.getElementById('main-nav');
@@ -332,6 +317,11 @@ class NavigationManager {
 }
 
 // ==================== STATS TABLE RENDERER ====================
+/**
+ * StatsTableRenderer
+ * Renders the public statistics table and player detail view.
+ * Provides client-side search/filter and lightweight pagination.
+ */
 class StatsTableRenderer {
     constructor(dataManager, navigationManager) {
         this.dataManager = dataManager;
@@ -390,10 +380,14 @@ class StatsTableRenderer {
         const { items, totalPages, totalCount } = this.dataManager.getPaginatedData();
 
         if (items.length === 0) {
+            const errorMsg = this.dataManager.fetchError 
+                ? `Unable to load players: ${this.dataManager.fetchError}<br><small>Make sure the backend server is running.</small>`
+                : 'No players found. Create a player profile to get started.';
+            
             this.statsTableBody.innerHTML = `
                 <tr>
                     <td colspan="10" style="text-align: center; padding: 20px; color: var(--text-muted);">
-                        No players found. Create a player profile to get started.
+                        ${errorMsg}
                     </td>
                 </tr>`;
             this.renderPaginationControls(totalPages, totalCount);
@@ -560,6 +554,11 @@ class StatsTableRenderer {
 }
 
 // ==================== PLAYER MANAGER ====================
+/**
+ * PlayerManager
+ * Admin tools for creating, editing, and deleting players.
+ * Integrates with DataManager and StatsTableRenderer to refresh UI.
+ */
 class PlayerManager {
     constructor(dataManager, statsTableRenderer) {
         this.dataManager = dataManager;
@@ -772,10 +771,14 @@ class PlayerManager {
 }
 
 // ==================== APPLICATION CONTROLLER ====================
+/**
+ * BasketballApp
+ * Composes managers and initializes the application lifecycle.
+ * Entry point: instantiates managers and triggers initial data load.
+ */
 class BasketballApp {
     constructor() {
         this.dataManager = new DataManager();
-        this.themeManager = new ThemeManager();
         this.navigationManager = new NavigationManager();
         this.statsTableRenderer = new StatsTableRenderer(this.dataManager, this.navigationManager);
         this.authManager = new AuthManager(() => this.handleAuthChange());
@@ -787,6 +790,15 @@ class BasketballApp {
     async init() {
         // Setup global goToStatsList function for back button
         window.goToStatsList = () => this.navigationManager.goToStatsList();
+
+        // Navigate to game.html when clicking "Log New Game"
+        const logNewGameBtn = document.getElementById('log-new-game-btn');
+        if (logNewGameBtn) {
+            logNewGameBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                window.location.href = 'game.html';
+            });
+        }
 
         // Load initial data
         await this.dataManager.fetchPlayerData();
