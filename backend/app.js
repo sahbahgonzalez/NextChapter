@@ -28,22 +28,21 @@ app.use('/game', gameRouter);
 app.use('/player', playerRouter);
 app.use('/user', userRouter);
 
-// Serve static files from the frontend directory (exclude API routes)
-app.use(express.static(path.join(__dirname, '..', 'frontend'), {
-    // Don't use this static middleware for API routes
-}));
+// Serve static files from the frontend directory
+app.use(express.static(path.join(__dirname, '..', 'frontend')));
 
 // Serve index.html for root path
 app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, '..', 'frontend', 'index.html'));
 });
 
-// Serve index.html for all other non-API routes (SPA fallback)
-app.use((req, res) => {
-    // Check if it's not an API error route
-    if (!req.path.startsWith('/api')) {
-        res.sendFile(path.join(__dirname, '..', 'frontend', 'index.html'));
+// Fallback: serve index.html for SPA routes (only for non-API paths)
+app.use((req, res, next) => {
+    // If request doesn't match static files and is not an API, serve index.html
+    if (!req.path.match(/\.(js|css|png|jpg|jpeg|gif|svg|ico|json)$/)) {
+        return res.sendFile(path.join(__dirname, '..', 'frontend', 'index.html'));
     }
+    next();
 });
 
 // Begin Listening

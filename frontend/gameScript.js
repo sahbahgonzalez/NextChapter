@@ -28,7 +28,10 @@ let pendingFTTeam = null;
  * @param {string} msg
  */
 function showStartError(msg = "") {
-  if (startErrorEl) startErrorEl.textContent = msg;
+  if (startErrorEl) {
+    startErrorEl.textContent = msg;
+    startErrorEl.style.display = msg ? 'block' : 'none';
+  }
 }
 
 /**
@@ -44,6 +47,7 @@ const gameContext = {
 let currentAssignTeam = null;
 let searchDebounce = null;
 // lastClickPos now tracked on GameController instance
+let lastCursorPos = null; // Track cursor position over court for hotkeys
 
 /**
  * Format seconds to MM:SS
@@ -717,6 +721,32 @@ document.addEventListener("DOMContentLoaded", () => {
     if (inRectBand || inTopCircle) return '2pt';
     return '3pt';
   }
+  
+  // Helper to infer shot type from cursor position (percentages)
+  function inferShotTypeFromPos(pos) {
+    if (!pos) return '2pt';
+    const img = document.getElementById('court_image');
+    if (!img) return '2pt';
+    const rect = img.getBoundingClientRect();
+    
+    // Convert percentage back to pixel coordinates
+    const clientX = rect.left + (pos.xPct / 100) * rect.width;
+    const clientY = rect.top + (pos.yPct / 100) * rect.height;
+    
+    const halfBandPx = 143;
+    const centerX = rect.left + rect.width * 0.5;
+    const dxPx = Math.abs(clientX - centerX);
+    const twoPtDepthPx = rect.height * 0.50 - 60;
+    const inRectBand = (clientY - rect.top) <= twoPtDepthPx && dxPx <= halfBandPx;
+    const radiusPx = halfBandPx;
+    const circleTopPx = rect.top + rect.height * 0.25 - 107;
+    const circleCenterYPx = circleTopPx + radiusPx;
+    const dyPx = clientY - circleCenterYPx;
+    const distSq = dxPx * dxPx + dyPx * dyPx;
+    const inTopCircle = distSq <= radiusPx * radiusPx;
+    if (inRectBand || inTopCircle) return '2pt';
+    return '3pt';
+  }
 
   function undoLast() {
     if (!isGameRunning) {
@@ -773,6 +803,54 @@ document.addEventListener("DOMContentLoaded", () => {
     if (e.target === ftModal.overlay) closeFtModal();
   });
 
+  // Timeout modal setup
+  const timeoutModal = {
+    overlay: document.getElementById('timeoutModal'),
+    playerABtn: document.getElementById('timeoutPlayerABtn'),
+    playerBBtn: document.getElementById('timeoutPlayerBBtn'),
+    closeBtn: document.getElementById('timeoutCloseBtn'),
+  };
+
+  const timeoutBtn = document.getElementById('timeoutBtn');
+
+  function closeTimeoutModal() {
+    if (timeoutModal.overlay) timeoutModal.overlay.style.display = 'none';
+  }
+
+  function openTimeoutModal() {
+    if (timeoutModal.overlay) timeoutModal.overlay.style.display = 'flex';
+  }
+
+  if (timeoutBtn) {
+    timeoutBtn.addEventListener('click', () => {
+      if (!isGameRunning) return showStartError('Assign both players and press Start Game.');
+      openTimeoutModal();
+    });
+  }
+
+  if (timeoutModal.playerABtn) {
+    timeoutModal.playerABtn.addEventListener('click', () => {
+      console.log('Timeout called by Team A');
+      state.history.push({ type: 'timeout', team: 'A', timestamp: new Date() });
+      closeTimeoutModal();
+      updateUI();
+    });
+  }
+
+  if (timeoutModal.playerBBtn) {
+    timeoutModal.playerBBtn.addEventListener('click', () => {
+      console.log('Timeout called by Team B');
+      state.history.push({ type: 'timeout', team: 'B', timestamp: new Date() });
+      closeTimeoutModal();
+      updateUI();
+    });
+  }
+
+  if (timeoutModal.closeBtn) timeoutModal.closeBtn.addEventListener('click', closeTimeoutModal);
+  if (timeoutModal.overlay) timeoutModal.overlay.addEventListener('click', (e) => {
+    if (e.target === timeoutModal.overlay) closeTimeoutModal();
+  });
+
   // Player modal wiring
   ['A', 'B'].forEach(key => {
     const set = selectorEls[key];
@@ -818,13 +896,39 @@ document.addEventListener("DOMContentLoaded", () => {
       if (!isGameRunning) { showStartError('Assign both players and press Start Game.'); return; }
       const shot = btn.getAttribute('data-shot');
       const result = btn.getAttribute('data-result');
-      controller.applyShot(controller.getActiveTeam(), shot, result);
+      
+      // For "auto" shot buttons, require cursor to be over court
+      if (shot === 'auto') {
+        if (!lastCursorPos) {
+          alert('Hover cursor over court to record shot location');
+          return;
+        }
+        const shotType = inferShotTypeFromPos(lastCursorPos);
+        const markerEl = addShotMarker(controller.getActiveTeam(), shotType, result, lastCursorPos);
+        controller.applyShot(controller.getActiveTeam(), shotType, result, markerEl);
+      } else {
+        controller.applyShot(controller.getActiveTeam(), shot, result);
+      }
     });
   });
 
   const courtImg = document.getElementById('court_image');
   if (courtImg) {
     courtImg.addEventListener('click', (evt) => controller.handleCourtClick(evt));
+    
+    // Track mouse position over court for hotkey shot recording
+    courtImg.addEventListener('mousemove', (evt) => {
+      const rect = courtImg.getBoundingClientRect();
+      lastCursorPos = {
+        xPct: ((evt.clientX - rect.left) / rect.width) * 100,
+        yPct: ((evt.clientY - rect.top) / rect.height) * 100
+      };
+    });
+    
+    // Clear position when mouse leaves court
+    courtImg.addEventListener('mouseleave', () => {
+      lastCursorPos = null;
+    });
   }
 
   // Shot modal wiring
@@ -858,25 +962,36 @@ document.addEventListener("DOMContentLoaded", () => {
   const newGameBtn = document.getElementById('newGameBtn');
 
   if (postGameClose) {
-    postGameClose.addEventListener('click', () => {
+    postGameClose.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      console.log('Close button clicked');
       if (postGameModal) postGameModal.style.display = 'none';
     });
   }
 
   if (postGameModal) {
     postGameModal.addEventListener('click', (e) => {
-      if (e.target === postGameModal) postGameModal.style.display = 'none';
+      if (e.target === postGameModal) {
+        console.log('Overlay clicked');
+        postGameModal.style.display = 'none';
+      }
     });
   }
 
   if (downloadPdfBtn) {
-    downloadPdfBtn.addEventListener('click', () => {
+    downloadPdfBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
       controller.generateGamePDF();
     });
   }
 
   if (newGameBtn) {
-    newGameBtn.addEventListener('click', () => {
+    newGameBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      console.log('New Game button clicked');
       // Close modal and reset for new game
       if (postGameModal) postGameModal.style.display = 'none';
       resetGameUI();
@@ -1183,6 +1298,7 @@ document.addEventListener("DOMContentLoaded", () => {
     if (els.b.ftBtn) els.b.ftBtn.disabled = !enabled;
     if (els.undo) els.undo.disabled = !enabled;
     if (pauseGameBtn) pauseGameBtn.disabled = !enabled;
+    if (timeoutBtn) timeoutBtn.disabled = !enabled;
   }
 
   /**
@@ -1358,6 +1474,201 @@ document.addEventListener("DOMContentLoaded", () => {
   controller.init();
   controller.state = state;
   controller.gameContext = gameContext;
+
+  // Keyboard shortcuts handler
+  document.addEventListener('keydown', (e) => {
+    // Don't trigger if user is typing in an input field or if a modal is open
+    if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+    
+    const assignModal = document.getElementById('assignPlayerModal');
+    const timeoutModal = document.getElementById('timeoutModal');
+    const postGameModal = document.getElementById('postGameModal');
+    const isModalOpen = (assignModal && assignModal.style.display === 'flex') ||
+                        (timeoutModal && timeoutModal.style.display === 'flex') ||
+                        (postGameModal && postGameModal.style.display === 'flex');
+    
+    if (isModalOpen) return;
+
+    const key = e.key.toLowerCase();
+    const isShift = e.shiftKey;
+    
+    // Tab - Switch active team
+    if (key === 'tab') {
+      e.preventDefault();
+      if (!isGameRunning) return;
+      const currentActive = state.active;
+      const newActive = currentActive === 'A' ? 'B' : 'A';
+      setActive(newActive);
+      return;
+    }
+    
+    // Only allow other hotkeys when game is running
+    if (!isGameRunning) return;
+    
+    // T - Timeout
+    if (key === 't') {
+      e.preventDefault();
+      if (timeoutBtn && !timeoutBtn.disabled) {
+        timeoutBtn.click();
+      }
+      return;
+    }
+    
+    // U - Undo
+    if (key === 'u') {
+      e.preventDefault();
+      if (els.undo && !els.undo.disabled) {
+        undoLast();
+      }
+      return;
+    }
+    
+    // A - Foul on Team A
+    if (key === 'a') {
+      e.preventDefault();
+      const foulBtn = document.getElementById('teamAFoulPlus');
+      if (foulBtn && !foulBtn.disabled) {
+        foulBtn.click();
+      }
+      return;
+    }
+    
+    // B - Foul on Team B
+    if (key === 'b') {
+      e.preventDefault();
+      const foulBtn = document.getElementById('teamBFoulPlus');
+      if (foulBtn && !foulBtn.disabled) {
+        foulBtn.click();
+      }
+      return;
+    }
+    
+    // M - Shot Made (auto-detect 2PT/3PT from cursor position)
+    if (key === 'm') {
+      e.preventDefault();
+      const result = 'made';
+      
+      // Must have cursor over court to record shot
+      if (lastCursorPos) {
+        const shotType = inferShotTypeFromPos(lastCursorPos);
+        const markerEl = addShotMarker(controller.getActiveTeam(), shotType, result, lastCursorPos);
+        controller.applyShot(controller.getActiveTeam(), shotType, result, markerEl);
+      } else {
+        alert('Hover cursor over court to record shot location');
+      }
+      return;
+    }
+    
+    // X - Shot Missed (auto-detect 2PT/3PT from cursor position)
+    if (key === 'x') {
+      e.preventDefault();
+      const result = 'missed';
+      
+      // Must have cursor over court to record shot
+      if (lastCursorPos) {
+        const shotType = inferShotTypeFromPos(lastCursorPos);
+        const markerEl = addShotMarker(controller.getActiveTeam(), shotType, result, lastCursorPos);
+        controller.applyShot(controller.getActiveTeam(), shotType, result, markerEl);
+      } else {
+        alert('Hover cursor over court to record shot location');
+      }
+      return;
+    }
+    
+    // 3 - 3PT Made, Shift+3 - 3PT Missed
+    if (key === '3' || key === '#') {
+      e.preventDefault();
+      const shotType = '3pt';
+      const result = isShift ? 'missed' : 'made';
+      
+      // If cursor is over court, record with coordinates
+      if (lastCursorPos) {
+        const markerEl = addShotMarker(controller.getActiveTeam(), shotType, result, lastCursorPos);
+        controller.applyShot(controller.getActiveTeam(), shotType, result, markerEl);
+      } else {
+        // Otherwise use button click (no coordinates)
+        const btn = document.querySelector(`button[data-shot="${shotType}"][data-result="${result}"]`);
+        if (btn && !btn.disabled) {
+          btn.click();
+        }
+      }
+      return;
+    }
+    
+    // 2 - 2PT Made, Shift+2 - 2PT Missed
+    if (key === '2' || key === '@') {
+      e.preventDefault();
+      const shotType = '2pt';
+      const result = isShift ? 'missed' : 'made';
+      
+      // If cursor is over court, record with coordinates
+      if (lastCursorPos) {
+        const markerEl = addShotMarker(controller.getActiveTeam(), shotType, result, lastCursorPos);
+        controller.applyShot(controller.getActiveTeam(), shotType, result, markerEl);
+      } else {
+        // Otherwise use button click (no coordinates)
+        const btn = document.querySelector(`button[data-shot="${shotType}"][data-result="${result}"]`);
+        if (btn && !btn.disabled) {
+          btn.click();
+        }
+      }
+      return;
+    }
+    
+    // F - FT Made, Shift+F - FT Missed
+    if (key === 'f') {
+      e.preventDefault();
+      const shotType = 'ft';
+      const result = isShift ? 'missed' : 'made';
+      
+      // If cursor is over court, record with coordinates
+      if (lastCursorPos) {
+        const markerEl = addShotMarker(controller.getActiveTeam(), shotType, result, lastCursorPos);
+        controller.applyShot(controller.getActiveTeam(), shotType, result, markerEl);
+      } else {
+        // Otherwise use button click (no coordinates)
+        const btn = document.querySelector(`button[data-shot="${shotType}"][data-result="${result}"]`);
+        if (btn && !btn.disabled) {
+          btn.click();
+        }
+      }
+      return;
+    }
+  });
+  
+  // Hotkey toggle functionality
+  const hotkeyToggleBtn = document.getElementById('hotkeyToggleBtn');
+  const hotkeyHints = document.querySelectorAll('.hotkey-hint');
+  
+  // Load hotkey visibility preference from localStorage
+  const hotkeyVisible = localStorage.getItem('hotkeyHintsVisible') !== 'false';
+  
+  function updateHotkeyVisibility(visible) {
+    hotkeyHints.forEach(hint => {
+      if (visible) {
+        hint.classList.remove('hidden');
+      } else {
+        hint.classList.add('hidden');
+      }
+    });
+    
+    if (hotkeyToggleBtn) {
+      hotkeyToggleBtn.textContent = visible ? '🎹 Hide Hotkeys' : '🎹 Show Hotkeys';
+    }
+    
+    localStorage.setItem('hotkeyHintsVisible', visible);
+  }
+  
+  // Initialize hotkey visibility
+  updateHotkeyVisibility(hotkeyVisible);
+  
+  // Toggle hotkey visibility on button click
+  if (hotkeyToggleBtn) {
+    hotkeyToggleBtn.addEventListener('click', () => {
+      const currentlyVisible = localStorage.getItem('hotkeyHintsVisible') !== 'false';
+      updateHotkeyVisibility(!currentlyVisible);
+    });
+  }
 
   // Initial UI sync
   updateUI();

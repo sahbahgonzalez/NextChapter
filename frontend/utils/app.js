@@ -36,6 +36,8 @@ class DataManager {
             this.playerData = playersList.map(player => {
                 const stats = player.overall_stats || {};
                 const gp = stats.games_played || 0;
+                const wins = stats.wins || 0;
+                const losses = stats.losses || 0;
                 const displayName = player.instagram_handle || player.name || player.hometown || '—';
                 const searchKey = `${player.instagram_handle || ''} ${player.name || ''} ${player.hometown || ''}`.trim();
                 
@@ -44,10 +46,14 @@ class DataManager {
                     player: displayName,
                     searchKey: searchKey,
                     gp: gp,
+                    wins: wins,
+                    losses: losses,
+                    win_pct: gp > 0 ? (wins / gp) * 100 : 0,
                     pts: gp > 0 ? ((stats.total_points || 0) / gp) : 0,
                     fg_pct: (stats.total_fga || 0) > 0 ? (((stats.total_fgm || 0) / stats.total_fga) * 100) : 0,
                     p3_pct: (stats.total_3pa || 0) > 0 ? (((stats.total_3pm || 0) / stats.total_3pa) * 100) : 0,
                     ft_pct: (stats.total_fta || 0) > 0 ? (((stats.total_ftm || 0) / stats.total_fta) * 100) : 0,
+                    fouls: gp > 0 ? ((stats.total_fouls || 0) / gp) : 0,
                     ast: gp > 0 ? ((stats.total_assists || 0) / gp) : 0,
                     reb: gp > 0 ? ((stats.total_rebounds || 0) / gp) : 0,
                     blk: gp > 0 ? ((stats.total_blocks || 0) / gp) : 0,
@@ -337,6 +343,86 @@ class StatsTableRenderer {
         }
     }
 
+    renderLeaders() {
+        const allPlayers = this.dataManager.getPlayerData();
+        
+        // Filter players with at least 1 game played
+        const activePlayers = allPlayers.filter(p => p.gp > 0);
+        
+        if (activePlayers.length === 0) {
+            ['winpct', 'fg', 'ft', 'fouls'].forEach(cat => {
+                const container = document.getElementById(`leaders-${cat}`);
+                if (container) container.innerHTML = '<div style="color: var(--text-muted); padding: 8px;">No data yet</div>';
+            });
+            return;
+        }
+        
+        // Win percentage leaders (minimum 1 game)
+        const winPctLeaders = [...activePlayers]
+            .sort((a, b) => b.win_pct - a.win_pct)
+            .slice(0, 3);
+        this.renderLeaderCategory('winpct', winPctLeaders, 'win_pct', '%', 'wins', 'losses');
+        
+        // FG% leaders (minimum FG% > 0)
+        const fgLeaders = [...activePlayers]
+            .filter(p => p.fg_pct > 0)
+            .sort((a, b) => b.fg_pct - a.fg_pct)
+            .slice(0, 3);
+        this.renderLeaderCategory('fg', fgLeaders, 'fg_pct', '%');
+        
+        // FT% leaders (minimum FT% > 0)
+        const ftLeaders = [...activePlayers]
+            .filter(p => p.ft_pct > 0)
+            .sort((a, b) => b.ft_pct - a.ft_pct)
+            .slice(0, 3);
+        this.renderLeaderCategory('ft', ftLeaders, 'ft_pct', '%');
+        
+        // Fewest fouls per game leaders
+        const foulsLeaders = [...activePlayers]
+            .sort((a, b) => a.fouls - b.fouls)
+            .slice(0, 3);
+        this.renderLeaderCategory('fouls', foulsLeaders, 'fouls', 'FPG');
+    }
+    
+    renderLeaderCategory(categoryId, leaders, statKey, suffix, winsKey, lossesKey) {
+        const container = document.getElementById(`leaders-${categoryId}`);
+        if (!container) return;
+        
+        if (leaders.length === 0) {
+            container.innerHTML = '<div style="color: var(--text-muted); padding: 8px;">Not enough data</div>';
+            return;
+        }
+        
+        container.innerHTML = leaders.map((player, index) => {
+            const value = player[statKey];
+            let displayValue;
+            
+            if (suffix === '%') {
+                displayValue = value.toFixed(1) + '%';
+            } else if (suffix === 'FPG') {
+                displayValue = value.toFixed(1);
+            } else {
+                displayValue = Math.floor(value);
+            }
+            
+            // For win percentage, show W-L record below percentage
+            let recordLine = '';
+            if (winsKey && lossesKey) {
+                const wins = player[winsKey] || 0;
+                const losses = player[lossesKey] || 0;
+                recordLine = `<div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 2px;">${wins}-${losses}</div>`;
+            }
+            
+            return `
+                <div class="leader-item" onclick="window.showPlayerProfile('${player._id}')">
+                    <span class="rank">${index + 1}.</span>
+                    <span class="player-name">${player.player}${recordLine}</span>
+                    <span class="stat-value">${displayValue}</span>
+                </div>
+            `;
+        }).join('');
+    }
+
     filterTable() {
         const rawFilter = this.searchInput.value || '';
         const filter = rawFilter.toUpperCase();
@@ -375,7 +461,7 @@ class StatsTableRenderer {
             
             this.statsTableBody.innerHTML = `
                 <tr>
-                    <td colspan="10" style="text-align: center; padding: 20px; color: var(--text-muted);">
+                    <td colspan="9" style="text-align: center; padding: 20px; color: var(--text-muted);">
                         ${errorMsg}
                     </td>
                 </tr>`;
@@ -385,15 +471,15 @@ class StatsTableRenderer {
 
         items.forEach(player => {
             const row = document.createElement('tr');
+            const wlRecord = `${player.wins || 0}-${player.losses || 0}`;
             row.innerHTML = `
                 <td class="player-name-link" style="font-weight: bold;">${player.player}</td>
+                <td style="font-weight: 600;">${wlRecord}</td>
                 <td>${player.gp}</td>
                 <td>${player.pts.toFixed(1)}</td>
                 <td>${player.fg_pct.toFixed(1)}%</td>
                 <td>${player.p3_pct.toFixed(1)}%</td>
                 <td>${player.ft_pct.toFixed(1)}%</td>
-                <td>${player.ast.toFixed(1)}</td>
-                <td>${player.reb.toFixed(1)}</td>
                 <td>${player.blk.toFixed(1)}</td>
                 <td>${player.stl.toFixed(1)}</td>
             `;
@@ -791,6 +877,7 @@ class BasketballApp {
 
         // Load initial data
         await this.dataManager.fetchPlayerData();
+        this.statsTableRenderer.renderLeaders();
         this.statsTableRenderer.render();
     }
 
