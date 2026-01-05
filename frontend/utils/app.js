@@ -30,22 +30,10 @@ class DataManager {
                 return [];
             }
 
-            // Fetch full player data individually since search endpoint doesn't include overall_stats
-            console.log('Fetching detailed stats for each player...');
-            const detailedPlayers = await Promise.all(
-                playersList.map(async (player) => {
-                    try {
-                        // Fetch full player data including overall_stats
-                        const fullPlayer = await apiClient.getPlayerById(player._id);
-                        return fullPlayer;
-                    } catch (err) {
-                        console.warn(`Failed to fetch details for player ${player._id}:`, err);
-                        return player; // Fall back to basic data
-                    }
-                })
-            );
+            // The searchPlayers endpoint already includes overall_stats, no need for extra API calls
+            console.log(`Processing ${playersList.length} players...`);
 
-            this.playerData = detailedPlayers.map(player => {
+            this.playerData = playersList.map(player => {
                 const stats = player.overall_stats || {};
                 const gp = stats.games_played || 0;
                 const displayName = player.instagram_handle || player.name || player.hometown || '—';
@@ -56,17 +44,18 @@ class DataManager {
                     player: displayName,
                     searchKey: searchKey,
                     gp: gp,
-                    pts: gp > 0 ? (stats.total_points || 0) / gp : 0,
-                    fg_pct: stats.total_fga > 0 ? ((stats.total_fgm || 0) / stats.total_fga) * 100 : 0,
-                    p3_pct: stats.total_3pa > 0 ? ((stats.total_3pm || 0) / stats.total_3pa) * 100 : 0,
-                    ft_pct: stats.total_fta > 0 ? ((stats.total_ftm || 0) / stats.total_fta) * 100 : 0,
-                    ast: gp > 0 ? (stats.total_assists || 0) / gp : 0,
-                    reb: gp > 0 ? (stats.total_rebounds || 0) / gp : 0,
-                    blk: gp > 0 ? (stats.total_blocks || 0) / gp : 0,
-                    stl: gp > 0 ? (stats.total_steals || 0) / gp : 0
+                    pts: gp > 0 ? ((stats.total_points || 0) / gp) : 0,
+                    fg_pct: (stats.total_fga || 0) > 0 ? (((stats.total_fgm || 0) / stats.total_fga) * 100) : 0,
+                    p3_pct: (stats.total_3pa || 0) > 0 ? (((stats.total_3pm || 0) / stats.total_3pa) * 100) : 0,
+                    ft_pct: (stats.total_fta || 0) > 0 ? (((stats.total_ftm || 0) / stats.total_fta) * 100) : 0,
+                    ast: gp > 0 ? ((stats.total_assists || 0) / gp) : 0,
+                    reb: gp > 0 ? ((stats.total_rebounds || 0) / gp) : 0,
+                    blk: gp > 0 ? ((stats.total_blocks || 0) / gp) : 0,
+                    stl: gp > 0 ? ((stats.total_steals || 0) / gp) : 0
                 };
             }).sort((a, b) => (a.player || '').localeCompare(b.player || '', undefined, { sensitivity: 'base' }));
 
+            console.log(`Successfully loaded ${this.playerData.length} players`);
             return this.playerData;
         } catch (error) {
             console.error('Error fetching player data:', error);

@@ -3,6 +3,7 @@ require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const mongoose = require('mongoose');
+const path = require('path');
 
 // Require Routes/API Endpoints
 const gameRouter = require('./routes/game');
@@ -11,7 +12,7 @@ const userRouter = require('./routes/user');
 
 // App Initialization
 const app = express();
-const port = process.env.PORT;
+const port = process.env.PORT || 3000;
 
 // DB Connection
 mongoose.connect(process.env.MONGODB_URI)
@@ -22,14 +23,23 @@ mongoose.connect(process.env.MONGODB_URI)
 app.use(cors());
 app.use(express.json());
 
-// Connecting Route Logic
+// API Routes (these must come BEFORE static file serving)
 app.use('/game', gameRouter);
 app.use('/player', playerRouter);
 app.use('/user', userRouter);
 
+// Serve index.html for root path
+app.get('/', (req, res) => {
+    res.sendFile(path.join(__dirname, '..', 'frontend', 'index.html'));
+});
+
+// Serve static files from the frontend directory
+app.use(express.static(path.join(__dirname, '..', 'frontend')));
+
 // Begin Listening
 app.listen(port, () => {
-    console.log(`Connected to port ${port}`)
+    console.log(`Server running on port ${port}`);
+    console.log(`Visit http://localhost:${port} to view the website`);
 });
 
 // Export App
