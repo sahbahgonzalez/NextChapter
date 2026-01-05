@@ -28,13 +28,13 @@ app.use('/game', gameRouter);
 app.use('/player', playerRouter);
 app.use('/user', userRouter);
 
-// Serve index.html for root path
-app.get('/', (req, res) => {
-    res.sendFile(path.join(__dirname, '..', 'frontend', 'index.html'));
-});
-
 // Serve static files from the frontend directory
 app.use(express.static(path.join(__dirname, '..', 'frontend')));
+
+// Serve index.html for all other routes (SPA fallback)
+app.use((req, res) => {
+    res.sendFile(path.join(__dirname, '..', 'frontend', 'index.html'));
+});
 
 // Begin Listening
 app.listen(port, () => {
