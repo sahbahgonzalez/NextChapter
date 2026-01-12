@@ -38,7 +38,6 @@
         }
         body.dark-mode .section,
         body.dark-mode header,
-        body.dark-mode nav,
         body.dark-mode .stat-card {
             background-color: var(--dark-card-color);
             box-shadow: 0 4px 8px rgba(0, 0, 0, 0.5);
@@ -191,6 +190,10 @@
             color: var(--dark-text-color) !important;
             border-color: var(--dark-border-color) !important;
         }
+
+        body.dark-mode #header-logo {
+            filter: brightness(0) invert(1);
+        }
         
         /* BASE STYLES - Aesthetic */
         body {
@@ -229,25 +232,37 @@
         .btn-outline-tnc { background:transparent; color:#e6e6e6; border:1px solid rgba(255,255,255,0.25); border-radius:8px; padding:8px 12px; font-weight:600; cursor:pointer; transition: all 0.2s ease; }
         .btn-outline-tnc:hover { background:rgba(255,255,255,0.08); border-color:rgba(255,255,255,0.5); color:#fff; }
         
-        /* Header & Toggle/Auth Buttons */
+        /* === MODIFIED HEADER === */
         header {
-            text-align: center;
-            padding: 40px 0 20px 0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 25px; /* Reduced padding */
             margin-bottom: 0; 
             background-color: var(--card-background);
-            border-radius: 0; 
             box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
-            position: relative;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 20px; /* Space between logo and nav */
+        }
+        
+        #header-logo {
+            height: 40px; /* Adjust logo height as needed */
+            width: auto;
+            object-fit: contain;
         }
 
         #header-controls {
-            position: absolute;
-            top: 15px;
-            right: 25px;
+            /* Removed absolute positioning */
             display: flex;
             align-items: center;
             gap: 10px;
         }
+        /* === END MODIFIED HEADER === */
 
         /* Mode toggle button */
         #mode-toggle {
@@ -274,42 +289,24 @@
             transform: translateY(-1px);
         }
 
-        h1 {
-            color: var(--primary-blue); 
-            font-size: 3.5em; 
-            margin-bottom: 0;
-            font-weight: 900;
-            letter-spacing: 2px;
-        }
-
-        .tagline {
-            color: var(--text-muted);
-            font-size: 1em;
-            font-weight: 500;
-            margin-top: 5px;
-        }
-
-        /* Navigation Bar */
+        /* Removed h1 and tagline styles as they are no longer in the header */
+        
+        /* === MODIFIED NAVIGATION === */
         nav {
             display: flex;
-            justify-content: center;
-            margin-bottom: 20px;
-            background-color: var(--card-background);
-            border-radius: 0;
-            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.05);
-            padding: 10px 0;
-            border-bottom: 1px solid var(--border-color);
+            /* Removed all previous styles (margin, bg, shadow, padding) */
         }
 
         nav a {
-            padding: 10px 20px;
+            padding: 10px 15px; /* Adjusted padding */
             color: var(--text-muted);
             text-decoration: none;
             border-bottom: 3px solid transparent;
-            margin: 0 15px;
+            margin: 0 5px; /* Reduced margin */
             font-weight: 600;
-            font-size: 1.05em;
+            font-size: 1.0em; /* Slightly smaller font */
         }
+        /* === END MODIFIED NAVIGATION === */
 
         nav a:hover, nav a.active {
             color: var(--primary-blue); 
@@ -322,6 +319,7 @@
             padding: 30px 40px; 
             border-radius: 10px; 
             margin-bottom: 20px;
+            margin-top: 20px; /* Added margin-top to separate from header */
             box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
             transition: background-color 0.3s, box-shadow 0.3s;
         }
@@ -530,27 +528,6 @@
             fill: var(--light-blue);
         }
         
-        /* Delete Button */
-        .delete-button {
-            padding: 6px 12px;
-            background-color: var(--accent-red);
-            color: var(--button-text);
-            border: none;
-            border-radius: 6px;
-            cursor: pointer;
-            font-size: 0.85em;
-            font-weight: 600;
-            transition: background-color 0.2s;
-        }
-
-        .delete-button:hover {
-            background-color: #c41e1e;
-        }
-
-        body.dark-mode .delete-button:hover {
-            background-color: #ff6b6b;
-        }
-        
         /* ===== Login Modal Styling ===== */
         .login-modal {
         display: none; /* Hidden by default */
@@ -634,8 +611,22 @@
             .section {
                 padding: 20px;
             }
-            h1 {
-                font-size: 2.5em;
+            header {
+                padding: 10px;
+                flex-direction: column;
+                gap: 10px;
+            }
+            .header-left {
+                width: 100%;
+                justify-content: space-between;
+            }
+            #header-controls {
+                width: 100%;
+                justify-content: flex-end;
+            }
+            nav {
+                width: 100%;
+                justify-content: center;
             }
             nav a {
                 padding: 8px 10px;
@@ -643,75 +634,58 @@
                 font-size: 0.9em;
             }
         }
+        
+        @media (max-width: 480px) {
+             .header-left {
+                flex-direction: column;
+                gap: 10px;
+            }
+            nav {
+                border-top: 1px solid var(--border-color);
+                padding-top: 10px;
+                margin-top: 10px;
+            }
+            body.dark-mode nav {
+                border-top-color: var(--dark-border-color);
+            }
+            #header-logo {
+                height: 30px;
+            }
+        }
     </style>
 </head>
 <body>
-    <!-- TNC-style top nav replicated -->
-    <nav id="site-nav">
-        <div class="nav-inner">
-            <div class="brand-left">
-                <div class="nav-logo"><img src="tnclogo.svg" alt="The Next Chapter" /></div>
-                <span class="brand-text">The Next Chapter</span>
-            </div>
-            <div class="nav-links">
-                <a href="index.html">Home</a>
-                <a href="index.html#stats">Stats</a>
-                <a href="game.html" id="nav-log-game-link" style="font-weight: 600;">Log Game</a>
-            </div>
-            <div class="nav-actions">
-                <button class="btn-outline-tnc" id="nav-sign-in">Sign In</button>
-                <button class="btn-outline-tnc" id="nav-sign-out" style="display:none;">Sign Out</button>
-            </div>
+    <!-- === MODIFIED HEADER STRUCTURE === -->
+    <header>
+        <div class="header-left">
+            <img src="./assets/tnc.png" 
+                 alt="TNC Logo" 
+                 id="header-logo"
+                 onerror="this.src='https://placehold.co/120x40/3A478F/FFFFFF?text=TNC+Logo&font=inter'; this.onerror=null;">
+            
+            <nav id="main-nav">
+                <a href="#stats" class="active">📊 Overall Stats</a>
+                <a href="#profiles" class="hidden-nav-link" style="display: none;">👤 Player Management</a> 
+                <!-- JS controls display: none; -->
+            </nav>
         </div>
-    </nav>
 
-    <!-- Hidden navigation for JavaScript compatibility -->
-    <nav id="main-nav" style="display:none;">
-        <a href="#stats" class="active">Stats</a>
-    </nav>
+        <div id="header-controls">
+            <button id="sign-in-button" class="auth-button">Sign In</button>
+            <button id="mode-toggle" aria-label="Toggle Dark Mode">
+                ☀️
+            </button>
+        </div>
+        
+        <!-- Removed H1 and Tagline from here -->
+    </header>
+    <!-- === END MODIFIED HEADER === -->
+
 
     <div class="container">
         
-        <!-- LEADERS SECTION -->
-        <div id="leaders" class="section">
-            <h2>🏆 Statistical Leaders</h2>
-            <p class="tagline" style="color: var(--text-muted); margin-bottom: 20px;">Top performers in key 1v1 categories</p>
-            
-            <div class="leaders-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 20px; margin-bottom: 30px;">
-                <!-- Win Percentage -->
-                <div class="leader-card">
-                    <h3 style="color: var(--primary-blue); font-size: 1rem; margin-bottom: 12px; font-weight: 700;">Win %</h3>
-                    <div id="leaders-winpct" class="leader-list">
-                        <div style="color: var(--text-muted); padding: 8px;">Loading...</div>
-                    </div>
-                </div>
-                
-                <!-- Field Goal Percentage -->
-                <div class="leader-card">
-                    <h3 style="color: var(--primary-blue); font-size: 1rem; margin-bottom: 12px; font-weight: 700;">FG%</h3>
-                    <div id="leaders-fg" class="leader-list">
-                        <div style="color: var(--text-muted); padding: 8px;">Loading...</div>
-                    </div>
-                </div>
-                
-                <!-- Free Throw Percentage -->
-                <div class="leader-card">
-                    <h3 style="color: var(--primary-blue); font-size: 1rem; margin-bottom: 12px; font-weight: 700;">FT%</h3>
-                    <div id="leaders-ft" class="leader-list">
-                        <div style="color: var(--text-muted); padding: 8px;">Loading...</div>
-                    </div>
-                </div>
-                
-                <!-- Fewest Fouls -->
-                <div class="leader-card">
-                    <h3 style="color: var(--primary-blue); font-size: 1rem; margin-bottom: 12px; font-weight: 700;">Fewest Fouls/G</h3>
-                    <div id="leaders-fouls" class="leader-list">
-                        <div style="color: var(--text-muted); padding: 8px;">Loading...</div>
-                    </div>
-                </div>
-            </div>
-        </div>
-        
+        <!-- Navigation bar was here, now it's in the header -->
+
         <!-- STATS SECTION: PUBLIC TABLE VIEW -->
         <div id="stats" class="section">
             <h2>📊 Overall Player Statistics</h2>
@@ -787,7 +761,7 @@
 
 
         <!-- PLAYER MANAGEMENT SECTION: HIDDEN UNTIL SIGNED IN -->
-        <div id="profiles" class="section hidden-section">
+        <div id="profiles" class="section hidden-section" style="display: none;">
             <h2>👤 Player Management & History</h2>
             <p class="tagline" style="color: var(--text-muted);">Manage profiles, view game history, and player-specific stats.</p>
             
@@ -853,8 +827,12 @@
         TheNextChapter &copy; 2025 | Public Stats Portal
     </footer>
 
-<!-- Removed inline script: using utils/app.js -->
-    <!--
+    <!-- Changed path to reflect uploaded file structure -->
+    <script src="./utils/api.js">
+        // API Section
+    </script>
+
+    <script>
         // --- DATA SECTION: EASILY REMOVABLE DUMMY DATA ---
         
         /* * TO REMOVE DUMMY DATA: 
@@ -1004,35 +982,76 @@
 
 
         // --- 3. SIGN-IN SIMULATION (REVISED LOGIC for Public Stats) ---
-        const SIGNED_IN_KEY = 'tnc_signed_in';
-        
-        function updateUIState() {
-            const isSignedIn = localStorage.getItem(SIGNED_IN_KEY) === 'true';
-            
-            if (isSignedIn) {
-                hiddenNavLinks.forEach(link => link.style.display = 'inline-block');
-                signInButton.textContent = 'Sign Out';
-            } else {
-                hiddenNavLinks.forEach(link => link.style.display = 'none');
-                hiddenSections.forEach(section => section.style.display = 'none'); 
-                signInButton.textContent = 'Sign In';
+        // --- LOGIN / LOGOUT WITH API ---
+        function showLoginModal() {
+            const modal = document.getElementById('login-modal');
+            modal.style.display = 'flex'; // show modal
 
-                // Ensure Stats is the active section when logging out
-                goToStatsList();
+            const emailInput = document.getElementById('login-email');
+            const passInput = document.getElementById('login-password');
+            const submitBtn = document.getElementById('login-submit');
+            const cancelBtn = document.getElementById('login-cancel');
+
+            // Clear previous values
+            emailInput.value = '';
+            passInput.value = '';
+
+            // Handle login
+            submitBtn.onclick = async () => {
+                const email = emailInput.value.trim();
+                const password = passInput.value.trim();
+                if (!email || !password) return alert('Please enter both fields.');
+
+                try {
+                const data = await apiClient.login(email, password);
+                console.log("Logged in:", data.user);
+                modal.style.display = 'none';
+                updateUIAfterLogin();
+                } catch (err) {
+                alert("Login failed: " + err.message);
+                }
+            };
+
+            // Handle cancel
+            cancelBtn.onclick = () => {
+                modal.style.display = 'none';
+            };
+
+            // Close modal when clicking outside
+            modal.onclick = (e) => {
+                if (e.target === modal) modal.style.display = 'none';
+            };
+        }
+
+        // Step 2: Update UI after login/logout
+        function updateUIAfterLogin() {
+            const user = apiClient.getUser();
+            if (user) {
+                // Show authorized sections
+                document.querySelectorAll('.hidden-nav-link').forEach(link => link.style.display = 'inline-block');
+                // We keep .hidden-section hidden by default, JS navigation will show it
+                signInButton.textContent = `Sign Out`; // Removed email for brevity
+            } else {
+                // Hide authorized sections
+                document.querySelectorAll('.hidden-nav-link').forEach(link => link.style.display = 'none');
+                document.querySelectorAll('.hidden-section').forEach(section => section.style.display = 'none');
+                signInButton.textContent = 'Sign In';
+                goToStatsList(); // Go back to stats if logged out from an admin page
             }
         }
 
-        const handleSignInOut = () => {
-            const isSignedIn = localStorage.getItem(SIGNED_IN_KEY) === 'true';
-            if (isSignedIn) {
-                localStorage.removeItem(SIGNED_IN_KEY); // Sign out
+        // Step 3: Handle sign in/out click
+        signInButton.addEventListener('click', async () => {
+            const token = apiClient.getToken();
+            if (token) {
+                localStorage.removeItem('authToken');
+                localStorage.removeItem('user');
+                console.log('Logged out manually');
+                updateUIAfterLogin();
             } else {
-                localStorage.setItem(SIGNED_IN_KEY, 'true'); // Sign in
+                showLoginModal();
             }
-            updateUIState();
-        };
-
-        signInButton.addEventListener('click', handleSignInOut);
+        });
         
         // --- 4. PLAYER SEARCH FUNCTIONALITY ---
         if (searchInput && statsTable) {
@@ -1110,18 +1129,21 @@
                 const targetElement = document.getElementById(targetId);
                 
                 if (targetElement) {
-                   targetElement.style.display = 'block';
+                   // Only show if it's the public stats page OR if it's not a hidden section (i.e., user is logged in)
+                   if (targetId === 'stats' || !targetElement.classList.contains('hidden-section')) {
+                       targetElement.style.display = 'block';
+                   } else if (apiClient.getUser()) {
+                       // Failsafe for logged-in user
+                       targetElement.style.display = 'block';
+                   }
                 }
             });
         });
         
         // --- INITIALIZATION ---
         renderStatsTable(); // Render player data on load
-        updateUIState(); // Set initial sign-in state
-    -->
-    <!-- Object-Oriented Application Scripts -->
-    <script src="./utils/api.js"></script>
-    <script src="./utils/app.js"></script>
+        updateUIAfterLogin(); // Set initial sign-in state
+    </script>
 
     <div id="login-modal" class="login-modal">
         <div class="login-content">
@@ -1135,40 +1157,5 @@
         </div>
     </div>
 
-    <!-- Add Player Modal -->
-    <div id="add-player-modal" class="login-modal">
-        <div class="login-content" style="width: 400px;">
-            <h2>Add New Player</h2>
-            <input type="text" id="player-name-input" placeholder="Player Name">
-            <input type="text" id="player-instagram-input" placeholder="Instagram Handle (optional)">
-            <input type="text" id="player-hometown-input" placeholder="Hometown (City)">
-            <input type="number" id="player-height-input" placeholder="Height (inches)">
-            <input type="number" id="player-weight-input" placeholder="Weight (lbs)">
-            <input type="text" id="player-bio-input" placeholder="Bio (optional)">
-            <div class="login-buttons">
-                <button id="add-player-submit">Create Player</button>
-                <button id="add-player-cancel">Cancel</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- Edit Player Modal (protected - requires sign-in) -->
-    <div id="edit-player-modal" class="login-modal" style="display:none;">
-        <div class="login-content" style="width: 400px;">
-            <h2>Edit Player</h2>
-            <input type="text" id="edit-player-name-input" placeholder="Player Name">
-            <input type="text" id="edit-player-instagram-input" placeholder="Instagram Handle (optional)">
-            <input type="text" id="edit-player-hometown-input" placeholder="Hometown (City)">
-            <input type="number" id="edit-player-height-input" placeholder="Height (inches)">
-            <input type="number" id="edit-player-weight-input" placeholder="Weight (lbs)">
-            <input type="text" id="edit-player-bio-input" placeholder="Bio (optional)">
-            <div class="login-buttons">
-                <button id="edit-player-submit">Save Changes</button>
-                <button id="edit-player-cancel">Cancel</button>
-            </div>
-        </div>
-    </div>
-
-<!-- merge marker removed: Stashed changes -->
 </body>
 </html>

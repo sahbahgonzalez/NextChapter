@@ -12,9 +12,7 @@
 (function(window) {
   'use strict';
 
-  const API_BASE_URL = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
-    ? 'http://localhost:3000'
-    : 'https://the-next-chapter-backend.onrender.com';
+  const API_BASE_URL = 'https://the-next-chapter-backend.onrender.com';
 
   // -----------------------------------------------------------------
   // 2. CORE HELPER FUNCTIONS
@@ -130,6 +128,9 @@
   // =============================================================
   // PLAYERS API
   // =============================================================
+  apiClient.listAllPlayers = async function(page = 1, limit = 25) {
+    return _fetchPublic(`/player/all?page=${page}&limit=${limit}`);
+  };
 
   apiClient.createPlayer = async function(playerData) {
     return _fetchWithToken('/player', 'POST', playerData);
@@ -144,35 +145,7 @@
   };
 
   apiClient.searchPlayers = async function(searchTerm) {
-    // If called with no argument or an empty/whitespace string, request all players
-    if (searchTerm === undefined || searchTerm === null) {
-      try {
-        return await _fetchPublic('/player?limit=0');
-      } catch (err) {
-        // Backwards-compatible fallback: some deployed backends still require a search term
-        if (err && err.message && err.message.toLowerCase().includes('search term is required')) {
-          console.warn('Backend requires a search term; falling back to space-based search');
-          return _fetchPublic('/player?search=%20');
-        }
-        throw err;
-      }
-    }
-
-    const raw = String(searchTerm);
-    if (raw.trim().length === 0) {
-      try {
-        return await _fetchPublic('/player?limit=0');
-      } catch (err) {
-        if (err && err.message && err.message.toLowerCase().includes('search term is required')) {
-          console.warn('Backend requires a search term; falling back to space-based search');
-          return _fetchPublic('/player?search=%20');
-        }
-        throw err;
-      }
-    }
-
-    // Otherwise search by the trimmed term
-    return _fetchPublic(`/player?search=${encodeURIComponent(raw.trim())}`);
+    return _fetchPublic(`/player?search=${encodeURIComponent(searchTerm)}`);
   };
 
   apiClient.getPlayerById = async function(playerId) {

@@ -328,6 +328,36 @@ const createGame = async (request, response) => {
     }
 };
 
+const updateGame = async (request, response) => {
+    const { id } = request.params;
+    const updates = request.body;
+
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+        return response.status(400).json({ message: 'Invalid Game ID format' });
+    }
+
+    try {
+        const updatedGame = await Game.findByIdAndUpdate(
+            id,
+            updates,
+            {
+                new: true,
+                runValidators: true // This ensures your schema validations (e.g., 'required' fields) run
+            }
+        );
+
+        if (!updatedGame) {
+            return response.status(404).json({ message: 'Game not found' });
+        }
+
+        return response.status(200).json(updatedGame);
+
+    } catch (error) {
+        console.error('Error updating game:', error);
+        return response.status(500).json({ message: 'Server error while updating game', error: error.message });
+    }
+}
+
 const addGameEvent = async (request, response) => {
     const { id: gameId } = request.params;
     const eventData = request.body;
@@ -496,6 +526,7 @@ const cancelGame = async (request, response) => {
 
 module.exports = {
     createGame,
+    updateGame,
     addGameEvent,
     getGameById,
     finalizeGame,
