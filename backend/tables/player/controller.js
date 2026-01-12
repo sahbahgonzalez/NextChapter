@@ -2,6 +2,11 @@ const Player = require('./model');
 const Game = require('../game/model');
 const mongoose = require('mongoose');
 
+// Escape user-provided input for safe regex use
+function escapeRegex(text) {
+    return String(text).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
 const createPlayer = async (request, response) => {
     // Assumes protect middleware ran and attached request.user
     const created_by = request.user._id;
@@ -14,33 +19,49 @@ const createPlayer = async (request, response) => {
         bio,
         height_inches,
         weight_lbs,
-        position,
+        hometown,
         date_of_birth,
         city,
         state
     } = request.body;
 
     // Basic validation (add more robust validation later, e.g., express-validator)
-    if (!name) {
-        return response.status(400).json({ message: 'Player name is required' });
+    // Name is optional now. Prepare name to store: trim surrounding whitespace
+    let nameToStore;
+    if (name !== undefined && name !== null) {
+        const n = String(name).trim();
+        if (n.length > 0) nameToStore = n;
+    }
+    // Trim instagram handle if present
+    let igHandleToStore;
+    if (instagram_handle !== undefined && instagram_handle !== null) {
+        const ig = String(instagram_handle).trim();
+        if (ig.length > 0) igHandleToStore = ig;
+    }
+    // Trim hometown if present
+    let hometownToStore;
+    if (hometown !== undefined && hometown !== null) {
+        const h = String(hometown).trim();
+        if (h.length > 0) hometownToStore = h;
     }
 
     try {
         // Create new player object
-        const newPlayer = new Player({
+        const newPlayerData = {
             created_by,
-            name,
-            instagram_handle,
             profile_image_url,
             bio,
             height_inches,
             weight_lbs,
-            position,
             date_of_birth,
             city,
             state
-            // overall_stats will and all_time_shot_data will start as an empty array
-        });
+        };
+        if (nameToStore) newPlayerData.name = nameToStore;
+        if (igHandleToStore) newPlayerData.instagram_handle = igHandleToStore;
+        if (hometownToStore) newPlayerData.hometown = hometownToStore;
+
+        const newPlayer = new Player(newPlayerData);
 
         // Save the player to the database
         const savedPlayer = await newPlayer.save();
@@ -73,6 +94,26 @@ const updatePlayer = async (request, response) => {
     delete updates.overall_stats;
     delete updates.all_time_shot_data;
     delete updates.created_by;
+
+    // Normalize name and instagram handle if provided
+    if (updates.name !== undefined && updates.name !== null) {
+        if (typeof updates.name === 'string') {
+            updates.name = updates.name.trim();
+            if (updates.name.length === 0) delete updates.name; // don't set empty string
+        }
+    }
+    if (updates.instagram_handle !== undefined && updates.instagram_handle !== null) {
+        if (typeof updates.instagram_handle === 'string') {
+            updates.instagram_handle = updates.instagram_handle.trim();
+            if (updates.instagram_handle.length === 0) delete updates.instagram_handle;
+        }
+    }
+    if (updates.hometown !== undefined && updates.hometown !== null) {
+        if (typeof updates.hometown === 'string') {
+            updates.hometown = updates.hometown.trim();
+            if (updates.hometown.length === 0) delete updates.hometown;
+        }
+    }
 
     try {
         const updatedPlayer = await Player.findByIdAndUpdate(id, updates, { new: true, runValidators: true });
@@ -112,27 +153,78 @@ const deletePlayer = async (request, response) => {
 
 const searchPlayers = async (request, response) => {
     const searchTerm = request.query.search;
+    const rawLimit = request.query.limit;
 
-    if (!searchTerm) {
-        return response.status(400).json({ message: 'Search term is required' });
+    // Interpret limit: if provided and >0, apply; if 0 treat as 'no limit'; if omitted, default to no limit
+    let parsedLimit;
+    if (rawLimit !== undefined) {
+        const p = parseInt(rawLimit, 10);
+        if (!isNaN(p) && p >= 0) parsedLimit = p; // 0 means no limit, >0 means limit, undefined means no limit by default
     }
 
     try {
-        const regex = new RegExp(searchTerm, 'i');
+        // If no search term provided or search is only whitespace, return all players
+        if (!searchTerm || String(searchTerm).trim().length === 0) {
+            let query = Player.find({})
+                .select('_id name instagram_handle profile_image_url hometown height_inches weight_lbs overall_stats');
 
-        const players = await Player.find({
-            $or: [
-                { name: regex },
-                { instagram_handle: regex }
-            ]
-        })
-        .select('_id name instagram_handle profile_image_url position height_inches weight_lbs')
-        .limit(20); // Limit results to prevent overwhelming response
+            // Apply limit only when parsedLimit is a positive integer
+            if (typeof parsedLimit === 'number' && parsedLimit > 0) {
+                query = query.limit(parsedLimit);
+            }
+
+            const players = await query;
+            return response.status(200).json(players);
+        }
+
+        // Normalize search term: remove all whitespace and escape regex chars
+        const cleaned = String(searchTerm).replace(/\s+/g, '').toLowerCase();
+        const safe = escapeRegex(cleaned);
+
+        // Use aggregation to create a whitespace-stripped, lowercased field for matching
+        const pipeline = [
+            // add normalized fields
+            {
+                $addFields: {
+                    __normalized_name: { $toLower: { $replaceAll: { input: { $ifNull: ['$name', ''] }, find: ' ', replacement: '' } } },
+                    __normalized_instagram: { $toLower: { $replaceAll: { input: { $ifNull: ['$instagram_handle', ''] }, find: ' ', replacement: '' } } }
+                }
+            },
+            // match against normalized fields using the cleaned search term
+            {
+                $match: {
+                    $or: [
+                        { __normalized_name: { $regex: safe } },
+                        { __normalized_instagram: { $regex: safe } }
+                    ]
+                }
+            },
+            // project only the public fields
+            {
+                $project: {
+                    _id: 1,
+                    name: 1,
+                    instagram_handle: 1,
+                    profile_image_url: 1,
+                    hometown: 1,
+                    height_inches: 1,
+                    weight_lbs: 1,
+                    overall_stats: 1
+                }
+            }
+        ];
+
+        // Apply limit only when parsedLimit is a positive integer
+        if (typeof parsedLimit === 'number' && parsedLimit > 0) {
+            pipeline.push({ $limit: parsedLimit });
+        }
+
+        const players = await Player.aggregate(pipeline);
 
         response.status(200).json(players);
 
     } catch (error) {
-        console.error("Player Search Error:", error);
+        console.error('Player Search Error:', error);
         response.status(500).json({ message: 'Server error during player search' });
     }
 };

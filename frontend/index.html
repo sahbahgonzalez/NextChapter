@@ -36,16 +36,119 @@
             background-color: var(--dark-background-color);
             color: var(--dark-text-color);
         }
-
         body.dark-mode .section,
         body.dark-mode header,
         body.dark-mode .stat-card {
             background-color: var(--dark-card-color);
             box-shadow: 0 4px 8px rgba(0, 0, 0, 0.5);
         }
-        
         body.dark-mode .stat-card {
             border: 1px solid var(--dark-border-color);
+        }
+        
+        /* Leaders Board Styling */
+        .leader-card {
+            background-color: var(--card-background);
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            padding: 16px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.08);
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        
+        .leader-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(58, 71, 143, 0.15);
+        }
+        
+        .leader-list {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        
+        .leader-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px 12px;
+            background-color: var(--table-header-bg);
+            border-radius: 6px;
+            transition: background-color 0.2s;
+            cursor: pointer;
+        }
+        
+        .leader-item:hover {
+            background-color: var(--border-color);
+        }
+        
+        .leader-item .rank {
+            font-weight: 700;
+            color: var(--primary-blue);
+            margin-right: 10px;
+            min-width: 20px;
+        }
+        
+        .leader-item .player-name {
+            flex: 1;
+            color: var(--text-dark);
+            font-weight: 600;
+            font-size: 0.9rem;
+        }
+        
+        .leader-item .stat-value {
+            color: var(--accent-green);
+            font-weight: 700;
+            font-size: 0.95rem;
+        }
+        
+        body.dark-mode .leader-card {
+            background-color: var(--dark-card-color);
+            border-color: var(--dark-border-color);
+        }
+        
+        body.dark-mode .leader-item {
+            background-color: var(--dark-table-header-bg);
+        }
+        
+        body.dark-mode .leader-item .player-name {
+            color: var(--dark-text-color);
+        }
+        
+        /* Video Grid */
+        .video-section {
+            max-width: 1200px;
+            margin: 24px auto;
+            padding: 0 16px;
+        }
+        .video-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+            gap: 16px;
+        }
+        .video-card {
+            background: var(--card-background);
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 4px 10px rgba(16, 24, 40, 0.18), 0 2px 4px rgba(16, 24, 40, 0.12);
+        }
+        .video-thumb {
+            width: 100%;
+            aspect-ratio: 16/9;
+            background: #0b0b0b;
+            display: block;
+            object-fit: cover;
+        }
+        .video-meta {
+            padding: 10px 12px;
+        }
+        .video-meta h3 {
+            margin: 0 0 6px 0;
+            font-size: 1rem;
+        }
+        .video-meta .duration {
+            color: var(--text-muted);
+            font-size: 0.9rem;
         }
 
         body.dark-mode h2,
@@ -92,7 +195,7 @@
             filter: brightness(0) invert(1);
         }
         
-        /* BASE STYLES - NBA Stats Aesthetic */
+        /* BASE STYLES - Aesthetic */
         body {
             font-family: 'Inter', sans-serif;
             margin: 0;
@@ -108,6 +211,26 @@
             margin: 0 auto;
             padding: 20px;
         }
+
+        /* TNC-style top nav shared styles */
+        #site-nav {
+            position: sticky;
+            top: 0;
+            z-index: 999;
+            background: #0B0B0B;
+            color: #fff;
+            border-bottom: 1px solid rgba(255,255,255,0.08);
+        }
+        .nav-inner { display:flex; align-items:center; justify-content:space-between; gap:16px; padding:10px 16px; max-width:1200px; margin:0 auto; }
+        .brand-left { display:flex; align-items:center; gap:10px; }
+        .brand-left .brand-text { font-weight:700; letter-spacing:0.5px; color:#fff; }
+        .nav-logo { width:40px; height:40px; display:flex; align-items:center; justify-content:center; border-radius:50%; background:#0b4a9e; }
+        .nav-logo img { width:24px; height:24px; display:block; object-fit:contain; }
+        .nav-links { display:flex; align-items:center; gap:18px; }
+        .nav-links a { color:#e6e6e6; text-decoration:none; font-weight:600; padding:6px 4px; }
+        .nav-actions { display:flex; align-items:center; gap:10px; }
+        .btn-outline-tnc { background:transparent; color:#e6e6e6; border:1px solid rgba(255,255,255,0.25); border-radius:8px; padding:8px 12px; font-weight:600; cursor:pointer; transition: all 0.2s ease; }
+        .btn-outline-tnc:hover { background:rgba(255,255,255,0.08); border-color:rgba(255,255,255,0.5); color:#fff; }
         
         /* === MODIFIED HEADER === */
         header {
@@ -141,6 +264,7 @@
         }
         /* === END MODIFIED HEADER === */
 
+        /* Mode toggle button */
         #mode-toggle {
             background: none;
             border: none;
@@ -580,13 +704,12 @@
                     <thead>
                         <tr>
                             <th>Player</th>
+                            <th>W-L</th>
                             <th>GP</th>
                             <th>PTS</th>
                             <th>FG%</th>
                             <th>3P%</th>
                             <th>FT%</th>
-                            <th>AST</th>
-                            <th>REB</th>
                             <th>BLK</th>
                             <th>STL</th>
                         </tr>
@@ -597,6 +720,8 @@
                 </table>
             </div>
         </div>
+
+        
         
         <!-- PLAYER PROFILE DETAIL SECTION: HIDDEN, SHOWN ON NAME CLICK -->
         <div id="player-profile-detail" class="section">
@@ -646,15 +771,26 @@
             </nav>
 
             <div id="player-manager">
-                <div style="text-align: center; padding: 20px;">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="50" height="50" fill="var(--light-blue)" viewBox="0 0 24 24">
-                        <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
-                    </svg>
-                    <p class="text-muted" style="margin-top: 10px;">
-                        Use this section to add, edit, or delete player profiles.
-                    </p>
+                <div style="margin-bottom: 20px;">
                     <button class="action-button add-player-button">+ Add Player</button>
-                    <button class="action-button cta-button" style="margin-left: 15px;">🚀 Log New Game</button>
+                    <button id="log-new-game-btn" class="action-button cta-button" style="margin-left: 15px;">🚀 Log New Game</button>
+                </div>
+                
+                <h3>All Players</h3>
+                <div style="overflow-x: auto;">
+                    <table id="player-management-table">
+                        <thead>
+                            <tr>
+                                <th>Player Name</th>
+                                <th>Hometown</th>
+                                <th>Games Played</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="player-management-body">
+                            <!-- Players will be listed here -->
+                        </tbody>
+                    </table>
                 </div>
             </div>
 

@@ -19,7 +19,6 @@ const playerSchema = new Schema({
     },
     name: {
         type: String,
-        required: true,
         trim: true
     },
     instagram_handle: {
@@ -43,10 +42,9 @@ const playerSchema = new Schema({
     weight_lbs: {
         type: Number
     },
-    position: {
+    hometown: {
         type: String,
-        enum: ['Guard', 'Forward', 'Center', 'Unknown'], // Example positions
-        default: 'Unknown'
+        trim: true
     },
     date_of_birth: {
         type: Date

@@ -86,6 +86,10 @@ const gameSchema = new Schema({
         enum: ['team_a', 'team_b', null], // Use null if game isn't finished or tied (if ties are possible)
         default: null
     },
+    live_stats_applied: {
+        type: Boolean,
+        default: false
+    },
     events: [eventSchema],
     // Use Map for game_stats_summary where keys are Player ObjectIds (as strings)
     game_stats_summary: {

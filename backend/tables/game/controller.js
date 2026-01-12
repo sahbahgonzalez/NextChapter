@@ -86,8 +86,65 @@ const _internalCalculateStats = (game) => {
     return statsSummary;
 };
 
+// Apply per-event increments directly to the player's aggregate stats during live play
+const _applyLivePlayerDelta = async (gameId, event) => {
+    const playerId = event.player_id;
+    if (!playerId) return;
+
+    const inc = {};
+    const points = event.points !== undefined && event.points !== null
+        ? event.points
+        : (event.type === 'free_throw' ? 1 : 0);
+
+    if (event.type === 'shot') {
+        inc['overall_stats.total_fga'] = 1;
+        if (points === 3) {
+            inc['overall_stats.total_3pa'] = 1;
+        } else {
+            inc['overall_stats.total_2pa'] = 1;
+        }
+        if (event.made) {
+            inc['overall_stats.total_fgm'] = 1;
+            inc['overall_stats.total_points'] = points;
+            if (points === 3) inc['overall_stats.total_3pm'] = 1;
+            else inc['overall_stats.total_2pm'] = 1;
+        }
+    } else if (event.type === 'free_throw') {
+        inc['overall_stats.total_fta'] = 1;
+        if (event.made) {
+            inc['overall_stats.total_ftm'] = 1;
+            inc['overall_stats.total_points'] = 1;
+        }
+    } else if (event.type === 'foul') {
+        inc['overall_stats.total_fouls'] = 1;
+    }
+
+    const update = { $inc: inc };
+
+    // Optionally push shot data if coordinates are provided
+    const hasCoords = event.location && typeof event.location.x === 'number' && typeof event.location.y === 'number';
+    if (hasCoords && (event.type === 'shot' || event.type === 'free_throw')) {
+        update.$push = {
+            all_time_shot_data: {
+                x: event.location.x,
+                y: event.location.y,
+                made: !!event.made,
+                points: points || 0,
+                game_id: gameId,
+                timestamp: event.timestamp || new Date()
+            }
+        };
+    }
+
+    // If no increments (unexpected type), exit
+    if (!Object.keys(inc).length) return;
+
+    await Player.findByIdAndUpdate(playerId, update);
+};
+
 // --- Update Player Overall Stats ---
-const _internalUpdatePlayerStats = async (game) => {
+const _internalUpdatePlayerStats = async (game, options = {}) => {
+    const { skipTotals = false } = options;
     let playerUpdatePromises = [];
     const shotsByPlayer = {};
 
@@ -138,6 +195,11 @@ const _internalUpdatePlayerStats = async (game) => {
                 'overall_stats.games_played': 1,
                 'overall_stats.wins': winIncrement,
                 'overall_stats.losses': lossIncrement,
+            }
+        };
+
+        if (!skipTotals) {
+            Object.assign(updateData.$inc, {
                 'overall_stats.total_points': stats.pts || 0,
                 'overall_stats.total_fga': stats.fga || 0,
                 'overall_stats.total_fgm': stats.fgm || 0,
@@ -157,10 +219,10 @@ const _internalUpdatePlayerStats = async (game) => {
                 'overall_stats.total_fouls': stats.pf || 0,
                 'overall_stats.total_double_doubles': stats.is_double_double ? 1 : 0,
                 'overall_stats.total_triple_doubles': stats.is_triple_double ? 1 : 0,
-            }
-        };
+            });
+        }
 
-        if (shotsByPlayer[playerIdStr] && shotsByPlayer[playerIdStr].length > 0) {
+        if (!skipTotals && shotsByPlayer[playerIdStr] && shotsByPlayer[playerIdStr].length > 0) {
             updateData.$push = {
                 all_time_shot_data: { $each: shotsByPlayer[playerIdStr] }
             };
@@ -206,7 +268,7 @@ const _internalFinalizeGame = async (gameId) => {
         game.game_stats_summary = _internalCalculateStats(game);
         const finalizedGame = await game.save();
 
-        _internalUpdatePlayerStats(finalizedGame).catch(err => {
+        _internalUpdatePlayerStats(finalizedGame, { skipTotals: finalizedGame.live_stats_applied }).catch(err => {
              console.error(`Background player stat update failed for finalized game ${gameId}:`, err);
          });
 
@@ -326,6 +388,9 @@ const addGameEvent = async (request, response) => {
         // Push event
         game.events.push(eventData);
 
+        // Mark that live stat deltas are being applied so finalize won't double count
+        game.live_stats_applied = true;
+
         // Update score if it was a made shot/FT
         if ((eventData.type === 'shot' || eventData.type === 'free_throw') && eventData.made) {
             const points = eventData.points || (eventData.type === 'free_throw' ? 1 : 0); // Default FT to 1 point
@@ -356,6 +421,9 @@ const addGameEvent = async (request, response) => {
             await game.save();
         }
         */
+
+        // Apply live player stat delta before persisting the game for consistency
+        await _applyLivePlayerDelta(game._id, eventData);
 
         await game.save();
 
@@ -444,7 +512,7 @@ const cancelGame = async (request, response) => {
 
         const canceledGame = await game.save();
 
-        _internalUpdatePlayerStats(canceledGame).catch(err => {
+        _internalUpdatePlayerStats(canceledGame, { skipTotals: canceledGame.live_stats_applied }).catch(err => {
              console.error(`Background player stat update failed for canceled game ${gameId}:`, err);
          });
 
@@ -464,3 +532,4 @@ module.exports = {
     finalizeGame,
     cancelGame
 };
+
