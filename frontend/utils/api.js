@@ -142,7 +142,35 @@
   };
 
   apiClient.searchPlayers = async function(searchTerm) {
-    return _fetchPublic(`/player?search=${encodeURIComponent(searchTerm)}`);
+    // If called with no argument or an empty/whitespace string, request all players
+    if (searchTerm === undefined || searchTerm === null) {
+      try {
+        return await _fetchPublic('/player?limit=0');
+      } catch (err) {
+        // Backwards-compatible fallback: some deployed backends still require a search term
+        if (err && err.message && err.message.toLowerCase().includes('search term is required')) {
+          console.warn('Backend requires a search term; falling back to space-based search');
+          return _fetchPublic('/player?search=%20');
+        }
+        throw err;
+      }
+    }
+
+    const raw = String(searchTerm);
+    if (raw.trim().length === 0) {
+      try {
+        return await _fetchPublic('/player?limit=0');
+      } catch (err) {
+        if (err && err.message && err.message.toLowerCase().includes('search term is required')) {
+          console.warn('Backend requires a search term; falling back to space-based search');
+          return _fetchPublic('/player?search=%20');
+        }
+        throw err;
+      }
+    }
+
+    // Otherwise search by the trimmed term
+    return _fetchPublic(`/player?search=${encodeURIComponent(raw.trim())}`);
   };
 
   apiClient.getPlayerById = async function(playerId) {
