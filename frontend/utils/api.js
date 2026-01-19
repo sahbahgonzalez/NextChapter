@@ -12,7 +12,9 @@
 (function(window) {
   'use strict';
 
-  const API_BASE_URL = 'https://the-next-chapter-backend.onrender.com';
+  const API_BASE_URL = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
+    ? 'http://localhost:3000'
+    : 'https://the-next-chapter-backend.onrender.com';
 
   // -----------------------------------------------------------------
   // 2. CORE HELPER FUNCTIONS
@@ -181,6 +183,14 @@
     return _fetchPublic(`/player/${playerId}/games`);
   };
 
+  apiClient.getPlayerShotChart = async function(playerId, gameId) {
+    let url = `/player/${playerId}/shot-chart`;
+    if (gameId) {
+      url += `?gameId=${gameId}`;
+    }
+    return _fetchPublic(url);
+  };
+
 
   // =============================================================
   // GAMES API
@@ -208,6 +218,22 @@
 
   apiClient.getGameById = async function(gameId) {
     return _fetchPublic(`/game/${gameId}`);
+  };
+
+  apiClient.getAllGames = async function() {
+    return _fetchPublic('/game');
+  };
+
+  apiClient.createGame = async function(gameData) {
+    return _fetchWithToken('/game', 'POST', gameData);
+  };
+
+  apiClient.updateGame = async function(gameId, gameData) {
+    return _fetchWithToken(`/game/${gameId}`, 'PATCH', gameData);
+  };
+
+  apiClient.deleteGame = async function(gameId) {
+    return _fetchWithToken(`/game/${gameId}`, 'DELETE');
   };
 
   window.apiClient = apiClient;
