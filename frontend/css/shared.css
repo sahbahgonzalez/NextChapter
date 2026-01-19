@@ -2074,3 +2074,287 @@ body.dark-mode .games-table tr:hover {
 .btn-undo:hover {
     background-color: #d97706;
 }
+
+/* Enhanced control buttons - visible but subtle */
+#startGameBtn, #pauseGameBtn, #timeoutBtn, #selectTeamA, #selectTeamB, #undoStatBtn {
+    padding: 11px 18px !important;
+    font-size: 0.95rem !important;
+    font-weight: 700 !important;
+    min-width: 130px !important;
+    border: 2px solid #1f6feb !important;
+    background: linear-gradient(135deg, #1e40af, #1e3a8a) !important;
+    color: #e0e7ff !important;
+    box-shadow: 0 4px 8px rgba(37, 99, 235, 0.25) !important;
+    transition: all 0.2s ease !important;
+}
+
+#startGameBtn:hover, #pauseGameBtn:hover, #timeoutBtn:hover, #selectTeamA:hover, #selectTeamB:hover, #undoStatBtn:hover {
+    background: linear-gradient(135deg, #2563eb, #1f6feb) !important;
+    border-color: #60a5fa !important;
+    box-shadow: 0 5px 12px rgba(37, 99, 235, 0.35) !important;
+    transform: translateY(-1px) !important;
+}
+
+#startGameBtn.active, #pauseGameBtn.active, #timeoutBtn.active, #selectTeamA.active, #selectTeamB.active, #undoStatBtn.active {
+    background: linear-gradient(135deg, #2563eb, #1f6feb) !important;
+    border-color: #60a5fa !important;
+    box-shadow: 0 6px 14px rgba(37, 99, 235, 0.4) !important;
+}
+
+/* Hotkey hint badges */
+.hotkey-hint {
+    display: inline-block;
+    margin-left: 8px;
+    padding: 3px 8px;
+    background: #0e2b62;
+    border: 2px solid #1f3a8a;
+    border-radius: 5px;
+    font-size: 0.7rem;
+    font-weight: 700;
+    color: #ffffff;
+    font-family: 'Courier New', monospace;
+    vertical-align: middle;
+    box-shadow: 0 2px 4px rgba(14, 43, 98, 0.3);
+    transition: all 0.2s ease;
+    opacity: 1;
+    max-width: 200px;
+    overflow: hidden;
+    white-space: nowrap;
+}
+
+.hotkey-hint.hidden {
+    opacity: 0;
+    max-width: 0;
+    margin-left: 0;
+    padding: 0;
+    border-width: 0;
+}
+
+/* Fixed widths for stat buttons to prevent shifting */
+.btn-stat {
+    min-width: 150px;
+    text-align: center;
+}
+
+/* Fixed widths for control buttons */
+#startGameBtn {
+    min-width: 170px;
+}
+
+#pauseGameBtn {
+    min-width: 140px;
+}
+
+#timeoutBtn {
+    min-width: 140px;
+}
+
+#selectTeamA, #selectTeamB {
+    min-width: 180px;
+}
+
+#undoStatBtn {
+    min-width: 150px;
+}
+
+/* Hotkey toggle button */
+#hotkeyToggleBtn {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    z-index: 1000;
+    padding: 10px 16px;
+    background: #0e2b62;
+    color: white;
+    border: 2px solid #1f3a8a;
+    border-radius: 8px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    cursor: pointer;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+    transition: all 0.2s ease;
+}
+
+#hotkeyToggleBtn:hover {
+    background: #1f3a8a;
+    transform: translateY(-2px);
+    box-shadow: 0 6px 12px rgba(0, 0, 0, 0.3);
+}
+
+/* Small buttons for FT and Foul */
+.btn-small {
+    padding: 2px 8px;
+    font-size: 0.8rem;
+    border-radius: 4px;
+    border: 1px solid #cbd5e1;
+    background: #fff;
+    cursor: pointer;
+    margin-left: 4px;
+}
+
+.btn-small:hover {
+    background: #f1f5f9;
+}
+
+.btn-small.btn-ft {
+    color: var(--primary-blue);
+    border-color: var(--primary-blue);
+}
+
+.btn-small.btn-foul {
+    color: var(--accent-red);
+    border-color: var(--accent-red);
+}
+
+/* Side stats styling */
+.side-stats {
+    font-size: 0.9rem;
+    color: #334155;
+    display: grid;
+    gap: 4px;
+    margin: 6px 0 8px;
+}
+
+/* Player stats in game page */
+#teamAStats, #teamBStats {
+    text-align: left;
+    font-size: 0.9rem;
+    margin: 10px 0;
+}
+
+#teamAStats div, #teamBStats div {
+    margin: 4px 0;
+}
+
+/* Assign button styles */
+.btn-assign {
+    width: 100%;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    padding: 10px 12px;
+    border: 2px solid #1f4b99;
+    background: #e8f0ff;
+    color: #0e2b62;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.08);
+    margin-bottom: 10px;
+    cursor: pointer;
+    border-radius: 8px;
+}
+
+.btn-assign:hover {
+    background: #d8e6ff;
+    border-color: #123571;
+}
+
+.btn-assign.assigned {
+    background: linear-gradient(120deg, #1f6feb, #1446a0);
+    color: #fff;
+    border-color: #0f2f6f;
+    box-shadow: 0 6px 14px rgba(20,70,160,0.25);
+}
+
+/* Possession highlight */
+.poss-active {
+    outline: 3px solid #1f6feb;
+    outline-offset: 4px;
+    border-radius: 10px;
+    box-shadow: 0 0 0 4px rgba(31,110,235,0.12), 0 10px 22px rgba(0,0,0,0.12);
+    transition: box-shadow 0.15s ease, outline-color 0.15s ease;
+}
+
+/* Court overlay for 2PT/3PT visualization */
+#court_container {
+    position: relative;
+}
+
+#court_overlay {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    z-index: 1;
+}
+
+/* 2PT zone (near the basket) */
+.zone-2pt {
+    position: absolute;
+    bottom: 2px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 55%;
+    height: 35%;
+    background: rgba(14, 43, 98, 0.25);
+    border: 2px solid #0e2b62;
+    border-top: none;
+}
+
+/* 3PT zone (outer arc) */
+.zone-3pt {
+    position: absolute;
+    bottom: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 85%;
+    height: 100%;
+    border: 3px solid rgba(255, 140, 0, 0.6);
+    border-top: none;
+    background: rgba(255, 140, 0, 0.05);
+}
+
+/* Shot markers overlay */
+#shot_markers {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    z-index: 2;
+}
+
+.shot-marker {
+    position: absolute;
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    transform: translate(-50%, -50%);
+    border: 2px solid #0e2b62;
+    background: rgba(255,255,255,0.85);
+    box-shadow: 0 2px 6px rgba(0,0,0,0.25);
+}
+
+.shot-marker.made {
+    background: rgba(0, 180, 100, 0.75);
+    border-color: #0f8a4c;
+}
+
+.shot-marker.missed {
+    background: rgba(255, 80, 80, 0.70);
+    border-color: #c62828;
+}
+
+.shot-marker.team-a {
+    box-shadow: 0 0 0 2px rgba(31,110,235,0.35);
+}
+
+.shot-marker.team-b {
+    box-shadow: 0 0 0 2px rgba(255,160,0,0.35);
+}
+
+/* Compact Fullscreen Game Layout */
+:root { --nav-height: 64px; }
+
+body.compact-mode { overflow: hidden; }
+
+body.compact-mode #main-content {
+    height: calc(100svh - var(--nav-height));
+    margin: 0 auto;
+    padding: 0.75rem;
+    display: grid;
+    grid-template-rows: auto auto auto 1fr;
+    gap: 8px;
+}
+
+body.compact-mode #timer_row { margin: 0.25rem 0 !important; }
+body.compact-mode #stat_selector { margin-top: 0.25rem !important; }
+body.compact-mode #court_section { margin-top: 0.5rem; height: 100%; }
+body.compact-mode #court_card { height: 100%; display: flex; }
+body.compact-mode #court_container { flex: 1 1 auto; }
+body.compact-mode #court_image { height: 100%; max-height: 100%; }
