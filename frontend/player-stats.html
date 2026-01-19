@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Player Stats | TheNextChapter</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="css/shared.css">
+    <link rel="stylesheet" href="header.css">
+    <style>
+        /* Page-specific styles for player-stats.html */
+        .player-info {
+            flex: 1;
+        }
+
+        .player-info h1 {
+            margin: 0 0 0.5rem 0;
+            font-size: 2rem;
+            color: var(--text-dark);
+        }
+
+        body.dark-mode .player-info h1 {
+            color: var(--dark-text-color);
+        }
+
+        .stat-card h3 {
+            margin: 0 0 1rem 0;
+            font-size: 0.95rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .stat-rows {
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
+        }
+
+        .stat-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0.5rem 0;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        body.dark-mode .stat-row {
+            border-bottom-color: var(--dark-border-color);
+        }
+
+        .stat-row:last-child {
+            border-bottom: none;
+        }
+
+        .stat-name {
+            color: var(--text-muted);
+            font-size: 0.9rem;
+        }
+
+        body.dark-mode .stat-name {
+            color: var(--dark-text-muted);
+        }
+
+        .stat-number {
+            font-weight: 700;
+            color: var(--primary-blue);
+            font-size: 1.1rem;
+        }
+
+        #heatmapCanvas {
+            max-width: 100%;
+            height: auto;
+            border-radius: 8px;
+            background-color: #d2691e;
+        }
+    </style>
+</head>
+<body>
+    <!-- Navigation -->
+    <nav id="site-nav">
+        <div class="nav-inner">
+            <div class="brand-left">
+                <div class="nav-logo"><img src="tnclogo.svg" alt="The Next Chapter" /></div>
+                <span class="brand-text">The Next Chapter</span>
+            </div>
+            <div class="nav-links">
+                <a href="index.html">Home</a>
+                <a href="index.html#stats">Stats</a>
+                <a href="player.html">Players</a>
+                <a href="games.html">Games</a>
+                <a href="game.html">Log Game</a>
+            </div>
+            <div class="nav-actions">
+                <button class="btn-outline-tnc" id="nav-sign-in">Sign In</button>
+                <button class="btn-outline-tnc" id="nav-sign-out" style="display:none;">Sign Out</button>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <div class="page-container">
+        <button class="back-button" onclick="window.history.back()">Back</button>
+
+        <div id="playerContent" class="loading">
+            <p>Loading player stats...</p>
+        </div>
+    </div>
+
+    <!-- Dark mode toggle removed -->
+
+    <!-- Scripts -->
+    <script src="utils/api.js"></script>
+    <script src="js/player-stats.js"></script>
+</body>
+</html>
