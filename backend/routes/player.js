@@ -13,5 +13,6 @@ router.delete('/:id', protect, restrictTo('admin'), controller.deletePlayer);
 router.get('/', controller.searchPlayers);
 router.get('/:id', controller.getPlayerById);
 router.get('/:id/games', controller.getPlayerRecentGames);
+router.get('/:id/shot-chart', controller.getPlayerShotChart);
 
 module.exports = router;
