@@ -34,8 +34,14 @@
     /* Shot Chart */
     --shot-chart-bg: #1A202C;
 
-    /* Header */
+    /* Header/Navigation */
+    --header-bg: #0B0B0B;
+    --header-text: #E6E6E6;
     --header-height: 60px;
+    --nav-padding: 12px 16px;
+    --brand-gap: 10px;
+    --links-gap: 24px;
+    --actions-gap: 10px;
 }
 
 /* ===== RESET & BASE STYLES ===== */
@@ -63,6 +69,220 @@ body {
 body.dark-mode {
     background-color: var(--dark-background-color);
     color: var(--dark-text-color);
+}
+
+/* ===== HEADER/NAV STYLING ===== */
+#site-nav {
+    position: sticky;
+    top: 0;
+    z-index: 999;
+    background-color: var(--header-bg);
+    color: var(--header-text);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    width: 100%;
+    height: var(--header-height);
+    display: flex;
+    align-items: center;
+}
+
+.nav-inner {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--links-gap);
+    padding: var(--nav-padding);
+    max-width: 1400px;
+    width: 100%;
+    margin: 0 auto;
+    flex: 1;
+}
+
+/* Brand section */
+.brand-left {
+    display: flex;
+    align-items: center;
+    gap: var(--brand-gap);
+    flex-shrink: 0;
+}
+
+.nav-logo {
+    width: 40px;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    background: var(--primary-blue);
+    color: white;
+    font-weight: 700;
+    font-size: 1.25rem;
+    flex-shrink: 0;
+}
+
+.nav-logo img {
+    width: 24px;
+    height: 24px;
+    display: block;
+    object-fit: contain;
+}
+
+.brand-text {
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    color: #FFFFFF;
+    white-space: nowrap;
+    font-size: 1rem;
+}
+
+/* Navigation links */
+.nav-links {
+    display: flex;
+    align-items: center;
+    gap: var(--links-gap);
+    flex: 1;
+    justify-content: center;
+}
+
+.nav-links a {
+    color: var(--header-text);
+    text-decoration: none;
+    font-weight: 600;
+    padding: 6px 8px;
+    transition: all 0.2s ease;
+    white-space: nowrap;
+    font-size: 0.95rem;
+}
+
+.nav-links a:hover {
+    color: #FFFFFF;
+}
+
+/* Action buttons section */
+.nav-actions {
+    display: flex;
+    align-items: center;
+    gap: var(--actions-gap);
+    flex-shrink: 0;
+}
+
+/* Header button styles */
+.btn-outline-tnc {
+    background: transparent;
+    color: var(--header-text);
+    border: 1px solid rgba(255, 255, 255, 0.25);
+    border-radius: 8px;
+    padding: 8px 12px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    font-size: 0.85rem;
+    white-space: nowrap;
+}
+
+.btn-outline-tnc:hover {
+    background: rgba(255, 255, 255, 0.08);
+    border-color: rgba(255, 255, 255, 0.5);
+    color: #FFFFFF;
+}
+
+.btn-outline-tnc.active {
+    background: linear-gradient(120deg, #1f6feb, #1446a0);
+    color: #FFFFFF;
+    border-color: #0f2f6f;
+    box-shadow: 0 6px 14px rgba(20, 70, 160, 0.4);
+    font-weight: 700;
+}
+
+/* Header responsive design */
+@media (max-width: 1024px) {
+    .nav-links {
+        gap: 18px;
+        flex: 1;
+        justify-content: center;
+    }
+
+    .nav-links a {
+        font-size: 0.9rem;
+        padding: 6px 6px;
+    }
+}
+
+@media (max-width: 768px) {
+    :root {
+        --header-height: 56px;
+        --nav-padding: 10px 12px;
+        --links-gap: 12px;
+        --actions-gap: 8px;
+    }
+
+    .nav-inner {
+        gap: 12px;
+    }
+
+    .brand-text {
+        display: none;
+    }
+
+    .nav-links {
+        gap: 12px;
+    }
+
+    .nav-links a {
+        font-size: 0.85rem;
+        padding: 4px 6px;
+    }
+
+    .btn-outline-tnc {
+        padding: 6px 10px;
+        font-size: 0.8rem;
+    }
+}
+
+@media (max-width: 480px) {
+    .nav-inner {
+        justify-content: space-between;
+    }
+
+    .nav-links {
+        position: absolute;
+        top: 100%;
+        left: 0;
+        right: 0;
+        flex-direction: column;
+        background-color: var(--header-bg);
+        border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+        padding: 8px;
+        gap: 0;
+        display: none;
+    }
+
+    .nav-links.active {
+        display: flex;
+    }
+
+    .nav-links a {
+        padding: 8px 12px;
+        display: block;
+        border-radius: 6px;
+    }
+
+    .nav-links a:hover {
+        background-color: rgba(255, 255, 255, 0.1);
+    }
+}
+
+/* Header dark mode support */
+body.dark-mode #site-nav {
+    background-color: #0B0B0B;
+    border-bottom-color: rgba(255, 255, 255, 0.1);
+}
+
+body.dark-mode .nav-links a {
+    color: #E6E6E6;
+}
+
+body.dark-mode .nav-links a:hover {
+    color: #FFFFFF;
 }
 
 /* ===== LAYOUT CONTAINERS ===== */
