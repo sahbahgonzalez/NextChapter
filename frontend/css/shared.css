@@ -112,7 +112,7 @@ body.dark-mode {
     align-items: center;
     justify-content: center;
     border-radius: 50%;
-    background: var(--primary-blue);
+    background: white;
     color: white;
     font-weight: 700;
     font-size: 1.25rem;

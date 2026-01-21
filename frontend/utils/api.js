@@ -112,9 +112,9 @@
   apiClient.logout = function() {
     localStorage.removeItem('authToken');
     localStorage.removeItem('user');
-    // Redirect to login page
-    window.location.href = '/login.html';
     console.log('Logged out');
+    // Reload current page to update UI
+    location.reload();
   };
 
   apiClient.getUser = function() {

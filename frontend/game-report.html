@@ -183,6 +183,7 @@
                 <a href="index.html#stats">Stats</a>
                 <a href="player.html">Players</a>
                 <a href="games.html">Games</a>
+                <a href="game.html" id="nav-log-game-link">Log Game</a>
             </div>
             <div class="nav-actions">
                 <button class="btn-outline-tnc" id="nav-sign-in">Sign In</button>
@@ -251,6 +252,19 @@
                 <p><strong>The Next Chapter - Game Statistics Report</strong></p>
                 <p id="generatedDate">Generated on -- at --</p>
                 <p>For more information, visit: www.thenextchapter.app</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Login Modal -->
+    <div id="login-modal" class="login-modal">
+        <div class="login-content">
+            <h2>Admin Login</h2>
+            <input type="email" id="login-email" placeholder="Email" required>
+            <input type="password" id="login-password" placeholder="Password" required>
+            <div class="login-buttons">
+                <button id="login-submit">Sign In</button>
+                <button id="login-cancel">Cancel</button>
             </div>
         </div>
     </div>

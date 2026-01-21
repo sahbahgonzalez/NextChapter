@@ -29,7 +29,7 @@
         <a href="index.html#stats">Stats</a>
         <a href="player.html">Players</a>
         <a href="games.html">Games</a>
-        <a href="game.html" style="font-weight: 600;">Log Game</a>
+        <a href="game.html" id="nav-log-game-link" style="font-weight: 600;">Log Game</a>
       </div>
       <div class="nav-actions">
         <button class="btn-outline-tnc" id="nav-sign-in">Sign In</button>
@@ -424,6 +424,19 @@
       box-shadow: 0 0 0 2px rgba(255,160,0,0.35);
     }
   </style>
+
+  <!-- Login Modal -->
+  <div id="login-modal" class="login-modal">
+      <div class="login-content">
+          <h2>Admin Login</h2>
+          <input type="email" id="login-email" placeholder="Email" required>
+          <input type="password" id="login-password" placeholder="Password" required>
+          <div class="login-buttons">
+              <button id="login-submit">Sign In</button>
+              <button id="login-cancel">Cancel</button>
+          </div>
+      </div>
+  </div>
 
   <script src="./utils/api.js"></script>
 

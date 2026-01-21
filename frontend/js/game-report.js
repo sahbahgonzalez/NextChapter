@@ -27,22 +27,75 @@ function getGameIdFromUrl() {
 function setupNavigation() {
     const signInBtn = document.getElementById('nav-sign-in');
     const signOutBtn = document.getElementById('nav-sign-out');
+    const logGameLink = document.getElementById('nav-log-game-link');
 
     if (apiClient.getToken()) {
         signInBtn.style.display = 'none';
         signOutBtn.style.display = 'block';
+        if (logGameLink) logGameLink.style.display = 'inline-block';
     } else {
         signInBtn.style.display = 'block';
         signOutBtn.style.display = 'none';
+        if (logGameLink) logGameLink.style.display = 'none';
     }
 
     signInBtn.addEventListener('click', () => {
-        window.location.href = '/login.html';
+        showLoginModal();
     });
 
     signOutBtn.addEventListener('click', () => {
         apiClient.logout();
     });
+}
+
+function showLoginModal() {
+    const modal = document.getElementById('login-modal');
+    modal.style.display = 'flex';
+
+    const emailInput = document.getElementById('login-email');
+    const passInput = document.getElementById('login-password');
+    const submitBtn = document.getElementById('login-submit');
+    const cancelBtn = document.getElementById('login-cancel');
+
+    emailInput.value = '';
+    passInput.value = '';
+
+    const handleSubmit = async () => {
+        const email = emailInput.value.trim();
+        const password = passInput.value.trim();
+
+        if (!email || !password) {
+            return alert('Please enter both fields.');
+        }
+
+        try {
+            const data = await apiClient.login(email, password);
+            console.log("Logged in:", data.user);
+            modal.style.display = 'none';
+            location.reload();
+        } catch (err) {
+            alert("Login failed: " + err.message);
+        }
+    };
+
+    submitBtn.onclick = handleSubmit;
+
+    const handleKeyPress = (e) => {
+        if (e.key === 'Enter') {
+            handleSubmit();
+        }
+    };
+
+    emailInput.onkeypress = handleKeyPress;
+    passInput.onkeypress = handleKeyPress;
+
+    cancelBtn.onclick = () => {
+        modal.style.display = 'none';
+    };
+
+    modal.onclick = (e) => {
+        if (e.target === modal) modal.style.display = 'none';
+    };
 }
 
 async function loadGameReport() {

@@ -129,9 +129,96 @@ async function loadGameData(gameId) {
   }
 }
 
+// Navigation setup
+function setupNavigation() {
+    const signInBtn = document.getElementById('nav-sign-in');
+    const signOutBtn = document.getElementById('nav-sign-out');
+    const logGameLink = document.getElementById('nav-log-game-link');
+
+    if (apiClient.getToken()) {
+        if (signInBtn) signInBtn.style.display = 'none';
+        if (signOutBtn) signOutBtn.style.display = 'block';
+        if (logGameLink) logGameLink.style.display = 'inline-block';
+    } else {
+        if (signInBtn) signInBtn.style.display = 'block';
+        if (signOutBtn) signOutBtn.style.display = 'none';
+        if (logGameLink) logGameLink.style.display = 'none';
+    }
+
+    if (signInBtn) {
+        signInBtn.addEventListener('click', () => {
+            showLoginModal();
+        });
+    }
+
+    if (signOutBtn) {
+        signOutBtn.addEventListener('click', () => {
+            localStorage.removeItem('authToken');
+            localStorage.removeItem('user');
+            window.location.href = 'index.html';
+        });
+    }
+}
+
+function showLoginModal() {
+    const modal = document.getElementById('login-modal');
+    if (!modal) return;
+    modal.style.display = 'flex';
+
+    const emailInput = document.getElementById('login-email');
+    const passInput = document.getElementById('login-password');
+    const submitBtn = document.getElementById('login-submit');
+    const cancelBtn = document.getElementById('login-cancel');
+
+    if (emailInput) emailInput.value = '';
+    if (passInput) passInput.value = '';
+
+    const handleSubmit = async () => {
+        const email = emailInput.value.trim();
+        const password = passInput.value.trim();
+
+        if (!email || !password) {
+            return alert('Please enter both fields.');
+        }
+
+        try {
+            const data = await apiClient.login(email, password);
+            console.log("Logged in:", data.user);
+            modal.style.display = 'none';
+            location.reload();
+        } catch (err) {
+            alert("Login failed: " + err.message);
+        }
+    };
+
+    if (submitBtn) {
+        submitBtn.onclick = handleSubmit;
+    }
+
+    const handleKeyPress = (e) => {
+        if (e.key === 'Enter') {
+            handleSubmit();
+        }
+    };
+
+    if (emailInput) emailInput.onkeypress = handleKeyPress;
+    if (passInput) passInput.onkeypress = handleKeyPress;
+
+    if (cancelBtn) {
+        cancelBtn.onclick = () => {
+            modal.style.display = 'none';
+        };
+    }
+
+    modal.onclick = (e) => {
+        if (e.target === modal) modal.style.display = 'none';
+    };
+}
+
 // Run once on DOM load
 /** Initialize event handlers and local state on DOM ready */
 document.addEventListener("DOMContentLoaded", () => {
+  setupNavigation();
   const urlParams = new URLSearchParams(window.location.search);
   const gameId = urlParams.get("gameId");
   

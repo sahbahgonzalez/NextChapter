@@ -168,10 +168,10 @@ class AuthManager {
         emailInput.value = '';
         passInput.value = '';
 
-        submitBtn.onclick = async () => {
+        const handleSubmit = async () => {
             const email = emailInput.value.trim();
             const password = passInput.value.trim();
-            
+
             if (!email || !password) {
                 return alert('Please enter both fields.');
             }
@@ -189,6 +189,17 @@ class AuthManager {
             }
         };
 
+        submitBtn.onclick = handleSubmit;
+
+        const handleKeyPress = (e) => {
+            if (e.key === 'Enter') {
+                handleSubmit();
+            }
+        };
+
+        emailInput.onkeypress = handleKeyPress;
+        passInput.onkeypress = handleKeyPress;
+
         cancelBtn.onclick = () => {
             modal.style.display = 'none';
         };
@@ -204,14 +215,11 @@ class AuthManager {
         if (user) {
             if (this.signInButton) this.signInButton.style.display = 'none';
             if (this.signOutButton) this.signOutButton.style.display = 'inline-block';
+            if (this.logGameLink) this.logGameLink.style.display = 'inline-block';
         } else {
             if (this.signInButton) this.signInButton.style.display = 'inline-block';
             if (this.signOutButton) this.signOutButton.style.display = 'none';
-        }
-
-        // Always show Log Game link in header regardless of role/auth state
-        if (this.logGameLink) {
-            this.logGameLink.style.display = 'inline-block';
+            if (this.logGameLink) this.logGameLink.style.display = 'none';
         }
     }
 
@@ -487,13 +495,13 @@ class StatsTableRenderer {
 
             const nameLink = row.querySelector('.player-name-link');
             if (nameLink) {
-                const rawForNorm = (player.searchKey && player.searchKey.length > 0) 
-                    ? player.searchKey 
+                const rawForNorm = (player.searchKey && player.searchKey.length > 0)
+                    ? player.searchKey
                     : (nameLink.textContent || nameLink.innerText || '');
                 const txtValue = String(rawForNorm).toUpperCase();
                 nameLink.dataset.normalized = txtValue.replace(/\s+/g, '');
                 nameLink.addEventListener('click', () => {
-                    this.displayPlayerProfile(player);
+                    window.location.href = `player-stats.html?id=${player._id}`;
                 });
             }
         });
