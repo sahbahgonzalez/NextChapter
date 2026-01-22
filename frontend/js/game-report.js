@@ -44,7 +44,9 @@ function setupNavigation() {
     });
 
     signOutBtn.addEventListener('click', () => {
-        apiClient.logout();
+        localStorage.removeItem('authToken');
+        localStorage.removeItem('user');
+        window.location.href = 'index.html';
     });
 }
 
