@@ -210,7 +210,12 @@ function createGameCard(game) {
             ` : ''}
             ${apiClient.getToken() ? `
                 <div class="game-actions">
-                    <button class="btn btn-secondary" onclick="viewGameDetails('${game._id}')">View</button>
+                    ${status === 'finished'
+                        ? `<button class="btn btn-secondary" onclick="viewGameDetails('${game._id}')">View</button>`
+                        : status === 'live' || status === 'in_progress'
+                            ? `<button class="btn btn-primary" onclick="viewGameDetails('${game._id}')">Resume Game</button>`
+                            : `<button class="btn btn-primary" onclick="viewGameDetails('${game._id}')">Start Game</button>`
+                    }
                     ${game.status !== 'finished' ? `<button class="btn btn-danger" onclick="deleteGame('${game._id}')">Delete</button>` : ''}
                 </div>
             ` : ''}

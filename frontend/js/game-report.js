@@ -264,9 +264,9 @@ function renderPlayerReports() {
                             <svg class="shot-overlay" id="overlay-${player._id}" preserveAspectRatio="xMidYMid meet"></svg>
                         </div>
                     </div>
-                    <div style="margin-top: 15px; font-size: 0.9rem; color: #6B7280;">
-                        <span style="color: #38A169; font-weight: 600;">Made Shots</span> |
-                        <span style="color: #E53E3E; font-weight: 600;">Missed Shots</span>
+                    <div style="margin-top: 15px; font-size: 0.9rem; color: #6B7280; display: flex; justify-content: center; gap: 20px; flex-wrap: wrap;">
+                        <span><span style="display: inline-block; width: 20px; height: 20px; background: rgba(56, 161, 105, 0.85); border-radius: 50%; vertical-align: middle; margin-right: 5px; border: 2px solid #22543d;"></span> <span style="color: #38A169; font-weight: 600;">Made (1/2/3 = points)</span></span>
+                        <span><span style="display: inline-block; width: 20px; height: 20px; background: rgba(229, 62, 62, 0.2); border-radius: 50%; vertical-align: middle; margin-right: 5px; border: 2px solid rgba(229, 62, 62, 0.6);"></span> <span style="color: #E53E3E; font-weight: 600;">Missed</span></span>
                     </div>
                 </div>
             </div>
@@ -286,12 +286,19 @@ function getPlayerShots(playerId) {
     events.forEach(event => {
         // Compare player IDs as strings to handle both ObjectId and string formats
         const eventPlayerId = event.player_id?._id ? String(event.player_id._id) : String(event.player_id);
-        if (event.type === 'shot' && eventPlayerId === String(playerId)) {
-            shots.push({
-                x: event.location?.x || 50,
-                y: event.location?.y || 50,
-                made: event.made || false
-            });
+
+        // Include both shots and free throws
+        if ((event.type === 'shot' || event.type === 'free_throw') && eventPlayerId === String(playerId)) {
+            // Only include shots that have valid location data
+            if (event.location && typeof event.location.x === 'number' && typeof event.location.y === 'number') {
+                shots.push({
+                    x: event.location.x,
+                    y: event.location.y,
+                    made: event.made || false,
+                    points: event.points || (event.type === 'free_throw' ? 1 : 2),
+                    type: event.type
+                });
+            }
         }
     });
 
@@ -310,50 +317,78 @@ function drawShotsOnSVG(overlayId, shots) {
     // Clear existing content
     overlay.innerHTML = '';
 
-    // Draw court background
-    const courtGroup = document.createElementNS('http://www.w3.org/2000/svg', 'g');
-    courtGroup.setAttribute('id', 'court');
-
-    // Court outline
-    const courtRect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
-    courtRect.setAttribute('x', '0');
-    courtRect.setAttribute('y', '0');
-    courtRect.setAttribute('width', '500');
-    courtRect.setAttribute('height', '470');
-    courtRect.setAttribute('fill', '#d2691e');
-    courtRect.setAttribute('stroke', '#fff');
-    courtRect.setAttribute('stroke-width', '2');
-    courtGroup.appendChild(courtRect);
-
-    overlay.appendChild(courtGroup);
+    // Draw court background using the court image
+    const courtImage = document.createElementNS('http://www.w3.org/2000/svg', 'image');
+    courtImage.setAttribute('href', 'assets/basketballcourt.svg');
+    courtImage.setAttribute('x', '0');
+    courtImage.setAttribute('y', '0');
+    courtImage.setAttribute('width', '500');
+    courtImage.setAttribute('height', '470');
+    courtImage.setAttribute('preserveAspectRatio', 'xMidYMid slice');
+    overlay.appendChild(courtImage);
 
     // Create a group for shots
     const shotsGroup = document.createElementNS('http://www.w3.org/2000/svg', 'g');
     shotsGroup.setAttribute('id', 'shots-group');
+
+    // Show message if no shots with location data
+    if (shots.length === 0) {
+        const noDataText = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+        noDataText.setAttribute('x', '250');
+        noDataText.setAttribute('y', '235');
+        noDataText.setAttribute('text-anchor', 'middle');
+        noDataText.setAttribute('fill', '#666');
+        noDataText.setAttribute('font-size', '16');
+        noDataText.textContent = 'No shot location data available';
+        shotsGroup.appendChild(noDataText);
+    }
 
     shots.forEach(shot => {
         const svgX = (shot.x / 100) * 500;
         const svgY = (shot.y / 100) * 470;
 
         if (shot.made) {
-            // Made shot - green circle
+            // Made shot - green circle with point value
             const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
             circle.setAttribute('cx', svgX);
             circle.setAttribute('cy', svgY);
-            circle.setAttribute('r', '12');
-            circle.setAttribute('fill', 'rgba(56, 161, 105, 0.7)');
+            circle.setAttribute('r', '14');
+            circle.setAttribute('fill', 'rgba(56, 161, 105, 0.85)');
             circle.setAttribute('stroke', '#22543d');
             circle.setAttribute('stroke-width', '2');
             shotsGroup.appendChild(circle);
+
+            // Add point value text inside circle
+            const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+            text.setAttribute('x', svgX);
+            text.setAttribute('y', svgY + 5);
+            text.setAttribute('text-anchor', 'middle');
+            text.setAttribute('fill', 'white');
+            text.setAttribute('font-size', '12');
+            text.setAttribute('font-weight', 'bold');
+            text.textContent = shot.points;
+            shotsGroup.appendChild(text);
         } else {
-            // Missed shot - red X
+            // Missed shot - red X with point indicator
             const size = 10;
+
+            // Draw background circle for context
+            const bgCircle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+            bgCircle.setAttribute('cx', svgX);
+            bgCircle.setAttribute('cy', svgY);
+            bgCircle.setAttribute('r', '14');
+            bgCircle.setAttribute('fill', 'rgba(229, 62, 62, 0.2)');
+            bgCircle.setAttribute('stroke', 'rgba(229, 62, 62, 0.6)');
+            bgCircle.setAttribute('stroke-width', '2');
+            shotsGroup.appendChild(bgCircle);
+
+            // Draw X
             const line1 = document.createElementNS('http://www.w3.org/2000/svg', 'line');
             line1.setAttribute('x1', svgX - size);
             line1.setAttribute('y1', svgY - size);
             line1.setAttribute('x2', svgX + size);
             line1.setAttribute('y2', svgY + size);
-            line1.setAttribute('stroke', 'rgba(229, 62, 62, 0.8)');
+            line1.setAttribute('stroke', 'rgba(229, 62, 62, 0.9)');
             line1.setAttribute('stroke-width', '3');
             line1.setAttribute('stroke-linecap', 'round');
 
@@ -362,7 +397,7 @@ function drawShotsOnSVG(overlayId, shots) {
             line2.setAttribute('y1', svgY - size);
             line2.setAttribute('x2', svgX - size);
             line2.setAttribute('y2', svgY + size);
-            line2.setAttribute('stroke', 'rgba(229, 62, 62, 0.8)');
+            line2.setAttribute('stroke', 'rgba(229, 62, 62, 0.9)');
             line2.setAttribute('stroke-width', '3');
             line2.setAttribute('stroke-linecap', 'round');
 

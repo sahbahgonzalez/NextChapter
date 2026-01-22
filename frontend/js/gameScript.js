@@ -95,38 +95,137 @@ async function loadGameData(gameId) {
     gameContext.gameId = game._id || gameId;
     gameContext.teams = game.teams || { team_a: [], team_b: [] };
 
-    // Scores start at 0 for live session; do not prefill from DB
-    document.getElementById("teamAScore").textContent = 0;
-    document.getElementById("teamBScore").textContent = 0;
+    // Store loaded game for reference
+    gameContext.loadedGame = game;
 
     // Helper: find player details by ID
-    function getPlayerName(playerId) {
-      const player = game.all_player_ids.find(p => p._id === playerId);
-      return player ? player.name : "Unknown Player";
+    function findPlayerById(playerId) {
+      if (!game.all_player_ids) return null;
+      return game.all_player_ids.find(p =>
+        String(p._id) === String(playerId) || String(p) === String(playerId)
+      );
     }
 
-    // Default to unassigned UI; we no longer auto-fill from existing game teams
-    gameContext.players.A = null;
-    gameContext.players.B = null;
-    if (startGameBtn) startGameBtn.disabled = true;
-    showStartError("Assign a player to both teams before starting the game.");
+    // Load players from team assignments
     const teamAButton = document.getElementById("teamAAssignBtn");
     const teamBButton = document.getElementById("teamBAssignBtn");
-    if (teamAButton) {
-      teamAButton.textContent = "Assign Player";
-      teamAButton.classList.remove('assigned');
-    }
-    if (teamBButton) {
-      teamBButton.textContent = "Assign Player";
-      teamBButton.classList.remove('assigned');
+
+    // Get player IDs from teams (handle both array of IDs and array of objects)
+    const teamAPlayerIds = game.teams?.team_a || [];
+    const teamBPlayerIds = game.teams?.team_b || [];
+
+    // Assign Team A player
+    if (teamAPlayerIds.length > 0) {
+      const playerAId = teamAPlayerIds[0]?._id || teamAPlayerIds[0];
+      const playerA = findPlayerById(playerAId);
+      if (playerA) {
+        gameContext.players.A = playerA;
+        if (teamAButton) {
+          teamAButton.textContent = playerA.name || 'Player A';
+          teamAButton.classList.add('assigned');
+        }
+      }
     }
 
-    // Optional: show game type; default to 1v1 wording if not provided
+    // Assign Team B player
+    if (teamBPlayerIds.length > 0) {
+      const playerBId = teamBPlayerIds[0]?._id || teamBPlayerIds[0];
+      const playerB = findPlayerById(playerBId);
+      if (playerB) {
+        gameContext.players.B = playerB;
+        if (teamBButton) {
+          teamBButton.textContent = playerB.name || 'Player B';
+          teamBButton.classList.add('assigned');
+        }
+      }
+    }
+
+    // Load scores from the game
+    const teamAScore = game.final_score?.team_a || 0;
+    const teamBScore = game.final_score?.team_b || 0;
+    document.getElementById("teamAScore").textContent = teamAScore;
+    document.getElementById("teamBScore").textContent = teamBScore;
+
+    // Check if both players are assigned
+    if (gameContext.players.A && gameContext.players.B) {
+      if (startGameBtn) startGameBtn.disabled = false;
+      showStartError("");
+    } else {
+      if (startGameBtn) startGameBtn.disabled = true;
+      showStartError("Assign a player to both teams before starting the game.");
+    }
+
+    // Show game type
     const gt = document.getElementById("gameType");
     if (gt) gt.textContent = game.game_type ? `${game.game_type} game` : "1v1 game to 50pts";
+
+    // Return the game data for further processing (like loading events)
+    return game;
   } catch (error) {
     console.error("Failed to load game data:", error);
+    return null;
   }
+}
+
+/**
+ * Restore game events (shots) from loaded game data onto the court
+ * @param {object} game - The loaded game object
+ */
+function restoreGameEvents(game) {
+  const shotMarkersEl = document.getElementById('shot_markers');
+  if (!shotMarkersEl) return;
+
+  // Clear existing markers
+  shotMarkersEl.innerHTML = '';
+
+  // Process each event
+  game.events.forEach(event => {
+    // Only process shots and free throws with location data
+    if ((event.type === 'shot' || event.type === 'free_throw') &&
+        event.location && typeof event.location.x === 'number' && typeof event.location.y === 'number') {
+
+      // Determine which team this shot belongs to
+      const teamKey = event.team === 'team_a' ? 'A' : 'B';
+      const player = gameContext.players[teamKey];
+
+      // Determine shot type based on points
+      let shotType = '2pt';
+      if (event.type === 'free_throw' || event.points === 1) {
+        shotType = 'ft';
+      } else if (event.points === 3) {
+        shotType = '3pt';
+      }
+
+      const result = event.made ? 'made' : 'missed';
+
+      // Create marker element
+      const marker = document.createElement('div');
+      marker.classList.add('shot-marker');
+      marker.classList.add(result === 'made' ? 'made' : 'missed');
+      marker.classList.add(teamKey === 'A' ? 'team-a' : 'team-b');
+
+      // Add player initials to the marker
+      const initials = player?.name ? player.name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) : teamKey;
+      marker.textContent = initials;
+      marker.style.fontSize = '10px';
+      marker.style.fontWeight = 'bold';
+      marker.style.display = 'flex';
+      marker.style.alignItems = 'center';
+      marker.style.justifyContent = 'center';
+      marker.style.color = result === 'made' ? '#fff' : '#333';
+
+      marker.title = `${player?.name || teamKey} - ${shotType.toUpperCase()} ${result}`;
+      marker.style.left = `${event.location.x}%`;
+      marker.style.top = `${event.location.y}%`;
+      marker.dataset.player = player?.name || teamKey;
+      marker.dataset.shotType = shotType;
+      marker.dataset.result = result;
+
+      shotMarkersEl.appendChild(marker);
+    }
+  });
+
+  console.log(`Restored ${shotMarkersEl.children.length} shot markers from game events`);
 }
 
 // Navigation setup
@@ -217,14 +316,19 @@ function showLoginModal() {
 
 // Run once on DOM load
 /** Initialize event handlers and local state on DOM ready */
-document.addEventListener("DOMContentLoaded", () => {
+document.addEventListener("DOMContentLoaded", async () => {
   setupNavigation();
   const urlParams = new URLSearchParams(window.location.search);
-  const gameId = urlParams.get("gameId");
-  
+  // Support both 'id' and 'gameId' parameters for backwards compatibility
+  const gameId = urlParams.get("id") || urlParams.get("gameId");
+
   // Only load an existing game if explicitly provided, otherwise start fresh
   if (gameId) {
-    loadGameData(gameId);
+    const game = await loadGameData(gameId);
+    // If game loaded successfully and has events, restore them on the court
+    if (game && game.events && game.events.length > 0) {
+      restoreGameEvents(game);
+    }
   } else {
     // Start fresh - no game loaded, user must assign players and start
     gameContext.gameId = null;
@@ -249,6 +353,31 @@ document.addEventListener("DOMContentLoaded", () => {
       B: []   // Store all of player B's shots
     }
   };
+
+  // If we loaded an existing game, restore the stats from events
+  if (gameContext.loadedGame && gameContext.loadedGame.events) {
+    const events = gameContext.loadedGame.events;
+    events.forEach(event => {
+      const teamKey = event.team === 'team_a' ? 'A' : 'B';
+      const team = state[teamKey];
+
+      if (event.type === 'shot') {
+        if (event.points === 3) {
+          team.threePA += 1;
+          if (event.made) team.threePM += 1;
+        } else {
+          team.twoPA += 1;
+          if (event.made) team.twoPM += 1;
+        }
+      } else if (event.type === 'free_throw') {
+        team.ftA += 1;
+        if (event.made) team.ftM += 1;
+      } else if (event.type === 'foul') {
+        team.fouls += 1;
+      }
+    });
+    console.log('Restored stats from loaded game:', { A: state.A, B: state.B });
+  }
 
   /**
    * UI element references
@@ -619,7 +748,7 @@ document.addEventListener("DOMContentLoaded", () => {
     return player ? (player._id || player) : null;
   }
 
-  async function persistGameEvent(teamKey, eventPayload) {
+  async function persistGameEvent(teamKey, eventPayload, pos = null) {
     if (!gameContext.gameId) {
       throw new Error('No active game ID. Please start a new game.');
     }
@@ -629,6 +758,15 @@ document.addEventListener("DOMContentLoaded", () => {
     }
     const teamField = teamKey === 'A' ? 'team_a' : 'team_b';
     const payload = { ...eventPayload, player_id: playerId, team: teamField };
+
+    // Include location data if position is available (for shots and free throws)
+    if (pos && (eventPayload.type === 'shot' || eventPayload.type === 'free_throw')) {
+      payload.location = {
+        x: pos.xPct,
+        y: pos.yPct
+      };
+    }
+
     const response = await apiClient.addGameEvent(gameContext.gameId, payload);
     return response;
   }
@@ -693,7 +831,7 @@ document.addEventListener("DOMContentLoaded", () => {
     if (els.selectB) els.selectB.classList.toggle('active', state.active === 'B');
   }
 
-  async function applyShot(teamKey, shotType, result, markerEl = null) {
+  async function applyShot(teamKey, shotType, result, markerEl = null, pos = null) {
     // Check if a player is assigned before recording the shot
     const playerId = getPlayerId(teamKey);
     if (!playerId) {
@@ -715,25 +853,25 @@ document.addEventListener("DOMContentLoaded", () => {
       if (result === 'made') team.ftM += 1;
     }
     state.history.push(change);
-    
+
     // DEBUG: Log the state after update
     console.log(`Shot applied - Team: ${teamKey}, Type: ${shotType}, Result: ${result}`, team);
     console.log(`Current state:`, JSON.stringify({ A: state.A, B: state.B }));
-    
+
     updateUI();
 
     try {
       const baseEvent = shotType === 'ft'
         ? { type: 'free_throw', made: result === 'made', points: 1 }
         : { type: 'shot', made: result === 'made', points: shotType === '3pt' ? 3 : 2 };
-      await persistGameEvent(teamKey, baseEvent);
-      console.log(`Shot recorded: ${teamKey} - ${shotType} - ${result}`);
+      await persistGameEvent(teamKey, baseEvent, pos);
+      console.log(`Shot recorded: ${teamKey} - ${shotType} - ${result}${pos ? ` at (${pos.xPct.toFixed(1)}%, ${pos.yPct.toFixed(1)}%)` : ''}`);
     } catch (err) {
       // Keep local stats even if network/database fails so the UI does not reset
       console.error('Failed to persist shot event (keeping local stats)', err);
       alert(`Saved locally. Network/database error: ${err.message}`);
     }
-    
+
     // If shot was missed, switch to the other player (turnover)
     if (result === 'missed') {
       const otherTeam = teamKey === 'A' ? 'B' : 'A';
@@ -877,12 +1015,14 @@ document.addEventListener("DOMContentLoaded", () => {
   // FT modal wiring
   if (ftModal.makeBtn) ftModal.makeBtn.addEventListener('click', () => {
     if (!pendingFTTeam) return;
-    controller.applyShot(pendingFTTeam, 'ft', 'made');
+    // FT modal doesn't have court position, so pass null
+    controller.applyShot(pendingFTTeam, 'ft', 'made', null, null);
     closeFtModal();
   });
   if (ftModal.missBtn) ftModal.missBtn.addEventListener('click', () => {
     if (!pendingFTTeam) return;
-    controller.applyShot(pendingFTTeam, 'ft', 'missed');
+    // FT modal doesn't have court position, so pass null
+    controller.applyShot(pendingFTTeam, 'ft', 'missed', null, null);
     closeFtModal();
   });
   if (ftModal.closeBtn) ftModal.closeBtn.addEventListener('click', closeFtModal);
@@ -905,20 +1045,45 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   function openTimeoutModal() {
-    if (timeoutModal.overlay) timeoutModal.overlay.style.display = 'flex';
+    console.log('openTimeoutModal called, overlay:', timeoutModal.overlay);
+    if (timeoutModal.overlay) {
+      // Update button text to show player names
+      if (timeoutModal.playerABtn) {
+        timeoutModal.playerABtn.textContent = gameContext.players.A?.name || 'Player A';
+      }
+      if (timeoutModal.playerBBtn) {
+        timeoutModal.playerBBtn.textContent = gameContext.players.B?.name || 'Player B';
+      }
+      timeoutModal.overlay.style.display = 'flex';
+      console.log('Timeout modal display set to flex');
+    } else {
+      console.error('Timeout modal overlay not found');
+    }
   }
 
   if (timeoutBtn) {
     timeoutBtn.addEventListener('click', () => {
-      if (!isGameRunning) return showStartError('Assign both players and press Start Game.');
+      console.log('Timeout button clicked, isGameRunning:', isGameRunning);
+      if (!isGameRunning) {
+        showStartError('Assign both players and press Start Game.');
+        return;
+      }
+      console.log('Opening timeout modal');
       openTimeoutModal();
     });
+  } else {
+    console.error('Timeout button not found in DOM');
   }
 
   if (timeoutModal.playerABtn) {
     timeoutModal.playerABtn.addEventListener('click', () => {
-      console.log('Timeout called by Team A');
+      const playerName = gameContext.players.A?.name || 'Team A';
+      console.log('Timeout called by', playerName);
       state.history.push({ type: 'timeout', team: 'A', timestamp: new Date() });
+      // Pause the game and update button to "Play"
+      stopTimer();
+      isPaused = true;
+      if (pauseGameBtn) pauseGameBtn.innerHTML = 'Play <span class="hotkey-hint">P</span>';
       closeTimeoutModal();
       updateUI();
     });
@@ -926,8 +1091,13 @@ document.addEventListener("DOMContentLoaded", () => {
 
   if (timeoutModal.playerBBtn) {
     timeoutModal.playerBBtn.addEventListener('click', () => {
-      console.log('Timeout called by Team B');
+      const playerName = gameContext.players.B?.name || 'Team B';
+      console.log('Timeout called by', playerName);
       state.history.push({ type: 'timeout', team: 'B', timestamp: new Date() });
+      // Pause the game and update button to "Play"
+      stopTimer();
+      isPaused = true;
+      if (pauseGameBtn) pauseGameBtn.innerHTML = 'Play <span class="hotkey-hint">P</span>';
       closeTimeoutModal();
       updateUI();
     });
@@ -983,18 +1153,20 @@ document.addEventListener("DOMContentLoaded", () => {
       if (!isGameRunning) { showStartError('Assign both players and press Start Game.'); return; }
       const shot = btn.getAttribute('data-shot');
       const result = btn.getAttribute('data-result');
-      
+
       // For "auto" shot buttons, require cursor to be over court
       if (shot === 'auto') {
         if (!lastCursorPos) {
           alert('Hover cursor over court to record shot location');
           return;
         }
-        const shotType = inferShotTypeFromPos(lastCursorPos);
-        const markerEl = addShotMarker(controller.getActiveTeam(), shotType, result, lastCursorPos);
-        controller.applyShot(controller.getActiveTeam(), shotType, result, markerEl);
+        const pos = { ...lastCursorPos }; // Copy position before it changes
+        const shotType = inferShotTypeFromPos(pos);
+        const markerEl = addShotMarker(controller.getActiveTeam(), shotType, result, pos);
+        controller.applyShot(controller.getActiveTeam(), shotType, result, markerEl, pos);
       } else {
-        controller.applyShot(controller.getActiveTeam(), shot, result);
+        // No position for manual shot type buttons
+        controller.applyShot(controller.getActiveTeam(), shot, result, null, null);
       }
     });
   });
@@ -1005,16 +1177,17 @@ document.addEventListener("DOMContentLoaded", () => {
     // These are handled in mousedown, so don't use the click event
     courtImg.addEventListener('mousedown', (evt) => {
       if (!isGameRunning) return;
-      
+
       // Left click = Make (button 0)
       if (evt.button === 0) {
         evt.preventDefault();
         const shotType = inferShotTypeFromClick(evt);
         const result = 'made';
-        
+
         if (lastCursorPos) {
-          const markerEl = addShotMarker(controller.getActiveTeam(), shotType, result, lastCursorPos);
-          controller.applyShot(controller.getActiveTeam(), shotType, result, markerEl);
+          const pos = { ...lastCursorPos }; // Copy position before it changes
+          const markerEl = addShotMarker(controller.getActiveTeam(), shotType, result, pos);
+          controller.applyShot(controller.getActiveTeam(), shotType, result, markerEl, pos);
         }
       }
       // Right click = Miss (button 2)
@@ -1022,10 +1195,11 @@ document.addEventListener("DOMContentLoaded", () => {
         evt.preventDefault();
         const shotType = inferShotTypeFromClick(evt);
         const result = 'missed';
-        
+
         if (lastCursorPos) {
-          const markerEl = addShotMarker(controller.getActiveTeam(), shotType, result, lastCursorPos);
-          controller.applyShot(controller.getActiveTeam(), shotType, result, markerEl);
+          const pos = { ...lastCursorPos }; // Copy position before it changes
+          const markerEl = addShotMarker(controller.getActiveTeam(), shotType, result, pos);
+          controller.applyShot(controller.getActiveTeam(), shotType, result, markerEl, pos);
         }
       }
     });
@@ -1057,15 +1231,17 @@ document.addEventListener("DOMContentLoaded", () => {
   });
   if (shotModal.makeBtn) shotModal.makeBtn.addEventListener('click', () => {
     if (!pendingShotType) return;
-    const markerEl = addShotMarker(controller.getActiveTeam(), pendingShotType, 'made', controller.lastClickPos);
-    controller.applyShot(controller.getActiveTeam(), pendingShotType, 'made', markerEl);
+    const pos = controller.lastClickPos ? { ...controller.lastClickPos } : null;
+    const markerEl = addShotMarker(controller.getActiveTeam(), pendingShotType, 'made', pos);
+    controller.applyShot(controller.getActiveTeam(), pendingShotType, 'made', markerEl, pos);
     controller.lastClickPos = null;
     closeShotModal();
   });
   if (shotModal.missBtn) shotModal.missBtn.addEventListener('click', () => {
     if (!pendingShotType) return;
-    const markerEl = addShotMarker(controller.getActiveTeam(), pendingShotType, 'missed', controller.lastClickPos);
-    controller.applyShot(controller.getActiveTeam(), pendingShotType, 'missed', markerEl);
+    const pos = controller.lastClickPos ? { ...controller.lastClickPos } : null;
+    const markerEl = addShotMarker(controller.getActiveTeam(), pendingShotType, 'missed', pos);
+    controller.applyShot(controller.getActiveTeam(), pendingShotType, 'missed', markerEl, pos);
     controller.lastClickPos = null;
     closeShotModal();
   });
@@ -1513,7 +1689,7 @@ document.addEventListener("DOMContentLoaded", () => {
           showStartError('');
           secondsElapsed = 0;
           timerDisplay.textContent = '00:00';
-          pauseGameBtn.textContent = 'Pause';
+          pauseGameBtn.innerHTML = 'Pause <span class="hotkey-hint">P</span>';
           isPaused = false;
           isGameRunning = false;
           setActionsEnabled(false);
@@ -1529,17 +1705,17 @@ document.addEventListener("DOMContentLoaded", () => {
     onPauseResumeClick() {
       if (!isPaused) {
         stopTimer();
-        pauseGameBtn.textContent = 'Resume';
+        pauseGameBtn.innerHTML = 'Play <span class="hotkey-hint">P</span>';
         isPaused = true;
       } else {
         startTimer();
-        pauseGameBtn.textContent = 'Pause';
+        pauseGameBtn.innerHTML = 'Pause <span class="hotkey-hint">P</span>';
         isPaused = false;
       }
     }
 
-    applyShot(teamKey, shotType, result, markerEl = null) {
-      return applyShot(teamKey, shotType, result, markerEl);
+    applyShot(teamKey, shotType, result, markerEl = null, pos = null) {
+      return applyShot(teamKey, shotType, result, markerEl, pos);
     }
 
     incrementFoul(teamKey) {
@@ -1632,7 +1808,16 @@ document.addEventListener("DOMContentLoaded", () => {
       }
       return;
     }
-    
+
+    // P - Pause/Play (toggle)
+    if (key === 'p') {
+      e.preventDefault();
+      if (pauseGameBtn && !pauseGameBtn.disabled) {
+        pauseGameBtn.click();
+      }
+      return;
+    }
+
     // U - Undo
     if (key === 'u') {
       e.preventDefault();
@@ -1666,90 +1851,86 @@ document.addEventListener("DOMContentLoaded", () => {
     if (key === 'm') {
       e.preventDefault();
       const result = 'made';
-      
+
       // Must have cursor over court to record shot
       if (lastCursorPos) {
-        const shotType = inferShotTypeFromPos(lastCursorPos);
-        const markerEl = addShotMarker(controller.getActiveTeam(), shotType, result, lastCursorPos);
-        controller.applyShot(controller.getActiveTeam(), shotType, result, markerEl);
+        const pos = { ...lastCursorPos }; // Copy position before it changes
+        const shotType = inferShotTypeFromPos(pos);
+        const markerEl = addShotMarker(controller.getActiveTeam(), shotType, result, pos);
+        controller.applyShot(controller.getActiveTeam(), shotType, result, markerEl, pos);
       } else {
         alert('Hover cursor over court to record shot location');
       }
       return;
     }
-    
+
     // X - Shot Missed (auto-detect 2PT/3PT from cursor position)
     if (key === 'x') {
       e.preventDefault();
       const result = 'missed';
-      
+
       // Must have cursor over court to record shot
       if (lastCursorPos) {
-        const shotType = inferShotTypeFromPos(lastCursorPos);
-        const markerEl = addShotMarker(controller.getActiveTeam(), shotType, result, lastCursorPos);
-        controller.applyShot(controller.getActiveTeam(), shotType, result, markerEl);
+        const pos = { ...lastCursorPos }; // Copy position before it changes
+        const shotType = inferShotTypeFromPos(pos);
+        const markerEl = addShotMarker(controller.getActiveTeam(), shotType, result, pos);
+        controller.applyShot(controller.getActiveTeam(), shotType, result, markerEl, pos);
       } else {
         alert('Hover cursor over court to record shot location');
       }
       return;
     }
-    
+
     // 3 - 3PT Made, Shift+3 - 3PT Missed
     if (key === '3' || key === '#') {
       e.preventDefault();
       const shotType = '3pt';
       const result = isShift ? 'missed' : 'made';
-      
+
       // If cursor is over court, record with coordinates
       if (lastCursorPos) {
-        const markerEl = addShotMarker(controller.getActiveTeam(), shotType, result, lastCursorPos);
-        controller.applyShot(controller.getActiveTeam(), shotType, result, markerEl);
+        const pos = { ...lastCursorPos }; // Copy position before it changes
+        const markerEl = addShotMarker(controller.getActiveTeam(), shotType, result, pos);
+        controller.applyShot(controller.getActiveTeam(), shotType, result, markerEl, pos);
       } else {
-        // Otherwise use button click (no coordinates)
-        const btn = document.querySelector(`button[data-shot="${shotType}"][data-result="${result}"]`);
-        if (btn && !btn.disabled) {
-          btn.click();
-        }
+        // No coordinates available
+        controller.applyShot(controller.getActiveTeam(), shotType, result, null, null);
       }
       return;
     }
-    
+
     // 2 - 2PT Made, Shift+2 - 2PT Missed
     if (key === '2' || key === '@') {
       e.preventDefault();
       const shotType = '2pt';
       const result = isShift ? 'missed' : 'made';
-      
+
       // If cursor is over court, record with coordinates
       if (lastCursorPos) {
-        const markerEl = addShotMarker(controller.getActiveTeam(), shotType, result, lastCursorPos);
-        controller.applyShot(controller.getActiveTeam(), shotType, result, markerEl);
+        const pos = { ...lastCursorPos }; // Copy position before it changes
+        const markerEl = addShotMarker(controller.getActiveTeam(), shotType, result, pos);
+        controller.applyShot(controller.getActiveTeam(), shotType, result, markerEl, pos);
       } else {
-        // Otherwise use button click (no coordinates)
-        const btn = document.querySelector(`button[data-shot="${shotType}"][data-result="${result}"]`);
-        if (btn && !btn.disabled) {
-          btn.click();
-        }
+        // No coordinates available
+        controller.applyShot(controller.getActiveTeam(), shotType, result, null, null);
       }
       return;
     }
-    
+
     // F - FT Made, Shift+F - FT Missed
     if (key === 'f') {
       e.preventDefault();
       const shotType = 'ft';
       const result = isShift ? 'missed' : 'made';
-      
+
       // If cursor is over court, record with coordinates
       if (lastCursorPos) {
-        const markerEl = addShotMarker(controller.getActiveTeam(), shotType, result, lastCursorPos);
-        controller.applyShot(controller.getActiveTeam(), shotType, result, markerEl);
+        const pos = { ...lastCursorPos }; // Copy position before it changes
+        const markerEl = addShotMarker(controller.getActiveTeam(), shotType, result, pos);
+        controller.applyShot(controller.getActiveTeam(), shotType, result, markerEl, pos);
       } else {
-        // Otherwise use button click (no coordinates)
-        const btn = document.querySelector(`button[data-shot="${shotType}"][data-result="${result}"]`);
-        if (btn && !btn.disabled) {
-          btn.click();
-        }
+        // No coordinates available
+        controller.applyShot(controller.getActiveTeam(), shotType, result, null, null);
       }
       return;
     }
