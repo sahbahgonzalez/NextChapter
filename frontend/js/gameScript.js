@@ -5,6 +5,7 @@
 let timerInterval;
 let secondsElapsed = 0;
 let isPaused = false;
+let isTimeout = false;
 let pendingShotType = null;
 let isGameRunning = false;
 
@@ -832,6 +833,12 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
 
   async function applyShot(teamKey, shotType, result, markerEl = null, pos = null) {
+    // Check if game is paused or in timeout
+    if (isPaused || isTimeout) {
+      if (markerEl) markerEl.remove(); // Clean up marker if it was created
+      return;
+    }
+
     // Check if a player is assigned before recording the shot
     const playerId = getPlayerId(teamKey);
     if (!playerId) {
@@ -880,6 +887,11 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
 
   async function incrementFoul(teamKey) {
+    // Check if game is paused or in timeout
+    if (isPaused || isTimeout) {
+      return;
+    }
+
     // Check if a player is assigned before recording the foul
     const playerId = getPlayerId(teamKey);
     if (!playerId) {
@@ -909,6 +921,9 @@ document.addEventListener("DOMContentLoaded", async () => {
   function openFtModal(teamKey) {
     if (!isGameRunning) {
       showStartError('Assign both players and press Start Game.');
+      return;
+    }
+    if (isPaused || isTimeout) {
       return;
     }
     if (!playersAssigned()) {
@@ -1038,6 +1053,35 @@ document.addEventListener("DOMContentLoaded", async () => {
     closeBtn: document.getElementById('timeoutCloseBtn'),
   };
 
+  const timeoutAlertModal = document.getElementById('timeoutAlertModal');
+  const timeoutAlertClose = document.getElementById('timeoutAlertClose');
+  let timeoutAlertTimer = null;
+
+  function showTimeoutAlert() {
+    if (timeoutAlertModal) {
+      timeoutAlertModal.style.display = 'flex';
+      // Clear any existing timer
+      if (timeoutAlertTimer) clearTimeout(timeoutAlertTimer);
+      timeoutAlertTimer = setTimeout(() => {
+        timeoutAlertModal.style.display = 'none';
+      }, 3000);
+    }
+  }
+
+  function closeTimeoutAlert() {
+    if (timeoutAlertModal) {
+      timeoutAlertModal.style.display = 'none';
+      if (timeoutAlertTimer) {
+        clearTimeout(timeoutAlertTimer);
+        timeoutAlertTimer = null;
+      }
+    }
+  }
+
+  if (timeoutAlertClose) {
+    timeoutAlertClose.addEventListener('click', closeTimeoutAlert);
+  }
+
   const timeoutBtn = document.getElementById('timeoutBtn');
 
   function closeTimeoutModal() {
@@ -1068,6 +1112,10 @@ document.addEventListener("DOMContentLoaded", async () => {
         showStartError('Assign both players and press Start Game.');
         return;
       }
+      if (isTimeout) {
+        showTimeoutAlert();
+        return;
+      }
       console.log('Opening timeout modal');
       openTimeoutModal();
     });
@@ -1080,10 +1128,9 @@ document.addEventListener("DOMContentLoaded", async () => {
       const playerName = gameContext.players.A?.name || 'Team A';
       console.log('Timeout called by', playerName);
       state.history.push({ type: 'timeout', team: 'A', timestamp: new Date() });
-      // Pause the game and update button to "Play"
-      stopTimer();
-      isPaused = true;
-      if (pauseGameBtn) pauseGameBtn.innerHTML = 'Play <span class="hotkey-hint">P</span>';
+      // Block stats but keep timer running
+      isTimeout = true;
+      if (pauseGameBtn) pauseGameBtn.innerHTML = 'Resume <span class="hotkey-hint">P</span>';
       closeTimeoutModal();
       updateUI();
     });
@@ -1094,10 +1141,9 @@ document.addEventListener("DOMContentLoaded", async () => {
       const playerName = gameContext.players.B?.name || 'Team B';
       console.log('Timeout called by', playerName);
       state.history.push({ type: 'timeout', team: 'B', timestamp: new Date() });
-      // Pause the game and update button to "Play"
-      stopTimer();
-      isPaused = true;
-      if (pauseGameBtn) pauseGameBtn.innerHTML = 'Play <span class="hotkey-hint">P</span>';
+      // Block stats but keep timer running
+      isTimeout = true;
+      if (pauseGameBtn) pauseGameBtn.innerHTML = 'Resume <span class="hotkey-hint">P</span>';
       closeTimeoutModal();
       updateUI();
     });
@@ -1151,6 +1197,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   document.querySelectorAll('#shot_buttons .btn-stat').forEach(btn => {
     btn.addEventListener('click', () => {
       if (!isGameRunning) { showStartError('Assign both players and press Start Game.'); return; }
+      if (isPaused || isTimeout) return;
       const shot = btn.getAttribute('data-shot');
       const result = btn.getAttribute('data-result');
 
@@ -1177,6 +1224,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     // These are handled in mousedown, so don't use the click event
     courtImg.addEventListener('mousedown', (evt) => {
       if (!isGameRunning) return;
+      if (isPaused || isTimeout) return;
 
       // Left click = Make (button 0)
       if (evt.button === 0) {
@@ -1262,6 +1310,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       e.stopPropagation();
       console.log('Close button clicked');
       if (postGameModal) postGameModal.style.display = 'none';
+      resetGameUI();
     });
   }
 
@@ -1270,6 +1319,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       if (e.target === postGameModal) {
         console.log('Overlay clicked');
         postGameModal.style.display = 'none';
+        resetGameUI();
       }
     });
   }
@@ -1529,6 +1579,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     state.B = { twoPA: 0, twoPM: 0, threePA: 0, threePM: 0, ftA: 0, ftM: 0, fouls: 0 };
     state.history = [];
     state.active = 'A';
+    isTimeout = false;
     
     // Clear shot markers from court
     const shotMarkersEl = document.getElementById('shot_markers');
@@ -1691,6 +1742,7 @@ document.addEventListener("DOMContentLoaded", async () => {
           timerDisplay.textContent = '00:00';
           pauseGameBtn.innerHTML = 'Pause <span class="hotkey-hint">P</span>';
           isPaused = false;
+          isTimeout = false;
           isGameRunning = false;
           setActionsEnabled(false);
         } catch (error) {
@@ -1703,6 +1755,13 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
 
     onPauseResumeClick() {
+      // If in timeout (stats blocked but timer running), just clear timeout
+      if (isTimeout && !isPaused) {
+        isTimeout = false;
+        pauseGameBtn.innerHTML = 'Pause <span class="hotkey-hint">P</span>';
+        return;
+      }
+
       if (!isPaused) {
         stopTimer();
         pauseGameBtn.innerHTML = 'Play <span class="hotkey-hint">P</span>';
@@ -1711,6 +1770,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         startTimer();
         pauseGameBtn.innerHTML = 'Pause <span class="hotkey-hint">P</span>';
         isPaused = false;
+        isTimeout = false; // Clear timeout when resuming from pause
       }
     }
 
@@ -1830,16 +1890,18 @@ document.addEventListener("DOMContentLoaded", async () => {
     // A - Foul on Team A
     if (key === 'a') {
       e.preventDefault();
+      if (isPaused || isTimeout) return;
       const foulBtn = document.getElementById('teamAFoulPlus');
       if (foulBtn && !foulBtn.disabled) {
         foulBtn.click();
       }
       return;
     }
-    
+
     // B - Foul on Team B
     if (key === 'b') {
       e.preventDefault();
+      if (isPaused || isTimeout) return;
       const foulBtn = document.getElementById('teamBFoulPlus');
       if (foulBtn && !foulBtn.disabled) {
         foulBtn.click();
@@ -1850,6 +1912,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     // M - Shot Made (auto-detect 2PT/3PT from cursor position)
     if (key === 'm') {
       e.preventDefault();
+      if (isPaused || isTimeout) return;
       const result = 'made';
 
       // Must have cursor over court to record shot
@@ -1867,6 +1930,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     // X - Shot Missed (auto-detect 2PT/3PT from cursor position)
     if (key === 'x') {
       e.preventDefault();
+      if (isPaused || isTimeout) return;
       const result = 'missed';
 
       // Must have cursor over court to record shot
@@ -1884,6 +1948,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     // 3 - 3PT Made, Shift+3 - 3PT Missed
     if (key === '3' || key === '#') {
       e.preventDefault();
+      if (isPaused || isTimeout) return;
       const shotType = '3pt';
       const result = isShift ? 'missed' : 'made';
 
@@ -1902,6 +1967,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     // 2 - 2PT Made, Shift+2 - 2PT Missed
     if (key === '2' || key === '@') {
       e.preventDefault();
+      if (isPaused || isTimeout) return;
       const shotType = '2pt';
       const result = isShift ? 'missed' : 'made';
 
@@ -1920,6 +1986,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     // F - FT Made, Shift+F - FT Missed
     if (key === 'f') {
       e.preventDefault();
+      if (isPaused || isTimeout) return;
       const shotType = 'ft';
       const result = isShift ? 'missed' : 'made';
 

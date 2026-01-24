@@ -7,6 +7,14 @@ let currentPlayerId = null;
 let playerData = null;
 let playerGames = [];
 
+// Helper function to format height from inches to feet'inches"
+function formatHeight(totalInches) {
+    if (!totalInches) return 'N/A';
+    const feet = Math.floor(totalInches / 12);
+    const inches = totalInches % 12;
+    return `${feet}'${inches}"`;
+}
+
 // Initialize
 document.addEventListener('DOMContentLoaded', () => {
     setupNavigation();
@@ -125,7 +133,7 @@ function renderPlayerStats() {
                     </div>
                     <div class="meta-item">
                         <span class="meta-label">Height</span>
-                        <span class="meta-value">${playerData.height_inches ? playerData.height_inches + '"' : 'N/A'}</span>
+                        <span class="meta-value">${formatHeight(playerData.height_inches)}</span>
                     </div>
                     <div class="meta-item">
                         <span class="meta-label">Weight</span>
@@ -247,7 +255,7 @@ function renderPlayerStats() {
                     </thead>
                     <tbody>
                         ${playerGames.map(game => `
-                            <tr>
+                            <tr onclick="window.location.href='game-report.html?id=${game._id}'" style="cursor: pointer;" title="View game report">
                                 <td>${new Date(game.createdAt).toLocaleDateString()}</td>
                                 <td>${game.game_type || 'Game'}</td>
                                 <td>${game.status === 'finished' ? 'Finished' : 'In Progress'}</td>

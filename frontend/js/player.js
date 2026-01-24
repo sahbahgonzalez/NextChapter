@@ -6,6 +6,14 @@
 let currentEditingId = null;
 let allPlayers = [];
 
+// Helper function to format height from inches to feet'inches"
+function formatHeight(totalInches) {
+    if (!totalInches) return 'N/A';
+    const feet = Math.floor(totalInches / 12);
+    const inches = totalInches % 12;
+    return `${feet}'${inches}"`;
+}
+
 // Initialize
 document.addEventListener('DOMContentLoaded', () => {
     loadPlayers();
@@ -128,7 +136,7 @@ function renderPlayers(players) {
             <div class="player-stats">
                 <div class="stat-item">
                     <div class="stat-label">Height</div>
-                    <div class="stat-value">${player.height_inches ? player.height_inches + '"' : 'N/A'}</div>
+                    <div class="stat-value">${formatHeight(player.height_inches)}</div>
                 </div>
                 <div class="stat-item">
                     <div class="stat-label">Weight</div>
@@ -170,7 +178,18 @@ function editPlayer(id) {
     document.getElementById('playerName').value = player.name || '';
     document.getElementById('playerIG').value = player.instagram_handle || '';
     document.getElementById('playerBio').value = player.bio || '';
-    document.getElementById('playerHeight').value = player.height_inches || '';
+
+    // Convert total inches to feet and inches
+    if (player.height_inches) {
+        const feet = Math.floor(player.height_inches / 12);
+        const inches = player.height_inches % 12;
+        document.getElementById('playerHeightFeet').value = feet;
+        document.getElementById('playerHeightInches').value = inches;
+    } else {
+        document.getElementById('playerHeightFeet').value = '';
+        document.getElementById('playerHeightInches').value = '';
+    }
+
     document.getElementById('playerWeight').value = player.weight_lbs || '';
     document.getElementById('playerHometown').value = player.hometown || '';
     document.getElementById('playerModal').classList.add('active');
@@ -184,11 +203,19 @@ function closePlayerModal() {
 async function handlePlayerFormSubmit(e) {
     e.preventDefault();
 
+    // Convert feet and inches to total inches
+    const feet = document.getElementById('playerHeightFeet').value;
+    const inches = document.getElementById('playerHeightInches').value;
+    let totalInches = null;
+    if (feet || inches) {
+        totalInches = (parseInt(feet) || 0) * 12 + (parseInt(inches) || 0);
+    }
+
     const playerData = {
         name: document.getElementById('playerName').value,
         instagram_handle: document.getElementById('playerIG').value,
         bio: document.getElementById('playerBio').value,
-        height_inches: document.getElementById('playerHeight').value ? parseInt(document.getElementById('playerHeight').value) : null,
+        height_inches: totalInches,
         weight_lbs: document.getElementById('playerWeight').value ? parseInt(document.getElementById('playerWeight').value) : null,
         hometown: document.getElementById('playerHometown').value
     };
