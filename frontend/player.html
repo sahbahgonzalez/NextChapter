@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Player Management | TheNextChapter</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="css/shared.css">
+    <style>
+        /* Page-specific styles for player.html */
+        .stat-item {
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+    <!-- Navigation -->
+    <nav id="site-nav">
+        <div class="nav-inner">
+            <div class="brand-left">
+                <div class="nav-logo"><img src="assets/tnclogo.svg" alt="The Next Chapter" /></div>
+                <span class="brand-text">The Next Chapter</span>
+            </div>
+            <div class="nav-links">
+                <a href="index.html">Home</a>
+                <a href="index.html#stats">Stats</a>
+                <a href="player.html" style="font-weight: 600;">Players</a>
+                <a href="games.html">Games</a>
+                <a href="game.html" id="nav-log-game-link">Log Game</a>
+            </div>
+            <div class="nav-actions">
+                <button class="btn-outline-tnc" id="nav-sign-in">Sign In</button>
+                <button class="btn-outline-tnc" id="nav-sign-out" style="display:none;">Sign Out</button>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <div class="page-container">
+        <!-- Page Header -->
+        <div class="page-header">
+            <h1>Player Management</h1>
+            <p>Create, update, and manage all player profiles</p>
+        </div>
+
+        <!-- Alert Messages -->
+        <div id="successAlert" class="alert alert-success"></div>
+        <div id="errorAlert" class="alert alert-error"></div>
+
+        <!-- Controls Bar -->
+        <div class="controls-bar">
+            <input 
+                type="text" 
+                id="searchInput" 
+                class="search-box" 
+                placeholder="Search players by name or Instagram handle..."
+            >
+            <button id="createPlayerBtn" class="btn btn-primary">+ Create Player</button>
+        </div>
+
+        <!-- Players Grid -->
+        <div id="playersContainer" class="players-grid"></div>
+
+        <!-- Empty State -->
+        <div id="emptyState" class="empty-state" style="display: none;">
+            <h3>No Players Found</h3>
+            <p>Get started by creating your first player profile.</p>
+        </div>
+    </div>
+
+    <!-- Create/Edit Player Modal -->
+    <div id="playerModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="modalTitle">Create New Player</h2>
+            </div>
+            <form id="playerForm">
+                <div class="form-group">
+                    <label for="playerName">Player Name *</label>
+                    <input type="text" id="playerName" placeholder="Full name" required>
+                </div>
+                <div class="form-group">
+                    <label for="playerIG">Instagram Handle</label>
+                    <input type="text" id="playerIG" placeholder="@handle">
+                </div>
+                <div class="form-group">
+                    <label for="playerBio">Bio</label>
+                    <textarea id="playerBio" placeholder="Player bio" rows="3"></textarea>
+                </div>
+                <div class="form-group">
+                    <label>Height</label>
+                    <div style="display: flex; gap: 8px; align-items: center;">
+                        <input type="number" id="playerHeightFeet" placeholder="ft" min="0" max="8" style="width: 70px;">
+                        <span>ft</span>
+                        <input type="number" id="playerHeightInches" placeholder="in" min="0" max="11" style="width: 70px;">
+                        <span>in</span>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="playerWeight">Weight (lbs)</label>
+                    <input type="number" id="playerWeight" placeholder="e.g., 180">
+                </div>
+                <div class="form-group">
+                    <label for="playerHometown">Hometown</label>
+                    <input type="text" id="playerHometown" placeholder="City, State">
+                </div>
+                <div class="modal-actions">
+                    <button type="submit" class="btn btn-primary">Save Player</button>
+                    <button type="button" class="btn btn-secondary" onclick="closePlayerModal()">Cancel</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Dark mode toggle removed -->
+
+    <!-- Login Modal -->
+    <div id="login-modal" class="login-modal">
+        <div class="login-content">
+            <h2>Admin Login</h2>
+            <input type="email" id="login-email" placeholder="Email" required>
+            <input type="password" id="login-password" placeholder="Password" required>
+            <div class="login-buttons">
+                <button id="login-submit">Sign In</button>
+                <button id="login-cancel">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="utils/api.js"></script>
+    <script src="js/player.js"></script>
+</body>
+</html>

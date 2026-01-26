@@ -12,7 +12,9 @@
 (function(window) {
   'use strict';
 
-  const API_BASE_URL = 'https://the-next-chapter-backend.onrender.com';
+  const API_BASE_URL = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
+    ? 'http://localhost:3000'
+    : 'https://the-next-chapter-backend.onrender.com';
 
   // -----------------------------------------------------------------
   // 2. CORE HELPER FUNCTIONS
@@ -110,9 +112,9 @@
   apiClient.logout = function() {
     localStorage.removeItem('authToken');
     localStorage.removeItem('user');
-    // Redirect to login page
-    window.location.href = '/login.html';
     console.log('Logged out');
+    // Reload current page to update UI
+    location.reload();
   };
 
   apiClient.getUser = function() {
@@ -145,7 +147,35 @@
   };
 
   apiClient.searchPlayers = async function(searchTerm) {
-    return _fetchPublic(`/player?search=${encodeURIComponent(searchTerm)}`);
+    // If called with no argument or an empty/whitespace string, request all players
+    if (searchTerm === undefined || searchTerm === null) {
+      try {
+        return await _fetchPublic('/player?limit=0');
+      } catch (err) {
+        // Backwards-compatible fallback: some deployed backends still require a search term
+        if (err && err.message && err.message.toLowerCase().includes('search term is required')) {
+          console.warn('Backend requires a search term; falling back to space-based search');
+          return _fetchPublic('/player?search=%20');
+        }
+        throw err;
+      }
+    }
+
+    const raw = String(searchTerm);
+    if (raw.trim().length === 0) {
+      try {
+        return await _fetchPublic('/player?limit=0');
+      } catch (err) {
+        if (err && err.message && err.message.toLowerCase().includes('search term is required')) {
+          console.warn('Backend requires a search term; falling back to space-based search');
+          return _fetchPublic('/player?search=%20');
+        }
+        throw err;
+      }
+    }
+
+    // Otherwise search by the trimmed term
+    return _fetchPublic(`/player?search=${encodeURIComponent(raw.trim())}`);
   };
 
   apiClient.getPlayerById = async function(playerId) {
@@ -154,6 +184,14 @@
 
   apiClient.getPlayerRecentGames = async function(playerId) {
     return _fetchPublic(`/player/${playerId}/games`);
+  };
+
+  apiClient.getPlayerShotChart = async function(playerId, gameId) {
+    let url = `/player/${playerId}/shot-chart`;
+    if (gameId) {
+      url += `?gameId=${gameId}`;
+    }
+    return _fetchPublic(url);
   };
 
 
@@ -183,6 +221,22 @@
 
   apiClient.getGameById = async function(gameId) {
     return _fetchPublic(`/game/${gameId}`);
+  };
+
+  apiClient.getAllGames = async function() {
+    return _fetchPublic('/game');
+  };
+
+  apiClient.createGame = async function(gameData) {
+    return _fetchWithToken('/game', 'POST', gameData);
+  };
+
+  apiClient.updateGame = async function(gameId, gameData) {
+    return _fetchWithToken(`/game/${gameId}`, 'PATCH', gameData);
+  };
+
+  apiClient.deleteGame = async function(gameId) {
+    return _fetchWithToken(`/game/${gameId}`, 'DELETE');
   };
 
   window.apiClient = apiClient;

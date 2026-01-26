@@ -328,36 +328,6 @@ const createGame = async (request, response) => {
     }
 };
 
-const updateGame = async (request, response) => {
-    const { id } = request.params;
-    const updates = request.body;
-
-    if (!mongoose.Types.ObjectId.isValid(id)) {
-        return response.status(400).json({ message: 'Invalid Game ID format' });
-    }
-
-    try {
-        const updatedGame = await Game.findByIdAndUpdate(
-            id,
-            updates,
-            {
-                new: true,
-                runValidators: true // This ensures your schema validations (e.g., 'required' fields) run
-            }
-        );
-
-        if (!updatedGame) {
-            return response.status(404).json({ message: 'Game not found' });
-        }
-
-        return response.status(200).json(updatedGame);
-
-    } catch (error) {
-        console.error('Error updating game:', error);
-        return response.status(500).json({ message: 'Server error while updating game', error: error.message });
-    }
-}
-
 const addGameEvent = async (request, response) => {
     const { id: gameId } = request.params;
     const eventData = request.body;
@@ -463,6 +433,22 @@ const getGameById = async (request, response) => {
     }
 };
 
+const getAllGames = async (request, response) => {
+    try {
+        const games = await Game.find()
+            .sort({ createdAt: -1 })
+            .lean();
+
+        console.log('Successfully retrieved games:', games.length);
+        response.status(200).json(games);
+
+    } catch (error) {
+        console.error("Games Retrieval Error:", error.message);
+        console.error("Full error:", error);
+        response.status(500).json({ message: 'Server error during games retrieval', error: error.message });
+    }
+};
+
 const finalizeGame = async (request, response) => {
     const { id: gameId } = request.params;
 
@@ -524,6 +510,7 @@ const cancelGame = async (request, response) => {
     }
 };
 
+<<<<<<< HEAD
 module.exports = {
     createGame,
     updateGame,
@@ -532,4 +519,33 @@ module.exports = {
     finalizeGame,
     cancelGame
 };
+=======
+class GameController {
+    async createGame(request, response) {
+        return await createGame(request, response);
+    }
+
+    async addGameEvent(request, response) {
+        return await addGameEvent(request, response);
+    }
+
+    async getGameById(request, response) {
+        return await getGameById(request, response);
+    }
+
+    async getAllGames(request, response) {
+        return await getAllGames(request, response);
+    }
+
+    async finalizeGame(request, response) {
+        return await finalizeGame(request, response);
+    }
+
+    async cancelGame(request, response) {
+        return await cancelGame(request, response);
+    }
+}
+
+module.exports = new GameController();
+>>>>>>> 24e3e91f6f8cfa0c569c59b1611bf2c232feaf98
 

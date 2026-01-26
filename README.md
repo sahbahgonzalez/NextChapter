@@ -2,7 +2,11 @@
 
 A full-stack basketball shot logging and player analytics application. Track player performance, log shots, and analyze game statistics in real-time.
 
+<<<<<<< HEAD
 ## 📋 Table of Contents
+=======
+## Table of Contents
+>>>>>>> 24e3e91f6f8cfa0c569c59b1611bf2c232feaf98
 
 - [Features](#features)
 - [Tech Stack](#tech-stack)
@@ -14,7 +18,11 @@ A full-stack basketball shot logging and player analytics application. Track pla
 - [Database](#database)
 - [Development](#development)
 
+<<<<<<< HEAD
 ## ✨ Features
+=======
+## Features
+>>>>>>> 24e3e91f6f8cfa0c569c59b1611bf2c232feaf98
 
 - **Player Management**: Create, update, and manage player profiles
 - **Shot Logging**: Record shot attempts with coordinates, points, and game details
@@ -24,7 +32,11 @@ A full-stack basketball shot logging and player analytics application. Track pla
 - **Responsive Design**: Works on desktop and mobile devices
 - **Search Functionality**: Search and filter players by name or Instagram handle
 
+<<<<<<< HEAD
 ## 🛠 Tech Stack
+=======
+## Tech Stack
+>>>>>>> 24e3e91f6f8cfa0c569c59b1611bf2c232feaf98
 
 ### Backend
 - **Node.js** with Express.js
@@ -39,7 +51,11 @@ A full-stack basketball shot logging and player analytics application. Track pla
 - **Vanilla JavaScript** (no framework dependencies)
 - **Fetch API** for HTTP requests
 
+<<<<<<< HEAD
 ## 📁 Project Structure
+=======
+## Project Structure
+>>>>>>> 24e3e91f6f8cfa0c569c59b1611bf2c232feaf98
 
 ```
 NextChapter/
@@ -65,6 +81,7 @@ NextChapter/
 │   │       └── controller.js  # User logic
 │   ├── migrations/
 │   │   └── migrate_players.js # Database migrations
+<<<<<<< HEAD
 │   ├── utils/
 │   │   └── hashPassword.js    # Password hashing utility
 │   └── public/
@@ -82,6 +99,32 @@ NextChapter/
 ```
 
 ## 🚀 Installation
+=======
+│   └── utils/
+│       └── hashPassword.js    # Password hashing utility
+├── frontend/
+│   ├── index.html             # Main application page
+│   ├── game.html              # Game tracker page
+│   ├── games.html             # Games list page
+│   ├── player.html            # Player management page
+│   ├── player-stats.html      # Player statistics page
+│   ├── css/
+│   │   └── shared.css         # Global styles
+│   ├── js/
+│   │   ├── gameScript.js      # Game tracker logic
+│   │   ├── games.js           # Games page logic
+│   │   ├── player.js          # Player page logic
+│   │   └── player-stats.js    # Player stats logic
+│   ├── utils/
+│   │   ├── api.js             # API client wrapper
+│   │   └── app.js             # Frontend utilities
+│   └── assets/                # Static assets (images, SVGs)
+├── documentation/             # Project documentation
+└── README.md                  # This file
+```
+
+## Installation
+>>>>>>> 24e3e91f6f8cfa0c569c59b1611bf2c232feaf98
 
 ### Prerequisites
 - Node.js (v14 or higher)
@@ -120,7 +163,11 @@ NextChapter/
    - Navigate to `http://localhost:3000` in your browser
    - The frontend files are served automatically by Express
 
+<<<<<<< HEAD
 ## ⚙️ Configuration
+=======
+## Configuration
+>>>>>>> 24e3e91f6f8cfa0c569c59b1611bf2c232feaf98
 
 ### MongoDB Connection
 Update the `MONGODB_URI` in your `.env` file with your MongoDB Atlas connection string. Format:
@@ -136,7 +183,11 @@ Change the `JWT_SECRET` to a secure random string for production use.
 ### Database Name
 The application uses the `nextChapterDb` database by default.
 
+<<<<<<< HEAD
 ## 💻 Usage
+=======
+## Usage
+>>>>>>> 24e3e91f6f8cfa0c569c59b1611bf2c232feaf98
 
 ### Running the Application
 
@@ -164,7 +215,11 @@ cd backend
 npm run migrate:players
 ```
 
+<<<<<<< HEAD
 ## 🔌 API Endpoints
+=======
+## API Endpoints
+>>>>>>> 24e3e91f6f8cfa0c569c59b1611bf2c232feaf98
 
 ### Authentication
 - `POST /user/login` - User login
@@ -185,7 +240,11 @@ npm run migrate:players
 - `PATCH /game/:id` - Update game (admin only)
 - `DELETE /game/:id` - Delete game (admin only)
 
+<<<<<<< HEAD
 ## 🗄️ Database
+=======
+## Database
+>>>>>>> 24e3e91f6f8cfa0c569c59b1611bf2c232feaf98
 
 ### Collections
 
@@ -203,7 +262,11 @@ npm run migrate:players
 - References to all participating players
 - Shot data for performance tracking
 
+<<<<<<< HEAD
 ## 🔧 Development
+=======
+## Development
+>>>>>>> 24e3e91f6f8cfa0c569c59b1611bf2c232feaf98
 
 ### Adding New Features
 
@@ -237,6 +300,7 @@ npm run migrate:players
 - Ensure the frontend is served from the same origin as the API
 - Check that CORS is properly enabled in `app.js`
 
+<<<<<<< HEAD
 ## 📝 License
 
 ISC
@@ -248,3 +312,17 @@ Lazaro Loureiro
 ---
 
 **Last Updated**: January 2026
+=======
+## License
+
+ISC
+
+## Authors
+
+- Lazaro Loureiro
+- Daniel Arriaga-Franco
+
+---
+
+**Last Updated**: January 2026
+>>>>>>> 24e3e91f6f8cfa0c569c59b1611bf2c232feaf98

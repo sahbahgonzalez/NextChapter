@@ -168,10 +168,17 @@ class AuthManager {
         emailInput.value = '';
         passInput.value = '';
 
+<<<<<<< HEAD
         submitBtn.onclick = async () => {
             const email = emailInput.value.trim();
             const password = passInput.value.trim();
             
+=======
+        const handleSubmit = async () => {
+            const email = emailInput.value.trim();
+            const password = passInput.value.trim();
+
+>>>>>>> 24e3e91f6f8cfa0c569c59b1611bf2c232feaf98
             if (!email || !password) {
                 return alert('Please enter both fields.');
             }
@@ -189,6 +196,20 @@ class AuthManager {
             }
         };
 
+<<<<<<< HEAD
+=======
+        submitBtn.onclick = handleSubmit;
+
+        const handleKeyPress = (e) => {
+            if (e.key === 'Enter') {
+                handleSubmit();
+            }
+        };
+
+        emailInput.onkeypress = handleKeyPress;
+        passInput.onkeypress = handleKeyPress;
+
+>>>>>>> 24e3e91f6f8cfa0c569c59b1611bf2c232feaf98
         cancelBtn.onclick = () => {
             modal.style.display = 'none';
         };
@@ -204,6 +225,7 @@ class AuthManager {
         if (user) {
             if (this.signInButton) this.signInButton.style.display = 'none';
             if (this.signOutButton) this.signOutButton.style.display = 'inline-block';
+<<<<<<< HEAD
         } else {
             if (this.signInButton) this.signInButton.style.display = 'inline-block';
             if (this.signOutButton) this.signOutButton.style.display = 'none';
@@ -212,6 +234,13 @@ class AuthManager {
         // Always show Log Game link in header regardless of role/auth state
         if (this.logGameLink) {
             this.logGameLink.style.display = 'inline-block';
+=======
+            if (this.logGameLink) this.logGameLink.style.display = 'inline-block';
+        } else {
+            if (this.signInButton) this.signInButton.style.display = 'inline-block';
+            if (this.signOutButton) this.signOutButton.style.display = 'none';
+            if (this.logGameLink) this.logGameLink.style.display = 'none';
+>>>>>>> 24e3e91f6f8cfa0c569c59b1611bf2c232feaf98
         }
     }
 
@@ -487,13 +516,22 @@ class StatsTableRenderer {
 
             const nameLink = row.querySelector('.player-name-link');
             if (nameLink) {
+<<<<<<< HEAD
                 const rawForNorm = (player.searchKey && player.searchKey.length > 0) 
                     ? player.searchKey 
+=======
+                const rawForNorm = (player.searchKey && player.searchKey.length > 0)
+                    ? player.searchKey
+>>>>>>> 24e3e91f6f8cfa0c569c59b1611bf2c232feaf98
                     : (nameLink.textContent || nameLink.innerText || '');
                 const txtValue = String(rawForNorm).toUpperCase();
                 nameLink.dataset.normalized = txtValue.replace(/\s+/g, '');
                 nameLink.addEventListener('click', () => {
+<<<<<<< HEAD
                     this.displayPlayerProfile(player);
+=======
+                    window.location.href = `player-stats.html?id=${player._id}`;
+>>>>>>> 24e3e91f6f8cfa0c569c59b1611bf2c232feaf98
                 });
             }
         });
@@ -801,7 +839,11 @@ class PlayerManager {
                     <td>${gp}</td>
                     <td>
                         <button class="delete-button" data-player-id="${player._id}" data-player-name="${displayName}">
+<<<<<<< HEAD
                             🗑️ Delete
+=======
+                            Delete
+>>>>>>> 24e3e91f6f8cfa0c569c59b1611bf2c232feaf98
                         </button>
                     </td>
                 `;
@@ -829,7 +871,11 @@ class PlayerManager {
                     const editBtn = document.createElement('button');
                     editBtn.className = 'action-button';
                     editBtn.style.marginRight = '8px';
+<<<<<<< HEAD
                     editBtn.textContent = '✏️ Edit';
+=======
+                    editBtn.textContent = 'Edit';
+>>>>>>> 24e3e91f6f8cfa0c569c59b1611bf2c232feaf98
                     editBtn.setAttribute('data-player-id', player._id);
                     editBtn.addEventListener('click', () => {
                         this.showEditPlayerModal(player);

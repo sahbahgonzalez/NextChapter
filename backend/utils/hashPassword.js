@@ -1,13 +1,24 @@
 const bcrypt = require('bcryptjs');
 
-const plainPassword = 'fedou1999'; // The password the user will type
-
-// --- Generate the hash ---
-bcrypt.hash(plainPassword, 10, (err, hash) => {
-    if (err) {
-        console.error('Error hashing password:', err);
-        return;
+/**
+ * PasswordHasher
+ * Simple OOP wrapper around bcrypt for hashing and verifying passwords.
+ * Usage:
+ *   const hasher = require('./hashPassword');
+ *   const hash = await hasher.hash('plainPassword');
+ *   const ok = await hasher.compare('plainPassword', hash);
+ */
+class PasswordHasher {
+    static async hash(plainText) {
+        if (typeof plainText !== 'string') throw new TypeError('Password must be a string');
+        const saltRounds = 10;
+        return await bcrypt.hash(plainText, saltRounds);
     }
-    console.log('Plain Password:', plainPassword);
-    console.log('Hashed Password:', hash); // save hash manually in DB
-});
+
+    static async compare(plainText, hashed) {
+        if (typeof plainText !== 'string' || typeof hashed !== 'string') return false;
+        return await bcrypt.compare(plainText, hashed);
+    }
+}
+
+module.exports = PasswordHasher;

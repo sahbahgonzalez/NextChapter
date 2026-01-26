@@ -1,6 +1,5 @@
 const jwt = require('jsonwebtoken');
 const User = require('../tables/user/model');
-require('dotenv').config();
 
 /**
  * Middleware to verify JWT token and attach user to request object.
@@ -18,7 +17,7 @@ const protect = async (req, res, next) => {
             // Get token from header (Bearer Token)
             token = req.headers.authorization.split(' ')[1];
 
-            // Verify the token using the secret key in environtment file
+            // Verify the token using the secret key in environment (loaded by app.js)
             const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
             // Fetch the user associated with the token
