@@ -469,7 +469,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     marker.classList.add('shot-marker');
     marker.classList.add(result === 'made' ? 'made' : 'missed');
     marker.classList.add(teamKey === 'A' ? 'team-a' : 'team-b');
-    
+
     // Add player initials to the marker
     const player = gameContext.players[teamKey];
     const initials = player?.name ? player.name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) : teamKey;
@@ -480,7 +480,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     marker.style.alignItems = 'center';
     marker.style.justifyContent = 'center';
     marker.style.color = result === 'made' ? '#fff' : '#333';
-    
+
     marker.title = `${player?.name || teamKey} - ${shotType.toUpperCase()} ${result}`;
     marker.style.left = `${pos.xPct}%`;
     marker.style.top = `${pos.yPct}%`;
@@ -488,10 +488,10 @@ document.addEventListener("DOMContentLoaded", async () => {
     marker.dataset.shotType = shotType;
     marker.dataset.result = result;
     shotMarkersEl.appendChild(marker);
-    
+
     // Log to shot history
     logShotToHistory(teamKey, shotType, result);
-    
+
     return marker;
   }
 
