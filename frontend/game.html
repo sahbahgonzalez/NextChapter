@@ -136,12 +136,18 @@
               <div>FT: <span id="teamAft">0/0</span> <button class="btn btn-small btn-ft" id="teamAFtBtn" title="Log FT for A">FT</button></div>
               <div>Fouls: <span id="teamAFouls">0</span> <button class="btn btn-small btn-foul" id="teamAFoulBtn" title="Add foul to A">+</button></div>
             </div>
+            <div class="player-actions" aria-live="polite">
+              <div class="player-actions__header">Actions</div>
+              <div id="action_log_A" class="player-actions__list"></div>
+            </div>
           </div>
           <div class="col-8" id="court_card">
+            <div class="zone-toolbar"></div>
             <div id="court_container">
               <img src="assets/basketballcourt.svg" id="court_image" alt="Basketball Court" />
               <div id="court_overlay" aria-hidden="true">
                 <div class="zone-2pt"></div>
+                <div class="zone-2pt-semicircle"></div>
                 <div class="zone-3pt"></div>
               </div>
               <div id="shot_markers" aria-hidden="true"></div>
@@ -155,6 +161,10 @@
               <div>2PT: <span id="teamB2pt">0/0</span></div>
               <div>FT: <span id="teamBft">0/0</span> <button class="btn btn-small btn-ft" id="teamBFtBtn" title="Log FT for B">FT</button></div>
               <div>Fouls: <span id="teamBFouls">0</span> <button class="btn btn-small btn-foul" id="teamBFoulBtn" title="Add foul to B">+</button></div>
+            </div>
+            <div class="player-actions" aria-live="polite">
+              <div class="player-actions__header">Actions</div>
+              <div id="action_log_B" class="player-actions__list"></div>
             </div>
           </div>
         </div>
@@ -382,25 +392,52 @@
 
     /* 2PT zone (near the basket) */
     .zone-2pt {
+      display: none;
       position: absolute;
-      bottom: 2px;
-      left: 50%;
+      bottom: 62%;
+      left:50%;
       transform: translateX(-50%);
-      width: 55%;
-      height: 35%;
+      width: 86%;
+      height: 26%;
       background: rgba(14, 43, 98, 0.25);
       border: 2px solid #0e2b62;
       border-top: none;
     }
 
+    /* 2PT semicircle zone */
+    .zone-2pt-semicircle {
+      display: none;
+      position: absolute;
+      top: var(--semicircle-top);
+      left: var(--semicircle-left);
+      transform: translateX(-50%) scaleY(-1);
+      width: var(--semicircle-width);
+      height: var(--semicircle-height);
+      background: rgba(14, 43, 98, var(--semicircle-opacity));
+      border: var(--semicircle-border-width) solid #0e2b62;
+      border-bottom: none;
+      clip-path: polygon(
+        var(--clip-p1),
+        var(--clip-p2),
+        var(--clip-p3),
+        var(--clip-p4),
+        var(--clip-p5),
+        var(--clip-p6),
+        var(--clip-p7),
+        var(--clip-p8),
+        var(--clip-p9)
+      );
+    }
+
     /* 3PT zone (outer arc) */
     .zone-3pt {
+      display: none;
       position: absolute;
-      bottom: 0;
+      bottom: 25px;
       left: 50%;
       transform: translateX(-50%);
-      width: 85%;
-      height: 100%;
+      width: 98%;
+      height: 83%;
       border: 3px solid rgba(255, 140, 0, 0.6);
       border-top: none;
       background: rgba(255, 140, 0, 0.05);
@@ -436,6 +473,133 @@
     }
     .shot-marker.team-b {
       box-shadow: 0 0 0 2px rgba(255,160,0,0.35);
+    }
+
+    /* Player actions log */
+    .player-actions {
+      margin-top: 12px;
+      padding: 10px;
+      border: 1px solid rgba(14, 43, 98, 0.15);
+      border-radius: 8px;
+      background: #fff;
+    }
+    .player-actions__header {
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+      color: #0e2b62;
+      margin-bottom: 8px;
+      text-transform: uppercase;
+    }
+    .player-actions__list {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      max-height: 180px;
+      overflow: auto;
+    }
+    .action-item {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 8px;
+      padding: 8px 10px;
+      border: 1px solid rgba(14, 43, 98, 0.15);
+      border-radius: 8px;
+      background: #fafafa;
+      font-size: 12px;
+      transition: all 0.2s ease;
+    }
+    .action-item:hover {
+      background: #f5f5f5;
+      border-color: rgba(14, 43, 98, 0.3);
+    }
+    .action-item.highlighted {
+      background: rgba(255, 193, 7, 0.12);
+      border-color: rgba(255, 193, 7, 0.5);
+      box-shadow: 0 0 0 2px rgba(255, 193, 7, 0.2);
+    }
+    .action-item__content {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      flex: 1;
+      min-width: 0;
+    }
+    .action-item__header {
+      display: flex;
+      align-items: baseline;
+      gap: 8px;
+      min-width: 0;
+    }
+    .action-item__label {
+      font-weight: 600;
+      color: #0e2b62;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .action-item__time {
+      color: #999;
+      font-size: 10px;
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+    .action-item__note {
+      font-size: 12px;
+      color: #333;
+      padding: 6px 8px;
+      background: rgba(14, 43, 98, 0.08);
+      border-left: 3px solid #0e2b62;
+      border-radius: 4px;
+      word-break: break-word;
+      margin-top: 4px;
+      line-height: 1.4;
+    }
+    .action-item__controls {
+      display: flex;
+      gap: 4px;
+      flex-shrink: 0;
+      align-items: center;
+    }
+    .action-btn {
+      border: 1px solid rgba(14, 43, 98, 0.2);
+      background: #fff;
+      color: #0e2b62;
+      padding: 4px 6px;
+      border-radius: 5px;
+      font-size: 12px;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      min-width: 28px;
+      text-align: center;
+    }
+    .action-btn:hover {
+      background: #f0f0f0;
+      border-color: rgba(14, 43, 98, 0.4);
+    }
+    .action-btn.delete {
+      border-color: rgba(244, 67, 54, 0.3);
+      color: #c62828;
+    }
+    .action-btn.delete:hover {
+      background: rgba(244, 67, 54, 0.08);
+      border-color: rgba(244, 67, 54, 0.6);
+    }
+    .action-btn.highlight {
+      border-color: rgba(255, 193, 7, 0.3);
+      color: #f57f17;
+    }
+    .action-btn.highlight:hover {
+      background: rgba(255, 193, 7, 0.1);
+      border-color: rgba(255, 193, 7, 0.6);
+    }
+    .action-btn.add-note {
+      border-color: rgba(33, 150, 243, 0.3);
+    }
+    .action-btn.add-note:hover {
+      background: rgba(33, 150, 243, 0.08);
+      border-color: rgba(33, 150, 243, 0.6);
     }
   </style>
 
