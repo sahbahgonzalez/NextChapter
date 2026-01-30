@@ -242,6 +242,14 @@
     </div>
   </div>
 
+  <!-- Game in progress alert modal -->
+  <div id="gameInProgressModal" class="modal-overlay" style="display:none;">
+    <div class="modal-card" style="width:360px; text-align:center; position:relative;">
+      <button id="gameInProgressClose" class="btn btn-sm" aria-label="Close" style="position:absolute; top:8px; right:8px;">&#10005;</button>
+      <p style="margin:16px 0; font-size:1.1rem; font-weight:600; color:#0e2b62;">Game is in progress...</p>
+    </div>
+  </div>
+
   <!-- Post-game modal -->
   <div id="postGameModal" class="modal-overlay" style="display:none;">
     <div class="modal-card" style="width:400px;">
@@ -423,19 +431,27 @@
       background: rgba(255,255,255,0.85);
       box-shadow: 0 2px 6px rgba(0,0,0,0.25);
     }
-    .shot-marker.made {
-      background: rgba(0, 180, 100, 0.75);
-      border-color: #0f8a4c;
-    }
     .shot-marker.missed {
       background: rgba(255, 80, 80, 0.70);
       border-color: #c62828;
     }
-    .shot-marker.team-a {
-      box-shadow: 0 0 0 2px rgba(31,110,235,0.35);
+    /* Player A: Green for made shots */
+    .shot-marker.team-a.made {
+      background: rgba(0, 180, 100, 0.75);
+      border-color: #0f8a4c;
+      box-shadow: 0 0 0 2px rgba(0, 180, 100, 0.35);
     }
-    .shot-marker.team-b {
-      box-shadow: 0 0 0 2px rgba(255,160,0,0.35);
+    .shot-marker.team-a.missed {
+      box-shadow: 0 0 0 2px rgba(0, 180, 100, 0.35);
+    }
+    /* Player B: Blue for made shots */
+    .shot-marker.team-b.made {
+      background: rgba(31, 110, 235, 0.85);
+      border-color: #1446a0;
+      box-shadow: 0 0 0 2px rgba(31, 110, 235, 0.35);
+    }
+    .shot-marker.team-b.missed {
+      box-shadow: 0 0 0 2px rgba(31, 110, 235, 0.35);
     }
   </style>
 
