@@ -105,7 +105,13 @@ function showLoginModal() {
 
 async function loadPlayers() {
     try {
-        allPlayers = await apiClient.searchPlayers();
+        // CHANGE: Use listAllPlayers (or a direct GET /players/list call) for initial load
+        // If your apiClient doesn't have listPlayers, stick to searchPlayers 
+        // but now the backend handles empty search correctly!
+        
+        // Assuming your apiClient.searchPlayers maps to the GET /players endpoint:
+        allPlayers = await apiClient.searchPlayers(''); // Pass empty string to trigger "return all" logic
+        
         renderPlayers(allPlayers);
     } catch (error) {
         showError('Failed to load players');

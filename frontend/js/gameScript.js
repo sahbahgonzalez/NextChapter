@@ -111,9 +111,9 @@ async function loadGameData(gameId) {
     const teamAButton = document.getElementById("teamAAssignBtn");
     const teamBButton = document.getElementById("teamBAssignBtn");
 
-    // Get player IDs from teams (handle both array of IDs and array of objects)
-    const teamAPlayerIds = game.teams?.team_a || [];
-    const teamBPlayerIds = game.teams?.team_b || [];
+    // Check if it's the new object structure (.players) or the old array structure
+    const teamAPlayerIds = game.teams?.team_a?.players || game.teams?.team_a || [];
+    const teamBPlayerIds = game.teams?.team_b?.players || game.teams?.team_b || [];
 
     // Assign Team A player
     if (teamAPlayerIds.length > 0) {
