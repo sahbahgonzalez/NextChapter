@@ -42,6 +42,26 @@
     --brand-gap: 10px;
     --links-gap: 24px;
     --actions-gap: 10px;
+
+    /* Semicircle Zone Customization */
+    --semicircle-top: 38%;
+    --semicircle-left: 50%;
+    --semicircle-width: 86%;
+    --semicircle-height: 29%;
+    --semicircle-border-width: 2px;
+    --semicircle-opacity: 0.15;
+    
+    /* Semicircle Clip Path Control - Define polygon points */
+    /* Format: x% y% (x is horizontal 0-100%, y is vertical 0-100%) */
+    --clip-p1: 0% 100%;         /* Bottom-left corner */
+    --clip-p2: 3% 80%;          /* Left side point */
+    --clip-p3: 13% 40%;         /* Left curve point */
+    --clip-p4: 26% 15%;         /* Left top curve */
+    --clip-p5: 50% 0%;          /* Top center peak */
+    --clip-p6: 74% 15%;         /* Right top curve */
+    --clip-p7: 87% 40%;         /* Right curve point */
+    --clip-p8: 97% 80%;         /* Right side point */
+    --clip-p9: 100% 100%;       /* Bottom-right corner */
 }
 
 /* ===== RESET & BASE STYLES ===== */
@@ -304,7 +324,7 @@ body.dark-mode .nav-links a:hover {
 .container-fluid { width: 100%; margin: 0 auto; padding: 0 16px; }
 .row { display: flex; flex-wrap: wrap; width: 100%; }
 .col { flex: 1 1 0; min-width: 0; padding: 0 8px; }
-.col-2 { flex: 0 0 16.6667%; max-width: 16.6667%; padding: 0 8px; }
+.col-2 { flex: 0 0 20%; max-width: 20%; padding: 0 8px; }
 .col-8 { flex: 0 0 66.6667%; max-width: 66.6667%; padding: 0 8px; }
 .col-auto { flex: 0 0 auto; width: auto; }
 
@@ -860,9 +880,9 @@ body.dark-mode .player-info p {
 .player-stats {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    gap: 0.75rem;
-    margin-bottom: 1rem;
-    padding: 1rem;
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+    padding: 1.5rem;
     background-color: var(--background-light);
     border-radius: 8px;
 }
@@ -873,7 +893,26 @@ body.dark-mode .player-stats {
 
 .player-actions {
     display: flex;
+    flex-direction: column;
     gap: 0.5rem;
+    margin-top: 2rem;
+    padding-top: 1.5rem;
+    border-top: 1px solid rgba(0, 0, 0, 0.1);
+}
+
+.player-actions__header {
+    font-weight: 700;
+    color: #0e2b62;
+    font-size: 0.95rem;
+    margin-bottom: 0.75rem;
+}
+
+.player-actions__list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    max-height: 400px;
+    overflow-y: auto;
 }
 
 .player-actions .btn {
@@ -1875,13 +1914,16 @@ body.dark-mode .games-table tr:hover {
 
 /* ===== GAME TRACKER PAGE (game.html) ===== */
 #main-content {
-    max-width: 80%;
-    margin: 3rem auto;
+    width: 100%;
+    height: calc(100vh - var(--header-height));
+    margin: 0;
     background: #ffffff;
-    border-radius: 12px;
+    border-radius: 0;
     padding: 1.5rem;
-    box-shadow: 0 8px 24px rgba(16, 24, 40, 0.12), 0 2px 6px rgba(16, 24, 40, 0.06);
-    overflow: hidden;
+    box-shadow: none;
+    overflow: auto;
+    display: flex;
+    flex-direction: column;
 }
 
 #main-content > * {
@@ -1978,6 +2020,8 @@ body.dark-mode .games-table tr:hover {
     color: var(--primary-blue);
     font-weight: 700;
     text-align: center;
+    min-width: 280px;
+    flex: 0 0 auto;
 }
 
 #team_a_players p.selected,
@@ -2330,6 +2374,35 @@ body.dark-mode .games-table tr:hover {
 }
 
 .shot-marker.team-b {
+    box-shadow: 0 0 0 2px rgba(255,160,0,0.35);
+}
+
+/* Foul marker styling */
+.foul-marker {
+    position: absolute;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    transform: translate(-50%, -50%);
+    border: 2px solid #ff6f00;
+    background: rgba(255, 111, 0, 0.2);
+    box-shadow: 0 2px 6px rgba(0,0,0,0.25);
+    z-index: 3;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.foul-marker:hover {
+    background: rgba(255, 111, 0, 0.4);
+    border-color: #ff8c00;
+    transform: translate(-50%, -50%) scale(1.2);
+}
+
+.foul-marker.team-a {
+    box-shadow: 0 0 0 2px rgba(31,110,235,0.35);
+}
+
+.foul-marker.team-b {
     box-shadow: 0 0 0 2px rgba(255,160,0,0.35);
 }
 

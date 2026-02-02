@@ -350,6 +350,10 @@ document.addEventListener("DOMContentLoaded", async () => {
     shotHistory: {
       A: [],  // Store all of player A's shots
       B: []   // Store all of player B's shots
+    },
+    actionHistory: {
+      A: [],
+      B: []
     }
   };
 
@@ -374,6 +378,8 @@ document.addEventListener("DOMContentLoaded", async () => {
       } else if (event.type === 'foul') {
         team.fouls += 1;
       }
+
+      seedActionFromEvent(event, teamKey);
     });
     console.log('Restored stats from loaded game:', { A: state.A, B: state.B });
   }
@@ -392,7 +398,8 @@ document.addEventListener("DOMContentLoaded", async () => {
       ftBtn: document.getElementById('teamAFtBtn'),
       score: document.getElementById('teamAScore'),
       foulPlus: document.getElementById('teamAFoulPlus'),
-      panel: document.getElementById('team_a_players')
+      panel: document.getElementById('team_a_players'),
+      actions: document.getElementById('action_log_A')
     },
     // team B
     b: {
@@ -404,7 +411,8 @@ document.addEventListener("DOMContentLoaded", async () => {
       ftBtn: document.getElementById('teamBFtBtn'),
       score: document.getElementById('teamBScore'),
       foulPlus: document.getElementById('teamBFoulPlus'),
-      panel: document.getElementById('team_b_players')
+      panel: document.getElementById('team_b_players'),
+      actions: document.getElementById('action_log_B')
     },
     activeSideLabel: document.getElementById('activeSideLabel'),
     selectA: document.getElementById('selectTeamA'),
@@ -463,6 +471,32 @@ document.addEventListener("DOMContentLoaded", async () => {
    * @param {'made'|'missed'} result
    * @param {{xPct:number,yPct:number}} pos
    */
+  function addFoulMarker(teamKey, pos) {
+    if (!shotMarkersEl || !pos) return null;
+    
+    const marker = document.createElement('div');
+    marker.classList.add('foul-marker');
+    marker.classList.add(teamKey === 'A' ? 'team-a' : 'team-b');
+    
+    // Add player initials to the marker
+    const player = gameContext.players[teamKey];
+    const initials = player?.name ? player.name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) : teamKey;
+    marker.textContent = '⚠️';  // Warning symbol for foul
+    marker.style.fontSize = '14px';
+    marker.style.display = 'flex';
+    marker.style.alignItems = 'center';
+    marker.style.justifyContent = 'center';
+    
+    marker.title = `${player?.name || teamKey} - Foul`;
+    marker.style.left = `${pos.xPct}%`;
+    marker.style.top = `${pos.yPct}%`;
+    marker.dataset.player = player?.name || teamKey;
+    marker.dataset.type = 'foul';
+    shotMarkersEl.appendChild(marker);
+    
+    return marker;
+  }
+
   function addShotMarker(teamKey, shotType, result, pos) {
     if (!shotMarkersEl || !pos) return;
     const marker = document.createElement('div');
@@ -537,7 +571,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     updateShotLogDisplay();
   }
 
-  function logFoulToHistory(teamKey) {
+  function logFoulToHistory(teamKey, pos = null) {
     const player = gameContext.players[teamKey];
     const playerName = player?.name || `Team ${teamKey}`;
     
@@ -561,8 +595,127 @@ document.addEventListener("DOMContentLoaded", async () => {
     
     state.shotHistory[teamKey].push(foulEntry);
     
+    // Add foul marker on court if position is available
+    let foulMarker = null;
+    if (pos) {
+      foulMarker = addFoulMarker(teamKey, pos);
+    }
+    
+    // Also log to new action history system
+    addActionEntry(teamKey, {
+      label: 'Foul',
+      type: 'foul',
+      gameSeconds: secondsElapsed
+    });
+    
     // Update display for current active player
     updateShotLogDisplay();
+    
+    return foulMarker;
+  }
+
+  function formatGameTime(seconds) {
+    if (typeof seconds !== 'number') return '—';
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+  }
+
+  function formatTimestamp(ts) {
+    if (!ts) return '—';
+    const date = new Date(ts);
+    if (Number.isNaN(date.getTime())) return '—';
+    return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  }
+
+  function addActionEntry(teamKey, entry) {
+    if (!state.actionHistory[teamKey]) return;
+    const action = {
+      id: entry.id || `action_${Date.now()}_${Math.random().toString(16).slice(2)}`,
+      teamKey,
+      label: entry.label,
+      timeLabel: entry.timeLabel || formatGameTime(entry.gameSeconds),
+      timestamp: entry.timestamp || Date.now(),
+      highlighted: !!entry.highlighted,
+      type: entry.type || 'action',
+      note: entry.note || ''
+    };
+    state.actionHistory[teamKey].push(action);
+    renderActionLog(teamKey);
+  }
+
+  function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+  }
+
+  function renderActionLog(teamKey) {
+    const container = teamKey === 'A' ? els.a.actions : els.b.actions;
+    if (!container) return;
+    const actions = state.actionHistory[teamKey] || [];
+    container.innerHTML = '';
+
+    if (actions.length === 0) {
+      container.innerHTML = '<div class="action-item"><div class="action-item__content"><div class="action-item__label">No actions yet</div></div></div>';
+      return;
+    }
+
+    const ordered = [...actions].reverse();
+    ordered.forEach((action) => {
+      const item = document.createElement('div');
+      item.className = `action-item${action.highlighted ? ' highlighted' : ''}`;
+      item.dataset.team = teamKey;
+      item.dataset.id = action.id;
+      const noteHtml = action.note ? `<div class="action-item__note">${escapeHtml(action.note)}</div>` : '';
+      item.innerHTML = `
+        <div class="action-item__content">
+          <div class="action-item__header">
+            <div class="action-item__label">${action.label}</div>
+            <div class="action-item__time">${action.timeLabel || '—'}</div>
+          </div>
+          ${noteHtml}
+        </div>
+        <div class="action-item__controls">
+          <button class="action-btn add-note" data-action="note" title="Add note" type="button">📝</button>
+          <button class="action-btn highlight" data-action="highlight" type="button">${action.highlighted ? '⭐' : '☆'}</button>
+          <button class="action-btn delete" data-action="delete" type="button">✕</button>
+        </div>
+      `;
+      container.appendChild(item);
+    });
+  }
+
+  function seedActionFromEvent(event, teamKey) {
+    if (!teamKey) return;
+    if (event.type === 'shot') {
+      const label = `${event.points === 3 ? '3PT' : '2PT'} ${event.made ? 'Made' : 'Missed'}`;
+      addActionEntry(teamKey, {
+        label,
+        type: 'shot',
+        timeLabel: formatTimestamp(event.timestamp),
+        timestamp: event.timestamp
+      });
+      return;
+    }
+    if (event.type === 'free_throw') {
+      const label = `FT ${event.made ? 'Made' : 'Missed'}`;
+      addActionEntry(teamKey, {
+        label,
+        type: 'free_throw',
+        timeLabel: formatTimestamp(event.timestamp),
+        timestamp: event.timestamp
+      });
+      return;
+    }
+    if (event.type === 'foul') {
+      addActionEntry(teamKey, {
+        label: 'Foul',
+        type: 'foul',
+        timeLabel: formatTimestamp(event.timestamp),
+        timestamp: event.timestamp
+      });
+    }
   }
 
   function updateShotLogDisplay() {
@@ -878,6 +1031,14 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     updateUI();
 
+    const actionLabelBase = shotType === '3pt' ? '3PT' : shotType === '2pt' ? '2PT' : 'FT';
+    const actionLabel = `${actionLabelBase} ${result === 'made' ? 'Made' : 'Missed'}`;
+    addActionEntry(teamKey, {
+      label: actionLabel,
+      type: shotType,
+      gameSeconds: secondsElapsed
+    });
+
     try {
       const baseEvent = shotType === 'ft'
         ? { type: 'free_throw', made: result === 'made', points: 1 }
@@ -910,12 +1071,20 @@ document.addEventListener("DOMContentLoaded", async () => {
       return;
     }
 
+    // Check if cursor is on court image
+    if (!lastCursorPos) {
+      alert('Cannot log foul off court image. Hover cursor over the court first.');
+      return;
+    }
+
     const team = teamKey === 'A' ? state.A : state.B;
     team.fouls += 1;
-    state.history.push({ kind: 'foul', team: teamKey });
     
-    // Log foul to shot history for display
-    logFoulToHistory(teamKey);
+    // Log foul to shot history with cursor position
+    const foulMarker = logFoulToHistory(teamKey, lastCursorPos);
+    
+    // Store in history with marker reference
+    state.history.push({ kind: 'foul', team: teamKey, marker: foulMarker });
     
     updateUI();
 
@@ -950,26 +1119,46 @@ document.addEventListener("DOMContentLoaded", async () => {
     if (ftModal.overlay) ftModal.overlay.style.display = 'none';
   }
 
+  function checkZoneContradiction(intendedShot, actualZone) {
+    // Check if user's hotkey intention contradicts the actual zone clicked
+    if (!actualZone || !intendedShot) return null;
+    
+    if (intendedShot === '2pt' && actualZone === '3pt') {
+      return 'Warning: 2PT shot logged in 3PT zone!';
+    }
+    if (intendedShot === '3pt' && actualZone === '2pt') {
+      return 'Warning: 3PT shot logged in 2PT zone!';
+    }
+    return null;
+  }
+
   function inferShotTypeFromClick(evt) {
     const img = document.getElementById('court_image');
     if (!img) return '2pt';
     const rect = img.getBoundingClientRect();
     const x = (evt.clientX - rect.left) / rect.width;  // 0..1
     const y = (evt.clientY - rect.top) / rect.height;  // 0..1
-    const halfBandPx = 143;  // half of 286px band width
+    
     const centerX = rect.left + rect.width * 0.5;
     const dxPx = Math.abs(evt.clientX - centerX);
-    // Rectangular band depth: 50% of height minus 60px
-    const twoPtDepthPx = rect.height * 0.50 - 60;
-    const inRectBand = (evt.clientY - rect.top) <= twoPtDepthPx && dxPx <= halfBandPx;
-    // Circular cap: start at 25% minus 107px, radius 143px
-    const radiusPx = halfBandPx;
-    const circleTopPx = rect.top + rect.height * 0.25 - 107;
-    const circleCenterYPx = circleTopPx + radiusPx;
-    const dyPx = evt.clientY - circleCenterYPx;
-    const distSq = dxPx * dxPx + dyPx * dyPx;
-    const inTopCircle = distSq <= radiusPx * radiusPx;
-    if (inRectBand || inTopCircle) return '2pt';
+    const clickYPct = y * 100;  // Convert to percentage from top
+    
+    // 2PT Rectangular zone: from 38% to 62% (26% height), 86% width centered
+    const rectZoneTop = 38;
+    const rectZoneBottom = 62;
+    const rectZoneWidth = rect.width * 0.86 / 2;  // half width for left/right check
+    const inRectBand = clickYPct >= rectZoneTop && clickYPct <= rectZoneBottom && dxPx <= rectZoneWidth;
+    
+    // 2PT Semicircle zone: top half at 38%, 86% width, 29% height (circular at top)
+    // Center at 38% height, radius approximately 43% of width (86% / 2)
+    const semicircleTopPct = 38;
+    const semicircleRadius = rect.width * 0.43;
+    const semicircleCenterYPx = rect.top + (semicircleTopPct / 100) * rect.height;
+    const semicircleDyPx = evt.clientY - semicircleCenterYPx;
+    const semicircleDistSq = dxPx * dxPx + semicircleDyPx * semicircleDyPx;
+    const inSemicircle = semicircleDistSq <= semicircleRadius * semicircleRadius && (evt.clientY <= semicircleCenterYPx);
+    
+    if (inRectBand || inSemicircle) return '2pt';
     return '3pt';
   }
   
@@ -984,18 +1173,26 @@ document.addEventListener("DOMContentLoaded", async () => {
     const clientX = rect.left + (pos.xPct / 100) * rect.width;
     const clientY = rect.top + (pos.yPct / 100) * rect.height;
     
-    const halfBandPx = 143;
     const centerX = rect.left + rect.width * 0.5;
     const dxPx = Math.abs(clientX - centerX);
-    const twoPtDepthPx = rect.height * 0.50 - 60;
-    const inRectBand = (clientY - rect.top) <= twoPtDepthPx && dxPx <= halfBandPx;
-    const radiusPx = halfBandPx;
-    const circleTopPx = rect.top + rect.height * 0.25 - 107;
-    const circleCenterYPx = circleTopPx + radiusPx;
-    const dyPx = clientY - circleCenterYPx;
-    const distSq = dxPx * dxPx + dyPx * dyPx;
-    const inTopCircle = distSq <= radiusPx * radiusPx;
-    if (inRectBand || inTopCircle) return '2pt';
+    const clickYPct = pos.yPct;  // Already in percentage
+    
+    // 2PT Rectangular zone: from 38% to 62% (26% height), 86% width centered
+    const rectZoneTop = 38;
+    const rectZoneBottom = 62;
+    const rectZoneWidth = rect.width * 0.86 / 2;  // half width for left/right check
+    const inRectBand = clickYPct >= rectZoneTop && clickYPct <= rectZoneBottom && dxPx <= rectZoneWidth;
+    
+    // 2PT Semicircle zone: top half at 38%, 86% width, 29% height (circular at top)
+    // Center at 38% height, radius approximately 43% of width (86% / 2)
+    const semicircleTopPct = 38;
+    const semicircleRadius = rect.width * 0.43;
+    const semicircleCenterYPx = rect.top + (semicircleTopPct / 100) * rect.height;
+    const semicircleDyPx = clientY - semicircleCenterYPx;
+    const semicircleDistSq = dxPx * dxPx + semicircleDyPx * semicircleDyPx;
+    const inSemicircle = semicircleDistSq <= semicircleRadius * semicircleRadius && (clientY <= semicircleCenterYPx);
+    
+    if (inRectBand || inSemicircle) return '2pt';
     return '3pt';
   }
 
@@ -1006,8 +1203,8 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
     const last = state.history.pop();
     if (!last) return;
-    // Remove marker if this was a court-click shot
-    if (last.kind === 'shot' && last.marker) {
+    // Remove marker if this was a court-click shot or foul
+    if ((last.kind === 'shot' || last.kind === 'foul') && last.marker) {
       last.marker.remove();
     }
     if (last.kind === 'shot') {
@@ -1022,9 +1219,21 @@ document.addEventListener("DOMContentLoaded", async () => {
         if (team.ftA > 0) team.ftA -= 1;
         if (last.result === 'made' && team.ftM > 0) team.ftM -= 1;
       }
+      // Remove from action history
+      const actionHistory = state.actionHistory[last.team];
+      if (actionHistory && actionHistory.length > 0) {
+        actionHistory.pop();
+        renderActionLog(last.team);
+      }
     } else if (last.kind === 'foul') {
       const team = last.team === 'A' ? state.A : state.B;
       if (team.fouls > 0) team.fouls -= 1;
+      // Remove from action history
+      const actionHistory = state.actionHistory[last.team];
+      if (actionHistory && actionHistory.length > 0) {
+        actionHistory.pop();
+        renderActionLog(last.team);
+      }
     }
     updateUI();
   }
@@ -1055,6 +1264,67 @@ document.addEventListener("DOMContentLoaded", async () => {
   if (ftModal.overlay) ftModal.overlay.addEventListener('click', (e) => {
     if (e.target === ftModal.overlay) closeFtModal();
   });
+
+  // Action log button handlers (delegation)
+  if (els.a.actions) {
+    els.a.actions.addEventListener('click', (e) => {
+      const actionBtn = e.target.closest('[data-action]');
+      if (!actionBtn) return;
+      
+      const actionItem = actionBtn.closest('.action-item');
+      const actionId = actionItem?.dataset.id;
+      const action = actionBtn.dataset.action;
+      const entry = state.actionHistory.A.find(a => a.id === actionId);
+      if (!entry) return;
+      
+      if (action === 'delete') {
+        const idx = state.actionHistory.A.findIndex(a => a.id === actionId);
+        if (idx !== -1) {
+          state.actionHistory.A.splice(idx, 1);
+          renderActionLog('A');
+        }
+      } else if (action === 'highlight') {
+        entry.highlighted = !entry.highlighted;
+        renderActionLog('A');
+      } else if (action === 'note') {
+        const newNote = prompt('Add note to this action:', entry.note || '');
+        if (newNote !== null) {
+          entry.note = newNote;
+          renderActionLog('A');
+        }
+      }
+    });
+  }
+
+  if (els.b.actions) {
+    els.b.actions.addEventListener('click', (e) => {
+      const actionBtn = e.target.closest('[data-action]');
+      if (!actionBtn) return;
+      
+      const actionItem = actionBtn.closest('.action-item');
+      const actionId = actionItem?.dataset.id;
+      const action = actionBtn.dataset.action;
+      const entry = state.actionHistory.B.find(a => a.id === actionId);
+      if (!entry) return;
+      
+      if (action === 'delete') {
+        const idx = state.actionHistory.B.findIndex(a => a.id === actionId);
+        if (idx !== -1) {
+          state.actionHistory.B.splice(idx, 1);
+          renderActionLog('B');
+        }
+      } else if (action === 'highlight') {
+        entry.highlighted = !entry.highlighted;
+        renderActionLog('B');
+      } else if (action === 'note') {
+        const newNote = prompt('Add note to this action:', entry.note || '');
+        if (newNote !== null) {
+          entry.note = newNote;
+          renderActionLog('B');
+        }
+      }
+    });
+  }
 
   // Timeout modal setup
   const timeoutModal = {
@@ -1998,15 +2268,23 @@ document.addEventListener("DOMContentLoaded", async () => {
       const shotType = '3pt';
       const result = isShift ? 'missed' : 'made';
 
-      // If cursor is over court, record with coordinates
-      if (lastCursorPos) {
-        const pos = { ...lastCursorPos }; // Copy position before it changes
-        const markerEl = addShotMarker(controller.getActiveTeam(), shotType, result, pos);
-        controller.applyShot(controller.getActiveTeam(), shotType, result, markerEl, pos);
-      } else {
-        // No coordinates available
-        controller.applyShot(controller.getActiveTeam(), shotType, result, null, null);
+      // Must have cursor over court to record shot
+      if (!lastCursorPos) {
+        alert('Cannot log shot off court image. Hover cursor over the court first.');
+        return;
       }
+
+      const pos = { ...lastCursorPos }; // Copy position before it changes
+      const actualZone = inferShotTypeFromPos(pos);
+      const warning = checkZoneContradiction(shotType, actualZone);
+      if (warning) {
+        console.warn(warning);
+        if (!confirm(warning + '\n\nContinue logging anyway?')) {
+          return;
+        }
+      }
+      const markerEl = addShotMarker(controller.getActiveTeam(), shotType, result, pos);
+      controller.applyShot(controller.getActiveTeam(), shotType, result, markerEl, pos);
       return;
     }
 
@@ -2017,15 +2295,23 @@ document.addEventListener("DOMContentLoaded", async () => {
       const shotType = '2pt';
       const result = isShift ? 'missed' : 'made';
 
-      // If cursor is over court, record with coordinates
-      if (lastCursorPos) {
-        const pos = { ...lastCursorPos }; // Copy position before it changes
-        const markerEl = addShotMarker(controller.getActiveTeam(), shotType, result, pos);
-        controller.applyShot(controller.getActiveTeam(), shotType, result, markerEl, pos);
-      } else {
-        // No coordinates available
-        controller.applyShot(controller.getActiveTeam(), shotType, result, null, null);
+      // Must have cursor over court to record shot
+      if (!lastCursorPos) {
+        alert('Cannot log shot off court image. Hover cursor over the court first.');
+        return;
       }
+
+      const pos = { ...lastCursorPos }; // Copy position before it changes
+      const actualZone = inferShotTypeFromPos(pos);
+      const warning = checkZoneContradiction(shotType, actualZone);
+      if (warning) {
+        console.warn(warning);
+        if (!confirm(warning + '\n\nContinue logging anyway?')) {
+          return;
+        }
+      }
+      const markerEl = addShotMarker(controller.getActiveTeam(), shotType, result, pos);
+      controller.applyShot(controller.getActiveTeam(), shotType, result, markerEl, pos);
       return;
     }
 
@@ -2036,15 +2322,8 @@ document.addEventListener("DOMContentLoaded", async () => {
       const shotType = 'ft';
       const result = isShift ? 'missed' : 'made';
 
-      // If cursor is over court, record with coordinates
-      if (lastCursorPos) {
-        const pos = { ...lastCursorPos }; // Copy position before it changes
-        const markerEl = addShotMarker(controller.getActiveTeam(), shotType, result, pos);
-        controller.applyShot(controller.getActiveTeam(), shotType, result, markerEl, pos);
-      } else {
-        // No coordinates available
-        controller.applyShot(controller.getActiveTeam(), shotType, result, null, null);
-      }
+      // Free throws don't show on court, only in actions and score
+      controller.applyShot(controller.getActiveTeam(), shotType, result, null, null);
       return;
     }
   });
