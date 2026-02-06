@@ -111,9 +111,9 @@ async function loadGameData(gameId) {
     const teamAButton = document.getElementById("teamAAssignBtn");
     const teamBButton = document.getElementById("teamBAssignBtn");
 
-    // Get player IDs from teams (handle both array of IDs and array of objects)
-    const teamAPlayerIds = game.teams?.team_a || [];
-    const teamBPlayerIds = game.teams?.team_b || [];
+    // Check if it's the new object structure (.players) or the old array structure
+    const teamAPlayerIds = game.teams?.team_a?.players || game.teams?.team_a || [];
+    const teamBPlayerIds = game.teams?.team_b?.players || game.teams?.team_b || [];
 
     // Assign Team A player
     if (teamAPlayerIds.length > 0) {
@@ -123,7 +123,6 @@ async function loadGameData(gameId) {
         gameContext.players.A = playerA;
         if (teamAButton) {
           teamAButton.textContent = playerA.name || 'Player A';
-          teamAButton.classList.add('assigned');
         }
       }
     }
@@ -136,7 +135,6 @@ async function loadGameData(gameId) {
         gameContext.players.B = playerB;
         if (teamBButton) {
           teamBButton.textContent = playerB.name || 'Player B';
-          teamBButton.classList.add('assigned');
         }
       }
     }
@@ -505,7 +503,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     marker.classList.add('shot-marker');
     marker.classList.add(result === 'made' ? 'made' : 'missed');
     marker.classList.add(teamKey === 'A' ? 'team-a' : 'team-b');
-    
+
     // Add player initials to the marker
     const player = gameContext.players[teamKey];
     const initials = player?.name ? player.name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) : teamKey;
@@ -516,7 +514,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     marker.style.alignItems = 'center';
     marker.style.justifyContent = 'center';
     marker.style.color = result === 'made' ? '#fff' : '#333';
-    
+
     marker.title = `${player?.name || teamKey} - ${shotType.toUpperCase()} ${result}`;
     marker.style.left = `${pos.xPct}%`;
     marker.style.top = `${pos.yPct}%`;
@@ -524,10 +522,10 @@ document.addEventListener("DOMContentLoaded", async () => {
     marker.dataset.shotType = shotType;
     marker.dataset.result = result;
     shotMarkersEl.appendChild(marker);
-    
+
     // Log to shot history
     logShotToHistory(teamKey, shotType, result);
-    
+
     return marker;
   }
 
@@ -813,7 +811,6 @@ document.addEventListener("DOMContentLoaded", async () => {
     const btn = selectorEls[teamKey].assignBtn;
     if (btn) {
       btn.textContent = player.name || 'Unnamed';
-      btn.classList.add('assigned');
     }
     // Enable start button if both teams have players
     if (playersAssigned()) {
@@ -983,6 +980,20 @@ document.addEventListener("DOMContentLoaded", async () => {
     // highlight active team selection button
     if (els.selectA) els.selectA.classList.toggle('active', state.active === 'A');
     if (els.selectB) els.selectB.classList.toggle('active', state.active === 'B');
+
+    // Apply blue gradient only to the active player's button (if assigned)
+    if (selectorEls.A.assignBtn) {
+      selectorEls.A.assignBtn.classList.toggle('assigned', state.active === 'A' && gameContext.players.A);
+    }
+    if (selectorEls.B.assignBtn) {
+      selectorEls.B.assignBtn.classList.toggle('assigned', state.active === 'B' && gameContext.players.B);
+    }
+
+    // Show only the active player's shot markers on the court
+    const teamAMarkers = document.querySelectorAll('.shot-marker.team-a');
+    const teamBMarkers = document.querySelectorAll('.shot-marker.team-b');
+    teamAMarkers.forEach(marker => marker.style.display = state.active === 'A' ? 'flex' : 'none');
+    teamBMarkers.forEach(marker => marker.style.display = state.active === 'B' ? 'flex' : 'none');
   }
 
   async function applyShot(teamKey, shotType, result, markerEl = null, pos = null) {
@@ -1327,6 +1338,10 @@ document.addEventListener("DOMContentLoaded", async () => {
   const timeoutAlertClose = document.getElementById('timeoutAlertClose');
   let timeoutAlertTimer = null;
 
+  const gameInProgressModal = document.getElementById('gameInProgressModal');
+  const gameInProgressClose = document.getElementById('gameInProgressClose');
+  let gameInProgressTimer = null;
+
   function showTimeoutAlert() {
     if (timeoutAlertModal) {
       timeoutAlertModal.style.display = 'flex';
@@ -1350,6 +1365,31 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   if (timeoutAlertClose) {
     timeoutAlertClose.addEventListener('click', closeTimeoutAlert);
+  }
+
+  function showGameInProgressAlert() {
+    if (gameInProgressModal) {
+      gameInProgressModal.style.display = 'flex';
+      // Clear any existing timer
+      if (gameInProgressTimer) clearTimeout(gameInProgressTimer);
+      gameInProgressTimer = setTimeout(() => {
+        gameInProgressModal.style.display = 'none';
+      }, 3000);
+    }
+  }
+
+  function closeGameInProgressAlert() {
+    if (gameInProgressModal) {
+      gameInProgressModal.style.display = 'none';
+      if (gameInProgressTimer) {
+        clearTimeout(gameInProgressTimer);
+        gameInProgressTimer = null;
+      }
+    }
+  }
+
+  if (gameInProgressClose) {
+    gameInProgressClose.addEventListener('click', closeGameInProgressAlert);
   }
 
   const timeoutBtn = document.getElementById('timeoutBtn');
@@ -1427,7 +1467,13 @@ document.addEventListener("DOMContentLoaded", async () => {
   // Player modal wiring
   ['A', 'B'].forEach(key => {
     const set = selectorEls[key];
-    if (set.assignBtn) set.assignBtn.addEventListener('click', () => openModal(key));
+    if (set.assignBtn) set.assignBtn.addEventListener('click', () => {
+      if (isGameRunning) {
+        showGameInProgressAlert();
+        return;
+      }
+      openModal(key);
+    });
   });
 
   if (modalEls.close) modalEls.close.addEventListener('click', closeModal);

@@ -176,19 +176,19 @@ function renderPlayerStats() {
                 <div class="stat-rows">
                     <div class="stat-row">
                         <span class="stat-name">Total Points</span>
-                        <span class="stat-number">${playerData.overall_stats?.pts || 0}</span>
+                        <span class="stat-number">${playerData.overall_stats.total_points}</span>
                     </div>
                     <div class="stat-row">
                         <span class="stat-name">Field Goals</span>
-                        <span class="stat-number">${playerData.overall_stats?.fgm || 0}/${playerData.overall_stats?.fga || 0}</span>
+                        <span class="stat-number">${playerData.overall_stats.total_fgm}/${playerData.overall_stats.total_fga}</span>
                     </div>
                     <div class="stat-row">
                         <span class="stat-name">3-Pointers</span>
-                        <span class="stat-number">${playerData.overall_stats?.['3pm'] || 0}/${playerData.overall_stats?.['3pa'] || 0}</span>
+                        <span class="stat-number">${playerData.overall_stats.total_3pm}/${playerData.overall_stats.total_3pa}</span>
                     </div>
                     <div class="stat-row">
                         <span class="stat-name">Free Throws</span>
-                        <span class="stat-number">${playerData.overall_stats?.ftm || 0}/${playerData.overall_stats?.fta || 0}</span>
+                        <span class="stat-number">${playerData.overall_stats.total_ftm}/${playerData.overall_stats.total_fta}</span>
                     </div>
                 </div>
             </div>
@@ -198,19 +198,19 @@ function renderPlayerStats() {
                 <div class="stat-rows">
                     <div class="stat-row">
                         <span class="stat-name">Rebounds</span>
-                        <span class="stat-number">${playerData.overall_stats?.reb || 0}</span>
+                        <span class="stat-number">${playerData.overall_stats.total_rebounds}</span>
                     </div>
                     <div class="stat-row">
                         <span class="stat-name">Assists</span>
-                        <span class="stat-number">${playerData.overall_stats?.ast || 0}</span>
+                        <span class="stat-number">${playerData.overall_stats.total_assists}</span>
                     </div>
                     <div class="stat-row">
                         <span class="stat-name">Steals</span>
-                        <span class="stat-number">${playerData.overall_stats?.stl || 0}</span>
+                        <span class="stat-number">${playerData.overall_stats.total_steals}</span>
                     </div>
                     <div class="stat-row">
                         <span class="stat-name">Blocks</span>
-                        <span class="stat-number">${playerData.overall_stats?.blk || 0}</span>
+                        <span class="stat-number">${playerData.overall_stats.total_blocks}</span>
                     </div>
                 </div>
             </div>
