@@ -1,0 +1,623 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Log Game | TheNextChapter</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/shared.css" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+  <style>
+    /* Page-specific layout tweaks */
+    #main-content { margin: 1.5rem auto; }
+    #stat_selector { margin-top: 0.5rem !important; }
+    #timer_row { margin: 0.5rem 0 0.5rem; }
+  </style>
+</head>
+
+<body>
+  <!-- TNC-style top nav replicated -->
+  <nav id="site-nav">
+    <div class="nav-inner">
+      <div class="brand-left">
+        <div class="nav-logo"><img src="assets/tnclogo.svg" alt="The Next Chapter" /></div>
+        <span class="brand-text">The Next Chapter</span>
+      </div>
+      <div class="nav-links">
+        <a href="index.html">Home</a>
+        <a href="index.html#stats">Stats</a>
+        <a href="player.html">Players</a>
+        <a href="games.html">Games</a>
+        <a href="game.html" id="nav-log-game-link" style="font-weight: 600;">Log Game</a>
+      </div>
+      <div class="nav-actions">
+        <button class="btn-outline-tnc" id="nav-sign-in">Sign In</button>
+        <button class="btn-outline-tnc" id="nav-sign-out" style="display:none;">Sign Out</button>
+      </div>
+    </div>
+  </nav>
+
+  <!-- Hotkey Toggle Button -->
+  <button id="hotkeyToggleBtn" title="Toggle keyboard shortcuts visibility">Hotkeys</button>
+
+  <div class="container-fluid">
+    <div class="row">
+      <div class="col" id="main-content">
+        <!-- Error message for player assignment -->
+        <div class="row mt-2">
+          <div class="col text-center">
+            <div id="startError" style="margin-top:12px; padding:12px 16px; background-color:#ffe0e0; color:#d14343; font-weight:700; font-size:15px; border-radius:4px; border-left:4px solid #d14343; display:none; text-align:center; min-height:20px;"></div>
+          </div>
+        </div>
+
+        <!-- Stat Selector under Timer -->
+        <div class="row mt-2" id="stat_selector" style="justify-content: center;">
+          <div class="col-auto">
+            <!-- Start and Pause Game Buttons -->
+            <div class="d-flex justify-content-center gap-2" style="margin-bottom: 12px;">
+              <button id="startGameBtn" class="btn btn-outline-tnc" disabled>Start Game</button>
+              <button id="timeoutBtn" class="btn btn-outline-tnc" title="Log a timeout" disabled>Timeout <span class="hotkey-hint">T</span></button>
+              <button id="pauseGameBtn" class="btn btn-outline-tnc" disabled>Pause <span class="hotkey-hint">P</span></button>
+            </div>
+
+            <!-- Team Selection -->
+            <div id="target_side" class="d-flex justify-content-center gap-3" style="margin-bottom: 12px;">
+              <button class="btn btn-outline-tnc" id="selectTeamA" style="flex: 0 0 auto;">Select Left (A) <span class="hotkey-hint">Tab</span></button>
+              <span id="activeSideLabel" style="align-self: center; font-weight: 600; color: #0e2b62; font-size: 14px;">Active: A</span>
+              <button class="btn btn-outline-tnc" id="selectTeamB" style="flex: 0 0 auto;">Select Right (B) <span class="hotkey-hint">Tab</span></button>
+            </div>
+
+            <!-- Shot Buttons (5 columns: Auto + 3PT + 2PT + FT + Fouls) -->
+            <div class="d-flex justify-content-center" style="margin-bottom: 12px;">
+              <div id="shot_buttons" class="d-flex" style="width: fit-content; gap: 16px;">
+                <!-- Column 1: Made/Missed (auto-detect 2PT/3PT) -->
+                <div class="d-flex flex-column" style="gap: 12px;">
+                  <button class="btn btn-stat" data-shot="auto" data-result="made">Shot Made <span class="hotkey-hint">M</span></button>
+                  <button class="btn btn-stat" data-shot="auto" data-result="missed">Shot Missed <span class="hotkey-hint">X</span></button>
+                </div>
+                <!-- Column 2: 3PT -->
+                <div class="d-flex flex-column" style="gap: 12px;">
+                  <button class="btn btn-stat" data-shot="3pt" data-result="made">3PT Made <span class="hotkey-hint">3</span></button>
+                  <button class="btn btn-stat" data-shot="3pt" data-result="missed">3PT Missed <span class="hotkey-hint">Shift+3</span></button>
+                </div>
+                <!-- Column 3: 2PT -->
+                <div class="d-flex flex-column" style="gap: 12px;">
+                  <button class="btn btn-stat" data-shot="2pt" data-result="made">2PT Made <span class="hotkey-hint">2</span></button>
+                  <button class="btn btn-stat" data-shot="2pt" data-result="missed">2PT Missed <span class="hotkey-hint">Shift+2</span></button>
+                </div>
+                <!-- Column 4: FT -->
+                <div class="d-flex flex-column" style="gap: 12px;">
+                  <button class="btn btn-stat" data-shot="ft" data-result="made">FT Made <span class="hotkey-hint">F</span></button>
+                  <button class="btn btn-stat" data-shot="ft" data-result="missed">FT Missed <span class="hotkey-hint">Shift+F</span></button>
+                </div>
+                <!-- Column 5: Fouls -->
+                <div class="d-flex flex-column" style="gap: 12px;">
+                  <button class="btn btn-stat" id="teamAFoulPlus" title="Add foul to Left (A)">Foul A <span class="hotkey-hint">A</span></button>
+                  <button class="btn btn-stat" id="teamBFoulPlus" title="Add foul to Right (B)">Foul B <span class="hotkey-hint">B</span></button>
+                </div>
+              </div>
+            </div>
+
+            <!-- Undo Button -->
+            <div class="d-flex justify-content-center">
+              <button id="undoStatBtn" class="btn btn-outline-tnc">Undo Last <span class="hotkey-hint">U</span></button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Timer and Scores Row -->
+        <div class="row mt-3" id="timer_row" style="justify-content: center; align-items: center;">
+          <div class="col-2 text-center">
+            <div id="teamAScoreDisplay" style="font-size: 3rem; font-weight: 800; color: #0e2b62; line-height: 1;">
+              <span id="teamAScore">0</span>
+            </div>
+            <div style="font-size: 0.85rem; font-weight: 600; color: #666; text-transform: uppercase; letter-spacing: 1px;">Player A</div>
+          </div>
+          <div class="col-auto text-center" style="padding: 0 2rem;">
+            <span id="gameTimer" style="font-size: 2.5rem; font-weight: 700; color: #0e2b62;">00:00</span>
+          </div>
+          <div class="col-2 text-center">
+            <div id="teamBScoreDisplay" style="font-size: 3rem; font-weight: 800; color: #0e2b62; line-height: 1;">
+              <span id="teamBScore">0</span>
+            </div>
+            <div style="font-size: 0.85rem; font-weight: 600; color: #666; text-transform: uppercase; letter-spacing: 1px;">Player B</div>
+          </div>
+        </div>
+
+        <!-- Court Section -->
+        <div class="row" id="court_section">
+          <div class="col-2" id="team_a_players">
+            <button id="teamAAssignBtn" class="btn btn-outline-tnc btn-assign">Assign Player</button>
+            <div id="teamAStats" class="player-stats">
+              <div><strong>PTS: </strong><span id="teamAPts">0</span></div>
+              <div>3PT: <span id="teamA3pt">0/0</span></div>
+              <div>2PT: <span id="teamA2pt">0/0</span></div>
+              <div>FT: <span id="teamAft">0/0</span> <button class="btn btn-small btn-ft" id="teamAFtBtn" title="Log FT for A">FT</button></div>
+              <div>Fouls: <span id="teamAFouls">0</span> <button class="btn btn-small btn-foul" id="teamAFoulBtn" title="Add foul to A">+</button></div>
+            </div>
+            <div class="player-actions" aria-live="polite">
+              <div class="player-actions__header">Actions</div>
+              <div id="action_log_A" class="player-actions__list"></div>
+            </div>
+          </div>
+          <div class="col-8" id="court_card">
+            <div class="zone-toolbar"></div>
+            <div id="court_container">
+              <img src="assets/basketballcourt.svg" id="court_image" alt="Basketball Court" />
+              <div id="court_overlay" aria-hidden="true">
+                <div class="zone-2pt"></div>
+                <div class="zone-2pt-semicircle"></div>
+                <div class="zone-3pt"></div>
+              </div>
+              <div id="shot_markers" aria-hidden="true"></div>
+            </div>
+          </div>
+          <div class="col-2" id="team_b_players">
+            <button id="teamBAssignBtn" class="btn btn-outline-tnc btn-assign">Assign Player</button>
+            <div id="teamBStats" class="player-stats">
+              <div><strong>PTS: </strong><span id="teamBPts">0</span></div>
+              <div>3PT: <span id="teamB3pt">0/0</span></div>
+              <div>2PT: <span id="teamB2pt">0/0</span></div>
+              <div>FT: <span id="teamBft">0/0</span> <button class="btn btn-small btn-ft" id="teamBFtBtn" title="Log FT for B">FT</button></div>
+              <div>Fouls: <span id="teamBFouls">0</span> <button class="btn btn-small btn-foul" id="teamBFoulBtn" title="Add foul to B">+</button></div>
+            </div>
+            <div class="player-actions" aria-live="polite">
+              <div class="player-actions__header">Actions</div>
+              <div id="action_log_B" class="player-actions__list"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Shot Stat Buttons moved under timer (see stat_selector) -->
+
+      </div>
+    </div>
+  </div>
+
+
+  <!-- Player modal -->
+  <div id="playerModal" class="modal-overlay" style="display:none;">
+    <div class="modal-card">
+      <div class="modal-header">
+        <span id="modalTitle">Assign Player</span>
+        <button id="modalClose" class="btn btn-sm" aria-label="Close">&#10005;</button>
+      </div>
+      <div class="modal-body">
+        <div class="modal-search-group">
+          <input id="modalSearchInput" type="text" class="form-control" placeholder="Search player name or IG" autocomplete="off" />
+          <div id="modalResults" class="player-search-results modal-dropdown"></div>
+        </div>
+        <div class="create-player-block" style="margin-top:12px;">
+          <div class="d-flex gap-2" style="margin-bottom:6px;">
+            <input id="modalCreateName" type="text" class="form-control" placeholder="New player name" />
+            <input id="modalCreateIg" type="text" class="form-control" placeholder="Instagram (optional)" />
+            <button id="modalCreateBtn" class="btn btn-primary">Create & Assign</button>
+          </div>
+          <small>Creating a player requires admin auth.</small>
+          <div id="modalMessage" style="margin-top:4px; font-size:0.9rem;"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Free Throw modal -->
+  <div id="ftModal" class="modal-overlay" style="display:none;">
+    <div class="modal-card" style="width:320px; text-align:center;">
+      <h5 style="font-size:1.5rem; font-weight:700; margin-bottom:12px;">Log Free Throw</h5>
+      <p style="margin:8px 0; font-size:1.1rem; font-weight:600; color:#0e2b62;">Was the free throw made or missed?</p>
+      <div style="display:flex; gap:8px; justify-content:center; margin-top:12px;">
+        <button id="ftMakeBtn" class="btn btn-outline-tnc" style="color:#0e2b62; border-color:#0e2b62;">Made</button>
+        <button id="ftMissBtn" class="btn btn-outline-tnc" style="color:#0e2b62; border-color:#0e2b62;">Missed</button>
+      </div>
+      <button id="ftCloseBtn" class="btn btn-outline-tnc" style="margin-top:12px; color:#0e2b62; border-color:#0e2b62;">Cancel</button>
+    </div>
+  </div>
+
+  <!-- Shot confirm modal -->
+  <div id="shotModal" class="modal-overlay" style="display:none;">
+    <div class="modal-card" style="max-width:360px;">
+      <div class="modal-header">
+        <span id="shotModalTitle">Log Shot</span>
+        <button id="shotModalClose" class="btn btn-sm" aria-label="Close">&#10005;</button>
+      </div>
+      <div class="modal-body" style="gap:12px;">
+        <div id="shotModalInfo" style="font-weight:600;">3PT attempt</div>
+        <div class="d-flex gap-2" style="justify-content:center;">
+          <button id="shotMakeBtn" class="btn btn-primary">Make</button>
+          <button id="shotMissBtn" class="btn btn-outline-tnc">Miss</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Timeout modal -->
+  <div id="timeoutModal" class="modal-overlay" style="display:none;">
+    <div class="modal-card" style="width:360px; text-align:center;">
+      <h5 style="font-size:1.5rem; font-weight:700; margin-bottom:12px;">Log Timeout</h5>
+      <p style="margin:8px 0; font-size:1rem; font-weight:600; color:#0e2b62;">Which player called the timeout?</p>
+      <div style="display:flex; gap:12px; justify-content:center; margin-top:16px; flex-wrap:wrap;">
+        <button id="timeoutPlayerABtn" class="btn btn-outline-tnc" style="color:#0e2b62; border-color:#0e2b62;">Player A</button>
+        <button id="timeoutPlayerBBtn" class="btn btn-outline-tnc" style="color:#0e2b62; border-color:#0e2b62;">Player B</button>
+      </div>
+      <button id="timeoutCloseBtn" class="btn btn-outline-tnc" style="margin-top:12px; color:#0e2b62; border-color:#0e2b62;">Cancel</button>
+    </div>
+  </div>
+
+  <!-- Timeout alert modal -->
+  <div id="timeoutAlertModal" class="modal-overlay" style="display:none;">
+    <div class="modal-card" style="width:360px; text-align:center; position:relative;">
+      <button id="timeoutAlertClose" class="btn btn-sm" aria-label="Close" style="position:absolute; top:8px; right:8px;">&#10005;</button>
+      <p style="margin:16px 0; font-size:1.1rem; font-weight:600; color:#0e2b62;">The game is already in a timeout!</p>
+    </div>
+  </div>
+
+  <!-- Post-game modal -->
+  <div id="postGameModal" class="modal-overlay" style="display:none;">
+    <div class="modal-card" style="width:400px;">
+      <div class="modal-header">
+        <span>Game Complete!</span>
+        <button id="postGameClose" class="btn btn-sm" aria-label="Close">&#10005;</button>
+      </div>
+      <div class="modal-body" style="text-align:center; gap:12px;">
+        <div id="postGameStats" style="font-weight:600; margin-bottom:12px;"></div>
+        <div class="d-flex gap-2" style="justify-content:center; flex-wrap:wrap;">
+          <button id="downloadPdfBtn" class="btn btn-primary">Download PDF</button>
+          <button id="newGameBtn" class="btn btn-success">New Game</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Minimal modal styles -->
+  <style>
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.5);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+      padding: 16px;
+    }
+    .modal-card {
+      background: #fff;
+      border-radius: 8px;
+      width: min(520px, 100%);
+      padding: 16px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+    }
+    .modal-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      margin-bottom: 8px;
+    }
+    .modal-body {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .modal-search-group {
+      position: relative;
+    }
+    .modal-dropdown {
+      position: absolute;
+      top: 100%;
+      left: 0;
+      right: 0;
+      background: #fff;
+      border: 1px solid #c8d1e2;
+      box-shadow: 0 10px 24px rgba(0,0,0,0.16);
+      border-radius: 8px;
+      max-height: 320px;
+      overflow-y: auto;
+      margin-top: 6px;
+      z-index: 1001;
+      padding: 6px;
+      display: none;
+    }
+    .modal-dropdown.show {
+      display: block;
+    }
+    .dropdown-item-btn {
+      width: 100%;
+      display: block;
+      text-align: left;
+      padding: 10px 12px;
+      margin: 0 0 6px 0;
+      border: 1px solid #d6ddeb;
+      border-radius: 6px;
+      background: #f7f9ff;
+      color: #0e2b62;
+      font-size: 1rem;
+      line-height: 1.3;
+      cursor: pointer;
+      transition: background 0.15s ease, border-color 0.15s ease, transform 0.1s ease;
+    }
+    .dropdown-item-btn:last-child {
+      margin-bottom: 0;
+    }
+    .dropdown-item-btn:hover,
+    .dropdown-item-btn:focus {
+      background: #e6edff;
+      border-color: #b8c7ec;
+      outline: none;
+      transform: translateY(-1px);
+    }
+    .btn-assign {
+      width: 100%;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      padding: 10px 12px;
+      border: 2px solid #1f4b99;
+      background: #e8f0ff;
+      color: #0e2b62;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.08);
+      margin-bottom: 10px;
+    }
+    .btn-assign:hover {
+      background: #d8e6ff;
+      border-color: #123571;
+    }
+    .btn-assign.assigned {
+      background: linear-gradient(120deg, #1f6feb, #1446a0);
+      color: #fff;
+      border-color: #0f2f6f;
+      box-shadow: 0 6px 14px rgba(20,70,160,0.25);
+    }
+    /* Possession highlight */
+    .poss-active {
+      outline: 3px solid #1f6feb;
+      outline-offset: 4px;
+      border-radius: 10px;
+      box-shadow: 0 0 0 4px rgba(31,110,235,0.12), 0 10px 22px rgba(0,0,0,0.12);
+      transition: box-shadow 0.15s ease, outline-color 0.15s ease;
+    }
+
+    /* Court overlay for 2PT/3PT visualization */
+    #court_container {
+      position: relative;
+    }
+    #court_overlay {
+      /* Overlay container */
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      z-index: 1;
+    }
+
+    /* 2PT zone (near the basket) */
+    .zone-2pt {
+      display: none;
+      position: absolute;
+      bottom: 62%;
+      left:50%;
+      transform: translateX(-50%);
+      width: 86%;
+      height: 26%;
+      background: rgba(14, 43, 98, 0.25);
+      border: 2px solid #0e2b62;
+      border-top: none;
+    }
+
+    /* 2PT semicircle zone */
+    .zone-2pt-semicircle {
+      display: none;
+      position: absolute;
+      top: var(--semicircle-top);
+      left: var(--semicircle-left);
+      transform: translateX(-50%) scaleY(-1);
+      width: var(--semicircle-width);
+      height: var(--semicircle-height);
+      background: rgba(14, 43, 98, var(--semicircle-opacity));
+      border: var(--semicircle-border-width) solid #0e2b62;
+      border-bottom: none;
+      clip-path: polygon(
+        var(--clip-p1),
+        var(--clip-p2),
+        var(--clip-p3),
+        var(--clip-p4),
+        var(--clip-p5),
+        var(--clip-p6),
+        var(--clip-p7),
+        var(--clip-p8),
+        var(--clip-p9)
+      );
+    }
+
+    /* 3PT zone (outer arc) */
+    .zone-3pt {
+      display: none;
+      position: absolute;
+      bottom: 25px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 98%;
+      height: 83%;
+      border: 3px solid rgba(255, 140, 0, 0.6);
+      border-top: none;
+      background: rgba(255, 140, 0, 0.05);
+    }
+
+    /* Shot markers overlay */
+    #shot_markers {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      z-index: 2;
+    }
+    .shot-marker {
+      position: absolute;
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      transform: translate(-50%, -50%);
+      border: 2px solid #0e2b62;
+      background: rgba(255,255,255,0.85);
+      box-shadow: 0 2px 6px rgba(0,0,0,0.25);
+    }
+    .shot-marker.made {
+      background: rgba(0, 180, 100, 0.75);
+      border-color: #0f8a4c;
+    }
+    .shot-marker.missed {
+      background: rgba(255, 80, 80, 0.70);
+      border-color: #c62828;
+    }
+    .shot-marker.team-a {
+      box-shadow: 0 0 0 2px rgba(31,110,235,0.35);
+    }
+    .shot-marker.team-b {
+      box-shadow: 0 0 0 2px rgba(255,160,0,0.35);
+    }
+
+    /* Player actions log */
+    .player-actions {
+      margin-top: 12px;
+      padding: 10px;
+      border: 1px solid rgba(14, 43, 98, 0.15);
+      border-radius: 8px;
+      background: #fff;
+    }
+    .player-actions__header {
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+      color: #0e2b62;
+      margin-bottom: 8px;
+      text-transform: uppercase;
+    }
+    .player-actions__list {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      max-height: 180px;
+      overflow: auto;
+    }
+    .action-item {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 8px;
+      padding: 8px 10px;
+      border: 1px solid rgba(14, 43, 98, 0.15);
+      border-radius: 8px;
+      background: #fafafa;
+      font-size: 12px;
+      transition: all 0.2s ease;
+    }
+    .action-item:hover {
+      background: #f5f5f5;
+      border-color: rgba(14, 43, 98, 0.3);
+    }
+    .action-item.highlighted {
+      background: rgba(255, 193, 7, 0.12);
+      border-color: rgba(255, 193, 7, 0.5);
+      box-shadow: 0 0 0 2px rgba(255, 193, 7, 0.2);
+    }
+    .action-item__content {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      flex: 1;
+      min-width: 0;
+    }
+    .action-item__header {
+      display: flex;
+      align-items: baseline;
+      gap: 8px;
+      min-width: 0;
+    }
+    .action-item__label {
+      font-weight: 600;
+      color: #0e2b62;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .action-item__time {
+      color: #999;
+      font-size: 10px;
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+    .action-item__note {
+      font-size: 12px;
+      color: #333;
+      padding: 6px 8px;
+      background: rgba(14, 43, 98, 0.08);
+      border-left: 3px solid #0e2b62;
+      border-radius: 4px;
+      word-break: break-word;
+      margin-top: 4px;
+      line-height: 1.4;
+    }
+    .action-item__controls {
+      display: flex;
+      gap: 4px;
+      flex-shrink: 0;
+      align-items: center;
+    }
+    .action-btn {
+      border: 1px solid rgba(14, 43, 98, 0.2);
+      background: #fff;
+      color: #0e2b62;
+      padding: 4px 6px;
+      border-radius: 5px;
+      font-size: 12px;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      min-width: 28px;
+      text-align: center;
+    }
+    .action-btn:hover {
+      background: #f0f0f0;
+      border-color: rgba(14, 43, 98, 0.4);
+    }
+    .action-btn.delete {
+      border-color: rgba(244, 67, 54, 0.3);
+      color: #c62828;
+    }
+    .action-btn.delete:hover {
+      background: rgba(244, 67, 54, 0.08);
+      border-color: rgba(244, 67, 54, 0.6);
+    }
+    .action-btn.highlight {
+      border-color: rgba(255, 193, 7, 0.3);
+      color: #f57f17;
+    }
+    .action-btn.highlight:hover {
+      background: rgba(255, 193, 7, 0.1);
+      border-color: rgba(255, 193, 7, 0.6);
+    }
+    .action-btn.add-note {
+      border-color: rgba(33, 150, 243, 0.3);
+    }
+    .action-btn.add-note:hover {
+      background: rgba(33, 150, 243, 0.08);
+      border-color: rgba(33, 150, 243, 0.6);
+    }
+  </style>
+
+  <!-- Login Modal -->
+  <div id="login-modal" class="login-modal">
+      <div class="login-content">
+          <h2>Admin Login</h2>
+          <input type="email" id="login-email" placeholder="Email" required>
+          <input type="password" id="login-password" placeholder="Password" required>
+          <div class="login-buttons">
+              <button id="login-submit">Sign In</button>
+              <button id="login-cancel">Cancel</button>
+          </div>
+      </div>
+  </div>
+
+  <script src="./utils/api.js"></script>
+
+  <script src="js/gameScript.js"></script>
+</body>
+</html>
