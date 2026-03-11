@@ -357,6 +357,33 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
   };
 
+  // Track most recent stat elements for gold highlighting
+  let mostRecentMarker = null;
+  let mostRecentActionId = null;
+  let pendingMarkerSet = false;
+
+  function setMostRecentMarker(marker) {
+    if (mostRecentMarker) {
+      mostRecentMarker.classList.remove('most-recent');
+    }
+    mostRecentMarker = marker;
+    if (marker) {
+      marker.classList.add('most-recent');
+    }
+    pendingMarkerSet = true;
+  }
+
+  function setMostRecentAction(actionId) {
+    // If no marker was set for this action, clear the previous marker
+    if (!pendingMarkerSet && mostRecentMarker) {
+      mostRecentMarker.classList.remove('most-recent');
+      mostRecentMarker = null;
+    }
+    pendingMarkerSet = false;
+    mostRecentActionId = actionId;
+    // Re-render will apply the class
+  }
+
   // If we loaded an existing game, restore the stats from events
   if (gameContext.loadedGame && gameContext.loadedGame.events) {
     const events = gameContext.loadedGame.events;
@@ -493,7 +520,10 @@ document.addEventListener("DOMContentLoaded", async () => {
     marker.dataset.player = player?.name || teamKey;
     marker.dataset.type = 'foul';
     shotMarkersEl.appendChild(marker);
-    
+
+    // Highlight as most recent
+    setMostRecentMarker(marker);
+
     return marker;
   }
 
@@ -522,6 +552,9 @@ document.addEventListener("DOMContentLoaded", async () => {
     marker.dataset.shotType = shotType;
     marker.dataset.result = result;
     shotMarkersEl.appendChild(marker);
+
+    // Highlight as most recent
+    setMostRecentMarker(marker);
 
     // Log to shot history
     logShotToHistory(teamKey, shotType, result);
@@ -641,6 +674,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       note: entry.note || ''
     };
     state.actionHistory[teamKey].push(action);
+    setMostRecentAction(action.id);
     renderActionLog(teamKey);
   }
 
@@ -664,7 +698,8 @@ document.addEventListener("DOMContentLoaded", async () => {
     const ordered = [...actions].reverse();
     ordered.forEach((action) => {
       const item = document.createElement('div');
-      item.className = `action-item${action.highlighted ? ' highlighted' : ''}`;
+      const isMostRecent = action.id === mostRecentActionId;
+      item.className = `action-item${action.highlighted ? ' highlighted' : ''}${isMostRecent ? ' most-recent' : ''}`;
       item.dataset.team = teamKey;
       item.dataset.id = action.id;
       const noteHtml = action.note ? `<div class="action-item__note">${escapeHtml(action.note)}</div>` : '';
@@ -1469,7 +1504,6 @@ document.addEventListener("DOMContentLoaded", async () => {
     const set = selectorEls[key];
     if (set.assignBtn) set.assignBtn.addEventListener('click', () => {
       if (isGameRunning) {
-        showGameInProgressAlert();
         return;
       }
       openModal(key);
