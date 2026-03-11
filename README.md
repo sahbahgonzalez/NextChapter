@@ -2,7 +2,7 @@
 
 A full-stack basketball shot logging and player analytics application. Track player performance, log shots, and analyze game statistics in real-time.
 
-## 📋 Table of Contents
+## Table of Contents
 
 - [Features](#features)
 - [Tech Stack](#tech-stack)
@@ -14,7 +14,7 @@ A full-stack basketball shot logging and player analytics application. Track pla
 - [Database](#database)
 - [Development](#development)
 
-## ✨ Features
+## Features
 
 - **Player Management**: Create, update, and manage player profiles
 - **Shot Logging**: Record shot attempts with coordinates, points, and game details
@@ -24,7 +24,7 @@ A full-stack basketball shot logging and player analytics application. Track pla
 - **Responsive Design**: Works on desktop and mobile devices
 - **Search Functionality**: Search and filter players by name or Instagram handle
 
-## 🛠 Tech Stack
+## Tech Stack
 
 ### Backend
 - **Node.js** with Express.js
@@ -39,7 +39,7 @@ A full-stack basketball shot logging and player analytics application. Track pla
 - **Vanilla JavaScript** (no framework dependencies)
 - **Fetch API** for HTTP requests
 
-## 📁 Project Structure
+## Project Structure
 
 ```
 NextChapter/
@@ -65,23 +65,30 @@ NextChapter/
 │   │       └── controller.js  # User logic
 │   ├── migrations/
 │   │   └── migrate_players.js # Database migrations
-│   ├── utils/
-│   │   └── hashPassword.js    # Password hashing utility
-│   └── public/
-│       └── images/            # Static images
+│   └── utils/
+│       └── hashPassword.js    # Password hashing utility
 ├── frontend/
 │   ├── index.html             # Main application page
-│   ├── game.html              # Game view page
-│   ├── gameScript.js          # Game logic
-│   ├── styles.css             # Global styles
+│   ├── game.html              # Game tracker page
+│   ├── games.html             # Games list page
+│   ├── player.html            # Player management page
+│   ├── player-stats.html      # Player statistics page
+│   ├── css/
+│   │   └── shared.css         # Global styles
+│   ├── js/
+│   │   ├── gameScript.js      # Game tracker logic
+│   │   ├── games.js           # Games page logic
+│   │   ├── player.js          # Player page logic
+│   │   └── player-stats.js    # Player stats logic
 │   ├── utils/
 │   │   ├── api.js             # API client wrapper
 │   │   └── app.js             # Frontend utilities
-│   └── public/                # Static assets
+│   └── assets/                # Static assets (images, SVGs)
+├── documentation/             # Project documentation
 └── README.md                  # This file
 ```
 
-## 🚀 Installation
+## Installation
 
 ### Prerequisites
 - Node.js (v14 or higher)
@@ -120,7 +127,7 @@ NextChapter/
    - Navigate to `http://localhost:3000` in your browser
    - The frontend files are served automatically by Express
 
-## ⚙️ Configuration
+## Configuration
 
 ### MongoDB Connection
 Update the `MONGODB_URI` in your `.env` file with your MongoDB Atlas connection string. Format:
@@ -136,7 +143,7 @@ Change the `JWT_SECRET` to a secure random string for production use.
 ### Database Name
 The application uses the `nextChapterDb` database by default.
 
-## 💻 Usage
+## Usage
 
 ### Running the Application
 
@@ -164,7 +171,7 @@ cd backend
 npm run migrate:players
 ```
 
-## 🔌 API Endpoints
+## API Endpoints
 
 ### Authentication
 - `POST /user/login` - User login
@@ -185,7 +192,7 @@ npm run migrate:players
 - `PATCH /game/:id` - Update game (admin only)
 - `DELETE /game/:id` - Delete game (admin only)
 
-## 🗄️ Database
+## Database
 
 ### Collections
 
@@ -203,7 +210,7 @@ npm run migrate:players
 - References to all participating players
 - Shot data for performance tracking
 
-## 🔧 Development
+## Development
 
 ### Adding New Features
 
@@ -237,13 +244,14 @@ npm run migrate:players
 - Ensure the frontend is served from the same origin as the API
 - Check that CORS is properly enabled in `app.js`
 
-## 📝 License
+## License
 
 ISC
 
-## 👤 Author
+## Authors
 
-Lazaro Loureiro
+- Lazaro Loureiro
+- Daniel Arriaga-Franco
 
 ---
 

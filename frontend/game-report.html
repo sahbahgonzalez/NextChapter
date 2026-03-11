@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Game Report - The Next Chapter</title>
+    <link rel="stylesheet" href="css/shared.css">
+    <style>
+        /* Page-specific styles for game-report.html */
+        body {
+            padding: 20px;
+        }
+
+        .game-meta {
+            display: flex;
+            justify-content: space-around;
+            color: #6B7280;
+            font-size: 0.95rem;
+            margin-top: 15px;
+            flex-wrap: wrap;
+            gap: 20px;
+        }
+
+        .game-meta .meta-item {
+            align-items: center;
+            gap: 5px;
+        }
+
+        .game-meta .meta-label {
+            font-weight: 600;
+            color: #9CA3AF;
+        }
+
+        .game-meta .meta-value {
+            font-size: 1.1rem;
+            color: #1f2937;
+            font-weight: 600;
+        }
+
+        .final-score-section h2 {
+            color: white;
+        }
+
+        .team-score {
+            flex: 1;
+        }
+
+        /* Stats Section */
+        .stats-section {
+            margin-bottom: 40px;
+        }
+
+        .stats-section h3 {
+            font-size: 1.4rem;
+            color: #1f2937;
+            margin-bottom: 20px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #e5e7eb;
+        }
+
+        thead {
+            background: #f3f4f6;
+            border-bottom: 2px solid #d1d5db;
+        }
+
+        .player-name {
+            font-weight: 600;
+            color: #3A478F;
+        }
+
+        /* Shot Chart Section */
+        .shot-chart-section {
+            margin-bottom: 40px;
+        }
+
+        .shot-chart-section h3 {
+            font-size: 1.4rem;
+            color: #1f2937;
+            margin-bottom: 20px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #e5e7eb;
+        }
+
+        .shot-chart-container {
+            background: #f3f4f6;
+            text-align: center;
+            position: relative;
+            display: inline-block;
+            width: 100%;
+        }
+
+        .shot-chart-wrapper {
+            position: relative;
+            display: block;
+            width: 100%;
+            max-width: 500px;
+            margin: 0 auto;
+            aspect-ratio: 500 / 470;
+            background: #f0f0f0;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        .shot-chart-svg {
+            width: 100%;
+            height: auto;
+            display: block;
+            background: white;
+            border-radius: 8px;
+        }
+
+        .shot-overlay {
+            display: block;
+            width: 100%;
+            height: 100%;
+            border-radius: 8px;
+        }
+
+        /* Player Report Page */
+        .player-report-page .player-header {
+            background: linear-gradient(135deg, #3A478F 0%, #6A7BC5 100%);
+            color: white;
+            padding: 30px;
+            border-radius: 12px;
+            margin-bottom: 30px;
+            text-align: center;
+            display: block;
+        }
+
+        .player-report-page .player-header h2 {
+            font-size: 2rem;
+            margin-bottom: 10px;
+            font-weight: 900;
+            color: white;
+        }
+
+        .player-stats-summary {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+            gap: 15px;
+            margin-top: 20px;
+        }
+
+        .player-stat-box {
+            background: rgba(255, 255, 255, 0.2);
+            padding: 15px;
+            border-radius: 8px;
+            text-align: center;
+        }
+
+        .player-stat-label {
+            font-size: 0.8rem;
+            opacity: 0.9;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .player-stat-value {
+            font-size: 2rem;
+            font-weight: 900;
+            margin-top: 5px;
+        }
+
+        .loading {
+            padding: 40px;
+            font-size: 1.1rem;
+        }
+    </style>
+</head>
+<body>
+    <!-- Header Navigation -->
+    <nav id="site-nav">
+        <div class="nav-inner">
+            <div class="brand-left">
+                <div class="nav-logo"><img src="assets/tnclogo.svg" alt="The Next Chapter" /></div>
+                <span class="brand-text">The Next Chapter</span>
+            </div>
+            <div class="nav-links">
+                <a href="index.html">Home</a>
+                <a href="index.html#stats">Stats</a>
+                <a href="player.html">Players</a>
+                <a href="games.html">Games</a>
+                <a href="game.html" id="nav-log-game-link">Log Game</a>
+            </div>
+            <div class="nav-actions">
+                <button class="btn-outline-tnc" id="nav-sign-in">Sign In</button>
+                <button class="btn-outline-tnc" id="nav-sign-out" style="display:none;">Sign Out</button>
+            </div>
+        </div>
+    </nav>
+
+    <div class="report-container">
+        <!-- Error Message -->
+        <div id="errorContainer" style="display: none;"></div>
+
+        <!-- Loading State -->
+        <div id="loadingContainer" class="loading">Loading game report...</div>
+
+        <!-- Report Content (hidden until loaded) -->
+        <div id="reportContent" style="display: none;">
+            <!-- Header -->
+            <div class="report-header">
+                <h1>Game Report</h1>
+                <div class="game-meta">
+                    <div class="meta-item">
+                        <span class="meta-label">Game Type</span>
+                        <span class="meta-value" id="gameType">1v1</span>
+                    </div>
+                    <div class="meta-item">
+                        <span class="meta-label">Date</span>
+                        <span class="meta-value" id="gameDate">--</span>
+                    </div>
+                    <div class="meta-item">
+                        <span class="meta-label">Status</span>
+                        <span class="meta-value" id="gameStatus">Finished</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Action Buttons -->
+            <div class="action-buttons">
+                <button class="btn btn-primary" onclick="generatePDF()">Download PDF</button>
+                <button class="btn btn-secondary" onclick="window.print()">Print</button>
+                <button class="btn btn-secondary" onclick="window.history.back()">Back</button>
+            </div>
+
+            <!-- Final Score -->
+            <div class="final-score-section">
+                <h2>Final Score</h2>
+                <div class="score-display">
+                    <div class="team-score">
+                        <div class="team-score-label" id="teamALabel">Team A</div>
+                        <div class="team-score-value" id="teamAScore">0</div>
+                    </div>
+                    <div class="vs-divider">vs</div>
+                    <div class="team-score">
+                        <div class="team-score-label" id="teamBLabel">Team B</div>
+                        <div class="team-score-value" id="teamBScore">0</div>
+                    </div>
+                </div>
+                <div class="winner-badge" id="winnerBadge">Team A Wins</div>
+            </div>
+
+            <!-- Player Reports -->
+            <div id="playerReportsContainer"></div>
+
+            <!-- Footer -->
+            <div class="report-footer">
+                <p><strong>The Next Chapter - Game Statistics Report</strong></p>
+                <p id="generatedDate">Generated on -- at --</p>
+                <p>For more information, visit: www.thenextchapter.app</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Login Modal -->
+    <div id="login-modal" class="login-modal">
+        <div class="login-content">
+            <h2>Admin Login</h2>
+            <input type="email" id="login-email" placeholder="Email" required>
+            <input type="password" id="login-password" placeholder="Password" required>
+            <div class="login-buttons">
+                <button id="login-submit">Sign In</button>
+                <button id="login-cancel">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <script src="utils/api.js"></script>
+    <script src="js/game-report.js"></script>
+</body>
+</html>

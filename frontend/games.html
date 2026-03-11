@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Games | TheNextChapter</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="css/shared.css">
+    <style>
+        /* Page-specific styles for games.html */
+        .team-players {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            max-height: 60px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        body.dark-mode .team-players {
+            color: var(--dark-text-muted);
+        }
+
+        .stat-item {
+            text-align: center;
+        }
+
+        @media (max-width: 768px) {
+            .team-players {
+                max-height: 40px;
+                font-size: 0.7rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Navigation -->
+    <nav id="site-nav">
+        <div class="nav-inner">
+            <div class="brand-left">
+                <div class="nav-logo"><img src="assets/tnclogo.svg" alt="The Next Chapter" /></div>
+                <span class="brand-text">The Next Chapter</span>
+            </div>
+            <div class="nav-links">
+                <a href="index.html">Home</a>
+                <a href="index.html#stats">Stats</a>
+                <a href="player.html">Players</a>
+                <a href="games.html" style="font-weight: 600;">Games</a>
+                <a href="game.html" id="nav-log-game-link">Log Game</a>
+            </div>
+            <div class="nav-actions">
+                <button class="btn-outline-tnc" id="nav-sign-in">Sign In</button>
+                <button class="btn-outline-tnc" id="nav-sign-out" style="display:none;">Sign Out</button>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <div class="page-container">
+        <!-- Page Header -->
+        <div class="page-header">
+            <h1>Games</h1>
+            <p>View past results, upcoming games, and live matches</p>
+        </div>
+
+        <!-- Alert Messages -->
+        <div id="successAlert" class="alert alert-success"></div>
+        <div id="errorAlert" class="alert alert-error"></div>
+
+        <!-- Controls Bar -->
+        <div class="controls-bar">
+            <input 
+                type="text" 
+                id="searchInput" 
+                class="search-box" 
+                placeholder="Search games..."
+            >
+            <button id="createGameBtn" class="btn btn-primary">+ Schedule Game</button>
+        </div>
+
+        <!-- Tabs -->
+        <div class="tabs">
+            <button class="tab-button active" data-tab="live">🔴 Live</button>
+            <button class="tab-button" data-tab="scheduled">📅 Scheduled</button>
+            <button class="tab-button" data-tab="completed">✅ Completed</button>
+        </div>
+
+        <!-- Live Games Tab -->
+        <div id="live" class="tab-content active">
+            <div id="liveGamesContainer" class="games-grid"></div>
+            <div id="liveEmptyState" class="empty-state" style="display: none;">
+                <h3>No Live Games</h3>
+                <p>There are currently no games in progress.</p>
+            </div>
+        </div>
+
+        <!-- Scheduled Games Tab -->
+        <div id="scheduled" class="tab-content">
+            <div id="scheduledGamesContainer" class="games-grid"></div>
+            <div id="scheduledEmptyState" class="empty-state" style="display: none;">
+                <h3>No Scheduled Games</h3>
+                <p>Schedule a new game to get started.</p>
+            </div>
+        </div>
+
+        <!-- Completed Games Tab -->
+        <div id="completed" class="tab-content">
+            <div id="completedGamesContainer" class="games-grid"></div>
+            <div id="completedEmptyState" class="empty-state" style="display: none;">
+                <h3>No Completed Games</h3>
+                <p>Completed games will appear here.</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Schedule Game Modal -->
+    <div id="gameModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="modalTitle">Schedule New Game</h2>
+            </div>
+            <form id="gameForm">
+                <div class="form-group">
+                    <label for="gameDate">Game Date/Time *</label>
+                    <input type="datetime-local" id="gameDate" required>
+                </div>
+                <div class="form-group">
+                    <label for="gameType">Game Type *</label>
+                    <select id="gameType" required>
+                        <option value="">Select type...</option>
+                        <option value="scrimmage">Scrimmage</option>
+                        <option value="league">League Game</option>
+                        <option value="tournament">Tournament</option>
+                        <option value="friendly">Friendly Match</option>
+                    </select>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="teamAName">Team A Name</label>
+                        <input type="text" id="teamAName" placeholder="Team name">
+                    </div>
+                    <div class="form-group">
+                        <label for="teamBName">Team B Name</label>
+                        <input type="text" id="teamBName" placeholder="Team name">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="gameLocation">Location</label>
+                    <input type="text" id="gameLocation" placeholder="Court/Venue name">
+                </div>
+                <div class="form-group">
+                    <label for="gameNotes">Notes</label>
+                    <textarea id="gameNotes" placeholder="Additional game details..." rows="3"></textarea>
+                </div>
+                <div class="modal-actions">
+                    <button type="submit" class="btn btn-primary">Schedule Game</button>
+                    <button type="button" class="btn btn-secondary" onclick="closeGameModal()">Cancel</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Dark mode toggle removed -->
+
+    <!-- Login Modal -->
+    <div id="login-modal" class="login-modal">
+        <div class="login-content">
+            <h2>Admin Login</h2>
+            <input type="email" id="login-email" placeholder="Email" required>
+            <input type="password" id="login-password" placeholder="Password" required>
+            <div class="login-buttons">
+                <button id="login-submit">Sign In</button>
+                <button id="login-cancel">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="utils/api.js"></script>
+    <script src="js/games.js"></script>
+</body>
+</html>
