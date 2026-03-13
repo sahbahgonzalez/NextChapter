@@ -128,7 +128,7 @@
             <div id="teamAScoreDisplay" style="font-size: 3rem; font-weight: 800; color: #0e2b62; line-height: 1;">
               <span id="teamAScore">0</span>
             </div>
-            <div style="font-size: 0.85rem; font-weight: 600; color: #666; text-transform: uppercase; letter-spacing: 1px;">Player A</div>
+            <div id="teamAScoreName" style="font-size: 0.85rem; font-weight: 600; color: #666; text-transform: uppercase; letter-spacing: 1px;">Player A</div>
           </div>
           <div class="col-auto text-center" style="padding: 0 2rem;">
             <span id="gameTimer" style="font-size: 2.5rem; font-weight: 700; color: #0e2b62;">00:00</span>
@@ -137,7 +137,7 @@
             <div id="teamBScoreDisplay" style="font-size: 3rem; font-weight: 800; color: #0e2b62; line-height: 1;">
               <span id="teamBScore">0</span>
             </div>
-            <div style="font-size: 0.85rem; font-weight: 600; color: #666; text-transform: uppercase; letter-spacing: 1px;">Player B</div>
+            <div id="teamBScoreName" style="font-size: 0.85rem; font-weight: 600; color: #666; text-transform: uppercase; letter-spacing: 1px;">Player B</div>
           </div>
         </div>
 
@@ -146,6 +146,9 @@
           <div class="col-2" id="team_a_players">
             <button id="teamAAssignBtn" class="btn btn-outline-tnc btn-assign">Assign Player</button>
             <button id="teamAAssignBtn2" class="btn btn-outline-tnc btn-assign tag-only" style="display:none;">Assign Tag Partner</button>
+            <div style="margin: 8px 0 10px;">
+              <input id="teamANameInput" class="form-control" type="text" placeholder="Custom team name (optional)" aria-label="Custom team name for Team A">
+            </div>
             <div id="teamAActivePicker" class="tag-only" style="display:none; margin: 8px 0 10px;">
               <label for="teamAActivePlayer" style="font-size: 12px; font-weight: 700; color: #0e2b62; text-transform: uppercase;">Active Player (A)</label>
               <select id="teamAActivePlayer" class="form-control" style="margin-top: 4px;"></select>
@@ -178,6 +181,9 @@
           <div class="col-2" id="team_b_players">
             <button id="teamBAssignBtn" class="btn btn-outline-tnc btn-assign">Assign Player</button>
             <button id="teamBAssignBtn2" class="btn btn-outline-tnc btn-assign tag-only" style="display:none;">Assign Tag Partner</button>
+            <div style="margin: 8px 0 10px;">
+              <input id="teamBNameInput" class="form-control" type="text" placeholder="Custom team name (optional)" aria-label="Custom team name for Team B">
+            </div>
             <div id="teamBActivePicker" class="tag-only" style="display:none; margin: 8px 0 10px;">
               <label for="teamBActivePlayer" style="font-size: 12px; font-weight: 700; color: #0e2b62; text-transform: uppercase;">Active Player (B)</label>
               <select id="teamBActivePlayer" class="form-control" style="margin-top: 4px;"></select>

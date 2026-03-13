@@ -178,8 +178,6 @@ function renderPlayerReports() {
             }
         }
 
-        const playerTeam = gameData.teams.team_a.some(p => String(p._id || p) === String(player._id)) ? 'team_a' : 'team_b';
-
         const reportHtml = `
             <div class="player-report-page" style="page-break-after: ${index < allPlayers.length - 1 ? 'always' : 'avoid'};">
                 <div class="player-header">

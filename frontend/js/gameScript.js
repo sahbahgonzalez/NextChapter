@@ -47,6 +47,7 @@ const gameContext = {
   players: { A: null, A2: null, B: null, B2: null },
   activePlayerIndex: { A: 0, B: 0 },
   ruleMode: '1v1',
+  customTeamNames: { A: '', B: '' },
   teams: { team_a: [], team_b: [] }
 };
 
@@ -110,6 +111,9 @@ function getActivePlayerForTeam(teamKey) {
 }
 
 function getTeamDisplayName(teamKey) {
+  const customName = (gameContext.customTeamNames?.[teamKey] || '').trim();
+  if (customName) return customName;
+
   const players = getTeamPlayers(teamKey);
   if (players.length === 0) return `Team ${teamKey}`;
   if (players.length === 1) return players[0]?.name || `Team ${teamKey}`;
@@ -130,6 +134,8 @@ async function loadGameData(gameId) {
     gameContext.gameId = game._id || gameId;
     gameContext.ruleMode = game.game_type === '2v2' ? 'tag-team-1v1' : '1v1';
     gameContext.teams = game.teams || { team_a: [], team_b: [] };
+    gameContext.customTeamNames.A = game.teams?.team_a?.name || '';
+    gameContext.customTeamNames.B = game.teams?.team_b?.name || '';
 
     // Store loaded game for reference
     gameContext.loadedGame = game;
@@ -467,6 +473,10 @@ document.addEventListener("DOMContentLoaded", async () => {
       actions: document.getElementById('action_log_B')
     },
     activeSideLabel: document.getElementById('activeSideLabel'),
+    teamAScoreName: document.getElementById('teamAScoreName'),
+    teamBScoreName: document.getElementById('teamBScoreName'),
+    teamANameInput: document.getElementById('teamANameInput'),
+    teamBNameInput: document.getElementById('teamBNameInput'),
     selectA: document.getElementById('selectTeamA'),
     selectB: document.getElementById('selectTeamB'),
     undo: document.getElementById('undoStatBtn'),
@@ -1340,6 +1350,18 @@ document.addEventListener("DOMContentLoaded", async () => {
     if (selectorEls.B.assignBtn) selectorEls.B.assignBtn.textContent = gameContext.players.B?.name || 'Assign Player';
     if (selectorEls.A.assignBtn2) selectorEls.A.assignBtn2.textContent = gameContext.players.A2?.name || 'Assign Tag Partner';
     if (selectorEls.B.assignBtn2) selectorEls.B.assignBtn2.textContent = gameContext.players.B2?.name || 'Assign Tag Partner';
+    if (els.teamANameInput && els.teamANameInput.value !== (gameContext.customTeamNames.A || '')) {
+      els.teamANameInput.value = gameContext.customTeamNames.A || '';
+    }
+    if (els.teamBNameInput && els.teamBNameInput.value !== (gameContext.customTeamNames.B || '')) {
+      els.teamBNameInput.value = gameContext.customTeamNames.B || '';
+    }
+    if (els.teamAScoreName) {
+      els.teamAScoreName.textContent = getTeamDisplayName('A') || 'Player A';
+    }
+    if (els.teamBScoreName) {
+      els.teamBScoreName.textContent = getTeamDisplayName('B') || 'Player B';
+    }
     
     // Team A stats
     if (els.a.pts) els.a.pts.textContent = pointsA;
@@ -1909,6 +1931,19 @@ document.addEventListener("DOMContentLoaded", async () => {
     });
   }
 
+  if (els.teamANameInput) {
+    els.teamANameInput.addEventListener('input', (e) => {
+      gameContext.customTeamNames.A = (e.target.value || '').trim();
+      updateUI();
+    });
+  }
+  if (els.teamBNameInput) {
+    els.teamBNameInput.addEventListener('input', (e) => {
+      gameContext.customTeamNames.B = (e.target.value || '').trim();
+      updateUI();
+    });
+  }
+
   if (modalEls.close) modalEls.close.addEventListener('click', closeModal);
   if (modalEls.overlay) modalEls.overlay.addEventListener('click', (e) => {
     if (e.target === modalEls.overlay) closeModal();
@@ -2135,6 +2170,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     gameContext.gameId = null;
     gameContext.players = { A: null, A2: null, B: null, B2: null };
     gameContext.activePlayerIndex = { A: 0, B: 0 };
+    gameContext.customTeamNames = { A: '', B: '' };
     gameContext.teams = {};
     gameContext.finalResult = null;
     gameContext.finalStats = null;

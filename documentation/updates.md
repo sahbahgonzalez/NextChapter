@@ -102,6 +102,18 @@ removeActionEntryById(teamKey, actionId);
 
 ---
 
+### 7. Editable Team Display Names
+**Date**: March 13, 2026  
+**Files Modified**: `frontend/game.html`, `frontend/js/gameScript.js`
+
+**Changes:**
+- Added optional custom team-name inputs for left (A) and right (B) sides.
+- Scoreboard/team display names now use custom team names when provided.
+- If custom name is empty, team display defaults to assigned player names (single player or joined tag-team names).
+- Loaded games initialize custom name fields from `teams.team_a.name` / `teams.team_b.name` when available.
+
+---
+
 ## January 2026 - Game Tracker Enhancements
 
 ### 1. Action History System
