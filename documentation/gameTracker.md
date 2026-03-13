@@ -10,18 +10,18 @@ Every game event is logged with detailed information and displayed in action car
 
 **Features:**
 - **Timestamps**: Each action shows game time in MM:SS format
-- **Action Types**: Shots (2PT, 3PT, FT), fouls, timeouts
+- **Action Types**: Shots (2PT, 3PT, 4PT, FT), fouls, timeouts
 - **Interactive Elements**:
   - **Notes**: Add custom text descriptions to any action (button displays pencil icon)
   - **Highlight**: Mark important actions for post-game review (toggles between star outline and filled star)
-  - **Delete**: Remove incorrectly logged actions (button displays X symbol)
+  - **Delete**: Performs a targeted undo for that specific action (button displays X symbol)
 
 **Action Entry Structure:**
 ```javascript
 {
   id: timestamp,
-  label: "3PT Made" | "2PT Missed" | "FT Made" | "Foul",
-  type: "3pt" | "2pt" | "ft" | "foul",
+  label: "4PT Made" | "3PT Made" | "2PT Missed" | "FT Made" | "Foul",
+  type: "4pt" | "3pt" | "2pt" | "ft" | "foul",
   timeLabel: "12:45",
   gameSeconds: 765,
   highlighted: false,
@@ -73,6 +73,12 @@ Visual and detection zones for accurate shot tracking.
 - `inferShotTypeFromPos(pos)`: Detects zone from percentage coordinates
 - Priority: 2PT Rectangle → 2PT Semicircle → 3PT (fallback)
 
+#### Current Temporary Runtime Setting
+- Warning header (`#startError`) is hidden in the game UI.
+- Auto 2PT/3PT detection is commented out in active shot logging paths.
+- "Auto" shot buttons/hotkeys currently record as `2pt` until detection is re-enabled.
+- Zone contradiction warning prompts are currently disabled.
+
 ---
 
 ### 3. Shot Markers
@@ -113,9 +119,28 @@ Complete rollback of the last action with full state restoration.
 
 **Implementation:**
 - Function: `undoLast()`
-- Triggered: Ctrl+Z or Undo button
+- Triggered: U hotkey or Undo button
 - References: Markers stored in `state.history[].marker`
 - Cleanup: `marker.remove()` + array splice
+
+### 4.1 Action Row Delete = Targeted Undo
+
+Deleting an action from the Actions table now undoes that exact action instead of only removing the row.
+
+**What the delete button now does:**
+1. Finds the linked history change using `actionId`
+2. Reverts only that change's stats (shot or foul)
+3. Removes that change's marker from the court
+4. Removes only that action row from `state.actionHistory`
+5. Refreshes UI totals and cards
+
+**Implementation:**
+- Functions: `undoActionById()`, `revertHistoryChange()`, `removeActionEntryById()`
+- Event handlers: `data-action="delete"` click handlers for Team A and Team B action logs
+
+**Important note:**
+- Runtime-created actions are fully reversible by delete (stats + marker + row).
+- Legacy/preloaded rows that do not have a linked runtime history entry will still remove only the row.
 
 ---
 
@@ -127,8 +152,10 @@ Keyboard shortcuts for rapid game logging.
 
 | Key | Action | Cursor Required | Zone Detection |
 |-----|--------|----------------|----------------|
-| M | Shot Made | Yes | Auto-detect 2PT/3PT |
-| X | Shot Missed | Yes | Auto-detect 2PT/3PT |
+| M | Shot Made | Yes | Temporarily forced 2PT |
+| X | Shot Missed | Yes | Temporarily forced 2PT |
+| 4 | 4PT Made | Yes | Forced 4PT |
+| Shift+4 | 4PT Missed | Yes | Forced 4PT |
 | 2 | 2PT Made | Yes | Forced 2PT |
 | Shift+2 | 2PT Missed | Yes | Forced 2PT |
 | 3 | 3PT Made | Yes | Forced 3PT |
@@ -144,7 +171,7 @@ Keyboard shortcuts for rapid game logging.
 | B | Foul on Team B | Yes |
 | Tab | Switch Active Player | No |
 | P | Pause/Resume | No |
-| Ctrl+Z | Undo Last Action | No |
+| U | Undo Last Action | No |
 
 #### Zone Contradiction Warnings
 
@@ -212,12 +239,12 @@ Ensures data integrity by requiring cursor to be over court for position-based a
 ```javascript
 state = {
   active: 'A',
-  A: { twoPM, twoPA, threePM, threePA, ftM, ftA, fouls },
-  B: { twoPM, twoPA, threePM, threePA, ftM, ftA, fouls },
-  history: [{ kind, team, shotType, result, marker }],
+  A: { twoPM, twoPA, threePM, threePA, fourPM, fourPA, ftM, ftA, fouls },
+  B: { twoPM, twoPA, threePM, threePA, fourPM, fourPA, ftM, ftA, fouls },
+  history: [{ kind, team, shotType, result, marker, actionId, playerId, pos, persisted }],
   actionHistory: {
-    A: [{ id, label, type, timeLabel, gameSeconds, highlighted, note }],
-    B: [{ id, label, type, timeLabel, gameSeconds, highlighted, note }]
+    A: [{ id, label, type, timeLabel, gameSeconds, highlighted, note, markerId }],
+    B: [{ id, label, type, timeLabel, gameSeconds, highlighted, note, markerId }]
   }
 }
 ```
@@ -240,6 +267,9 @@ state = {
 - `renderActionLog(teamKey)` - Renders all actions for team
 - `formatGameTime(seconds)` - Converts to MM:SS format
 - `escapeHtml(text)` - Sanitizes user input for notes
+- `undoActionById(teamKey, actionId)` - Reverts one specific action by id
+- `revertHistoryChange(change)` - Reverts stat and marker for one history item
+- `removeActionEntryById(teamKey, actionId)` - Removes one action row safely
 
 **Undo System:**
 - `undoLast()` - Removes last action from all state, removes markers, updates UI
@@ -247,6 +277,12 @@ state = {
 **Validation:**
 - `checkZoneContradiction(intendedShot, actualZone)` - Validates hotkey matches zone
 - Cursor position checks in all relevant hotkey handlers
+
+**Backend Sync:**
+- Live event sync can be toggled with `SYNC_LIVE_EVENTS_TO_BACKEND`.
+- When disabled, events are buffered in `state.history` and flushed at End Game.
+- Finalization sends explicit `final_score` and `winner`.
+- If native 4PT backend event persistence is rejected, compatibility fallback persists equivalent total points (`3PT` + made `FT` for made 4PT).
 
 ---
 

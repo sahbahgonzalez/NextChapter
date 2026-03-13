@@ -6,6 +6,12 @@
 let gameId = null;
 let gameData = null;
 
+function shouldAutoDownloadFromUrl() {
+    const params = new URLSearchParams(window.location.search);
+    const value = (params.get('autodownload') || '').toLowerCase();
+    return value === '1' || value === 'true' || value === 'yes';
+}
+
 // Initialize
 document.addEventListener('DOMContentLoaded', async () => {
     setupNavigation();
@@ -144,6 +150,13 @@ function renderReport() {
 
     // Render player reports
     renderPlayerReports();
+
+    if (shouldAutoDownloadFromUrl()) {
+        // Let the browser finish layout before html2pdf snapshots the DOM.
+        setTimeout(() => {
+            generatePDF(true);
+        }, 300);
+    }
 }
 
 function renderPlayerReports() {
@@ -426,14 +439,38 @@ function showError(message) {
     errorContainer.style.display = 'block';
 }
 
-function generatePDF() {
+function generatePDF(autoMode = false) {
     const element = document.querySelector('.report-container');
+    if (!element) {
+        showError('Could not find report content to export.');
+        return;
+    }
+
     const opt = {
         margin: 10,
         filename: `game-report-${gameId}.pdf`,
         image: { type: 'png', quality: 0.98 },
-        html2canvas: { scale: 2 },
+        html2canvas: {
+            scale: 2,
+            useCORS: true,
+            logging: false
+        },
+        pagebreak: { mode: ['css', 'legacy'] },
         jsPDF: { orientation: 'portrait', unit: 'mm', format: 'a4' }
     };
-    html2pdf().set(opt).from(element).save();
+
+    html2pdf()
+        .set(opt)
+        .from(element)
+        .save()
+        .then(() => {
+            if (autoMode) {
+                // In auto-download flow, close the helper tab after save is triggered.
+                setTimeout(() => window.close(), 250);
+            }
+        })
+        .catch((error) => {
+            console.error('Failed to generate PDF:', error);
+            showError('Failed to generate PDF. Please try again.');
+        });
 }

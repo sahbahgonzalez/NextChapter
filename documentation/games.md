@@ -137,7 +137,7 @@ POST /game
     y: Number             // Percentage (0-100)
   },
   made: Boolean,          // For shots/free throws
-  points: Number,         // 1, 2, or 3 for scoring events
+  points: Number,         // 1, 2, 3, or 4 for scoring events
   rebound_type: String,   // 'offensive' or 'defensive'
   turnover_type: String   // Classification of turnover
 }
@@ -165,6 +165,21 @@ POST /game/:id/event
 }
 ```
 
+**4PT Shot Example:**
+```json
+{
+  "type": "shot",
+  "player_id": "player_id",
+  "team": "team_a",
+  "location": {
+    "x": 41.0,
+    "y": 27.4
+  },
+  "made": true,
+  "points": 4
+}
+```
+
 **Free Throw Example:**
 ```json
 {
@@ -188,6 +203,10 @@ POST /game/:id/event
   }
 }
 ```
+
+**Compatibility Note:**
+- Some backend environments may reject native `points: 4` event writes.
+- Frontend game tracking includes a compatibility fallback path to preserve total points during end-game sync.
 
 ---
 

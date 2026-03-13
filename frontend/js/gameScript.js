@@ -8,6 +8,9 @@ let isPaused = false;
 let isTimeout = false;
 let pendingShotType = null;
 let isGameRunning = false;
+// Backend currently has no event-reversal endpoint, so live event sync can overcount after undo/delete.
+// Keep scoreboard authoritative in frontend and persist final score/winner at game end.
+const SYNC_LIVE_EVENTS_TO_BACKEND = false;
 
 const timerDisplay = document.getElementById("gameTimer");
 const startGameBtn = document.getElementById("startGameBtn");
@@ -41,11 +44,13 @@ function showStartError(msg = "") {
  */
 const gameContext = {
   gameId: null,
-  players: { A: null, B: null },
+  players: { A: null, A2: null, B: null, B2: null },
+  activePlayerIndex: { A: 0, B: 0 },
+  ruleMode: '1v1',
   teams: { team_a: [], team_b: [] }
 };
 
-let currentAssignTeam = null;
+let currentAssignTarget = null;
 let searchDebounce = null;
 // lastClickPos now tracked on GameController instance
 let lastCursorPos = null; // Track cursor position over court for hotkeys
@@ -79,7 +84,36 @@ function stopTimer() {
  * @returns {boolean}
  */
 function playersAssigned() {
+  if (gameContext.ruleMode === 'tag-team-1v1') {
+    return !!(gameContext.players.A && gameContext.players.A2 && gameContext.players.B && gameContext.players.B2);
+  }
   return !!(gameContext.players.A && gameContext.players.B);
+}
+
+function requiredPlayersPerTeam() {
+  return gameContext.ruleMode === 'tag-team-1v1' ? 2 : 1;
+}
+
+function getTeamPlayers(teamKey) {
+  if (teamKey === 'A') {
+    return [gameContext.players.A, gameContext.players.A2].filter(Boolean);
+  }
+  return [gameContext.players.B, gameContext.players.B2].filter(Boolean);
+}
+
+function getActivePlayerForTeam(teamKey) {
+  const players = getTeamPlayers(teamKey);
+  if (players.length === 0) return null;
+  if (gameContext.ruleMode !== 'tag-team-1v1') return players[0];
+  const idx = gameContext.activePlayerIndex[teamKey] || 0;
+  return players[idx] || players[0] || null;
+}
+
+function getTeamDisplayName(teamKey) {
+  const players = getTeamPlayers(teamKey);
+  if (players.length === 0) return `Team ${teamKey}`;
+  if (players.length === 1) return players[0]?.name || `Team ${teamKey}`;
+  return players.map((p) => p?.name || 'Player').join(' & ');
 }
 
 // Placeholder - actual handlers will be set up in DOMContentLoaded
@@ -94,6 +128,7 @@ async function loadGameData(gameId) {
     console.log("Game data from API:", game);
 
     gameContext.gameId = game._id || gameId;
+    gameContext.ruleMode = game.game_type === '2v2' ? 'tag-team-1v1' : '1v1';
     gameContext.teams = game.teams || { team_a: [], team_b: [] };
 
     // Store loaded game for reference
@@ -115,7 +150,7 @@ async function loadGameData(gameId) {
     const teamAPlayerIds = game.teams?.team_a?.players || game.teams?.team_a || [];
     const teamBPlayerIds = game.teams?.team_b?.players || game.teams?.team_b || [];
 
-    // Assign Team A player
+    // Assign Team A players
     if (teamAPlayerIds.length > 0) {
       const playerAId = teamAPlayerIds[0]?._id || teamAPlayerIds[0];
       const playerA = findPlayerById(playerAId);
@@ -126,8 +161,12 @@ async function loadGameData(gameId) {
         }
       }
     }
+    if (teamAPlayerIds.length > 1) {
+      const playerA2Id = teamAPlayerIds[1]?._id || teamAPlayerIds[1];
+      gameContext.players.A2 = findPlayerById(playerA2Id);
+    }
 
-    // Assign Team B player
+    // Assign Team B players
     if (teamBPlayerIds.length > 0) {
       const playerBId = teamBPlayerIds[0]?._id || teamBPlayerIds[0];
       const playerB = findPlayerById(playerBId);
@@ -138,6 +177,10 @@ async function loadGameData(gameId) {
         }
       }
     }
+    if (teamBPlayerIds.length > 1) {
+      const playerB2Id = teamBPlayerIds[1]?._id || teamBPlayerIds[1];
+      gameContext.players.B2 = findPlayerById(playerB2Id);
+    }
 
     // Load scores from the game
     const teamAScore = game.final_score?.team_a || 0;
@@ -146,12 +189,12 @@ async function loadGameData(gameId) {
     document.getElementById("teamBScore").textContent = teamBScore;
 
     // Check if both players are assigned
-    if (gameContext.players.A && gameContext.players.B) {
+    if (playersAssigned()) {
       if (startGameBtn) startGameBtn.disabled = false;
       showStartError("");
     } else {
       if (startGameBtn) startGameBtn.disabled = true;
-      showStartError("Assign a player to both teams before starting the game.");
+      showStartError(`Assign ${requiredPlayersPerTeam()} player(s) to each team before starting the game.`);
     }
 
     // Show game type
@@ -191,6 +234,8 @@ function restoreGameEvents(game) {
       let shotType = '2pt';
       if (event.type === 'free_throw' || event.points === 1) {
         shotType = 'ft';
+      } else if (event.points === 4) {
+        shotType = '4pt';
       } else if (event.points === 3) {
         shotType = '3pt';
       }
@@ -332,10 +377,12 @@ document.addEventListener("DOMContentLoaded", async () => {
     // Start fresh - no game loaded, user must assign players and start
     gameContext.gameId = null;
     gameContext.players.A = null;
+    gameContext.players.A2 = null;
     gameContext.players.B = null;
+    gameContext.players.B2 = null;
     // Ensure button is disabled until both players are assigned
     if (startGameBtn) startGameBtn.disabled = true;
-    showStartError("Assign a player to both teams before starting the game.");
+    showStartError(`Assign ${requiredPlayersPerTeam()} player(s) to each team before starting the game.`);
   }
 
   // ---- Local stat tracking for 1v1 view ----
@@ -344,8 +391,8 @@ document.addEventListener("DOMContentLoaded", async () => {
    */
   const state = {
     active: 'A',
-    A: { twoPA: 0, twoPM: 0, threePA: 0, threePM: 0, ftA: 0, ftM: 0, fouls: 0 },
-    B: { twoPA: 0, twoPM: 0, threePA: 0, threePM: 0, ftA: 0, ftM: 0, fouls: 0 },
+    A: { twoPA: 0, twoPM: 0, threePA: 0, threePM: 0, fourPA: 0, fourPM: 0, ftA: 0, ftM: 0, fouls: 0 },
+    B: { twoPA: 0, twoPM: 0, threePA: 0, threePM: 0, fourPA: 0, fourPM: 0, ftA: 0, ftM: 0, fouls: 0 },
     history: [],
     shotHistory: {
       A: [],  // Store all of player A's shots
@@ -365,7 +412,10 @@ document.addEventListener("DOMContentLoaded", async () => {
       const team = state[teamKey];
 
       if (event.type === 'shot') {
-        if (event.points === 3) {
+        if (event.points === 4) {
+          team.fourPA += 1;
+          if (event.made) team.fourPM += 1;
+        } else if (event.points === 3) {
           team.threePA += 1;
           if (event.made) team.threePM += 1;
         } else {
@@ -391,6 +441,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     // team A
     a: {
       pts: document.getElementById('teamAPts'),
+      s4: document.getElementById('teamA4pt'),
       s3: document.getElementById('teamA3pt'),
       s2: document.getElementById('teamA2pt'),
       ft: document.getElementById('teamAft'),
@@ -404,6 +455,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     // team B
     b: {
       pts: document.getElementById('teamBPts'),
+      s4: document.getElementById('teamB4pt'),
       s3: document.getElementById('teamB3pt'),
       s2: document.getElementById('teamB2pt'),
       ft: document.getElementById('teamBft'),
@@ -417,7 +469,12 @@ document.addEventListener("DOMContentLoaded", async () => {
     activeSideLabel: document.getElementById('activeSideLabel'),
     selectA: document.getElementById('selectTeamA'),
     selectB: document.getElementById('selectTeamB'),
-    undo: document.getElementById('undoStatBtn')
+    undo: document.getElementById('undoStatBtn'),
+    gameRuleSelect: document.getElementById('gameRuleSelect'),
+    teamAActivePlayer: document.getElementById('teamAActivePlayer'),
+    teamBActivePlayer: document.getElementById('teamBActivePlayer'),
+    teamAActivePicker: document.getElementById('teamAActivePicker'),
+    teamBActivePicker: document.getElementById('teamBActivePicker')
   };
 
   // DEBUG: Log if all elements were found
@@ -432,10 +489,12 @@ document.addEventListener("DOMContentLoaded", async () => {
   /** Selector buttons for assigning players */
   const selectorEls = {
     A: {
-      assignBtn: document.getElementById('teamAAssignBtn')
+      assignBtn: document.getElementById('teamAAssignBtn'),
+      assignBtn2: document.getElementById('teamAAssignBtn2')
     },
     B: {
-      assignBtn: document.getElementById('teamBAssignBtn')
+      assignBtn: document.getElementById('teamBAssignBtn'),
+      assignBtn2: document.getElementById('teamBAssignBtn2')
     }
   };
 
@@ -467,7 +526,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   /**
    * Add a shot marker on the court overlay
    * @param {'A'|'B'} teamKey
-   * @param {'2pt'|'3pt'|'ft'} shotType
+  * @param {'2pt'|'3pt'|'4pt'|'ft'} shotType
    * @param {'made'|'missed'} result
    * @param {{xPct:number,yPct:number}} pos
    */
@@ -479,7 +538,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     marker.classList.add(teamKey === 'A' ? 'team-a' : 'team-b');
     
     // Add player initials to the marker
-    const player = gameContext.players[teamKey];
+    const player = getActivePlayerForTeam(teamKey);
     const initials = player?.name ? player.name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) : teamKey;
     marker.textContent = '⚠️';  // Warning symbol for foul
     marker.style.fontSize = '14px';
@@ -505,7 +564,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     marker.classList.add(teamKey === 'A' ? 'team-a' : 'team-b');
 
     // Add player initials to the marker
-    const player = gameContext.players[teamKey];
+    const player = getActivePlayerForTeam(teamKey);
     const initials = player?.name ? player.name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) : teamKey;
     marker.textContent = initials;
     marker.style.fontSize = '10px';
@@ -533,14 +592,14 @@ document.addEventListener("DOMContentLoaded", async () => {
    * Append a shot entry to the active player's shot history
    * and update the Latest Shot panel.
    * @param {'A'|'B'} teamKey
-   * @param {'2pt'|'3pt'|'ft'} shotType
+  * @param {'2pt'|'3pt'|'4pt'|'ft'} shotType
    * @param {'made'|'missed'} result
    */
   function logShotToHistory(teamKey, shotType, result) {
     const shotLog = document.getElementById('shot_log');
     if (!shotLog) return;
     
-    const player = gameContext.players[teamKey];
+    const player = getActivePlayerForTeam(teamKey);
     const playerName = player?.name || `Team ${teamKey}`;
     
     // Use game timer instead of clock time
@@ -549,7 +608,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     const gameTime = `${mins}:${secs.toString().padStart(2, '0')}`;
     
     const shotEmoji = result === 'made' ? '✓' : '✗';
-    const shotLabel = shotType === '3pt' ? '3PT' : shotType === '2pt' ? '2PT' : 'FT';
+    const shotLabel = shotType === '4pt' ? '4PT' : shotType === '3pt' ? '3PT' : shotType === '2pt' ? '2PT' : 'FT';
     const resultColor = result === 'made' ? '#4caf50' : '#f44336';
     
     // Store shot in history for this player
@@ -571,8 +630,8 @@ document.addEventListener("DOMContentLoaded", async () => {
     updateShotLogDisplay();
   }
 
-  function logFoulToHistory(teamKey, pos = null) {
-    const player = gameContext.players[teamKey];
+  function logFoulToHistory(teamKey, pos = null, actionId = null) {
+    const player = getActivePlayerForTeam(teamKey);
     const playerName = player?.name || `Team ${teamKey}`;
     
     // Use game timer
@@ -603,9 +662,11 @@ document.addEventListener("DOMContentLoaded", async () => {
     
     // Also log to new action history system
     addActionEntry(teamKey, {
+      id: actionId || undefined,
       label: 'Foul',
       type: 'foul',
-      gameSeconds: secondsElapsed
+      gameSeconds: secondsElapsed,
+      markerEl: foulMarker || null
     });
     
     // Update display for current active player
@@ -630,18 +691,148 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   function addActionEntry(teamKey, entry) {
     if (!state.actionHistory[teamKey]) return;
+    const actionId = entry.id || `action_${Date.now()}_${Math.random().toString(16).slice(2)}`;
     const action = {
-      id: entry.id || `action_${Date.now()}_${Math.random().toString(16).slice(2)}`,
+      id: actionId,
       teamKey,
       label: entry.label,
       timeLabel: entry.timeLabel || formatGameTime(entry.gameSeconds),
       timestamp: entry.timestamp || Date.now(),
       highlighted: !!entry.highlighted,
       type: entry.type || 'action',
-      note: entry.note || ''
+      note: entry.note || '',
+      markerEl: entry.markerEl || null,
+      markerId: entry.markerId || null
     };
+    if (action.markerEl) {
+      action.markerId = action.markerEl.dataset.markerId || action.markerId || `marker_${Date.now()}_${Math.random().toString(16).slice(2)}`;
+      action.markerEl.dataset.markerId = action.markerId;
+      action.markerEl.dataset.actionId = action.id;
+    }
     state.actionHistory[teamKey].push(action);
     renderActionLog(teamKey);
+  }
+
+  function removeActionEntryById(teamKey, actionId) {
+    const actions = state.actionHistory[teamKey] || [];
+    const index = actions.findIndex((action) => action.id === actionId);
+    if (index === -1) return false;
+
+    if (highlightedActionMarker) {
+      const highlightedId = highlightedActionMarker.dataset.actionId;
+      if (highlightedId && highlightedId === actionId) {
+        clearHighlightedActionMarker();
+      }
+    }
+
+    actions.splice(index, 1);
+    renderActionLog(teamKey);
+    return true;
+  }
+
+  function revertHistoryChange(change) {
+    if (!change) return;
+
+    if ((change.kind === 'shot' || change.kind === 'foul') && change.marker) {
+      change.marker.remove();
+    }
+
+    if (change.kind === 'shot') {
+      const team = change.team === 'A' ? state.A : state.B;
+      if (change.shotType === '4pt') {
+        if (team.fourPA > 0) team.fourPA -= 1;
+        if (change.result === 'made' && team.fourPM > 0) team.fourPM -= 1;
+      } else if (change.shotType === '3pt') {
+        if (team.threePA > 0) team.threePA -= 1;
+        if (change.result === 'made' && team.threePM > 0) team.threePM -= 1;
+      } else if (change.shotType === '2pt') {
+        if (team.twoPA > 0) team.twoPA -= 1;
+        if (change.result === 'made' && team.twoPM > 0) team.twoPM -= 1;
+      } else if (change.shotType === 'ft') {
+        if (team.ftA > 0) team.ftA -= 1;
+        if (change.result === 'made' && team.ftM > 0) team.ftM -= 1;
+      }
+      return;
+    }
+
+    if (change.kind === 'foul') {
+      const team = change.team === 'A' ? state.A : state.B;
+      if (team.fouls > 0) team.fouls -= 1;
+    }
+  }
+
+  function undoActionById(teamKey, actionId) {
+    if (!actionId) return false;
+
+    let historyIndex = -1;
+    for (let i = state.history.length - 1; i >= 0; i -= 1) {
+      const change = state.history[i];
+      if (change.team === teamKey && change.actionId === actionId) {
+        historyIndex = i;
+        break;
+      }
+    }
+
+    if (historyIndex === -1) return removeActionEntryById(teamKey, actionId);
+
+    const [change] = state.history.splice(historyIndex, 1);
+    revertHistoryChange(change);
+    removeActionEntryById(teamKey, actionId);
+    updateUI();
+    return true;
+  }
+
+  let highlightedActionMarker = null;
+
+  function clearHighlightedActionMarker() {
+    if (highlightedActionMarker) {
+      highlightedActionMarker.classList.remove('linked-highlight');
+      highlightedActionMarker = null;
+    }
+  }
+
+  function findMarkerForActionEntry(entry) {
+    if (!entry) return null;
+    if (entry.markerEl && document.body.contains(entry.markerEl)) return entry.markerEl;
+    if (entry.markerId) {
+      return document.querySelector(`[data-marker-id="${entry.markerId}"]`);
+    }
+    return null;
+  }
+
+  function highlightMarkerForAction(teamKey, actionId) {
+    clearHighlightedActionMarker();
+    if (!actionId) return;
+    const entry = (state.actionHistory[teamKey] || []).find((a) => a.id === actionId);
+    if (!entry) return;
+    const marker = findMarkerForActionEntry(entry);
+    if (!marker) return;
+
+    marker.classList.add('linked-highlight');
+    highlightedActionMarker = marker;
+  }
+
+  function wireActionHover(container, teamKey) {
+    if (!container) return;
+
+    container.addEventListener('mouseover', (e) => {
+      const actionItem = e.target.closest('.action-item');
+      if (!actionItem || !container.contains(actionItem)) return;
+      const actionId = actionItem.dataset.id;
+      if (!actionId) {
+        clearHighlightedActionMarker();
+        return;
+      }
+      highlightMarkerForAction(teamKey, actionId);
+    });
+
+    container.addEventListener('mouseout', (e) => {
+      const actionItem = e.target.closest('.action-item');
+      if (!actionItem || !container.contains(actionItem)) return;
+      const related = e.relatedTarget;
+      if (related && actionItem.contains(related)) return;
+      clearHighlightedActionMarker();
+    });
   }
 
   function escapeHtml(text) {
@@ -689,7 +880,8 @@ document.addEventListener("DOMContentLoaded", async () => {
   function seedActionFromEvent(event, teamKey) {
     if (!teamKey) return;
     if (event.type === 'shot') {
-      const label = `${event.points === 3 ? '3PT' : '2PT'} ${event.made ? 'Made' : 'Missed'}`;
+      const pointsLabel = event.points === 4 ? '4PT' : event.points === 3 ? '3PT' : '2PT';
+      const label = `${pointsLabel} ${event.made ? 'Made' : 'Missed'}`;
       addActionEntry(teamKey, {
         label,
         type: 'shot',
@@ -765,14 +957,102 @@ document.addEventListener("DOMContentLoaded", async () => {
   function closeModal() {
     if (modalEls.overlay) modalEls.overlay.style.display = 'none';
     if (modalEls.results) modalEls.results.classList.remove('show');
-    currentAssignTeam = null;
+    currentAssignTarget = null;
+  }
+
+  function getPlayerSlotKey(teamKey, slotIndex) {
+    if (teamKey === 'A') return slotIndex === 2 ? 'A2' : 'A';
+    return slotIndex === 2 ? 'B2' : 'B';
+  }
+
+  function getAssignedPlayerById(playerId) {
+    const slots = [
+      { team: 'A', slot: 1, key: 'A' },
+      { team: 'A', slot: 2, key: 'A2' },
+      { team: 'B', slot: 1, key: 'B' },
+      { team: 'B', slot: 2, key: 'B2' }
+    ];
+    return slots.find(({ key }) => {
+      const p = gameContext.players[key];
+      return p && String(p._id) === String(playerId);
+    }) || null;
+  }
+
+  function populateActivePlayerSelectors() {
+    const selectMap = {
+      A: els.teamAActivePlayer,
+      B: els.teamBActivePlayer
+    };
+
+    ['A', 'B'].forEach((teamKey) => {
+      const selectEl = selectMap[teamKey];
+      if (!selectEl) return;
+
+      const players = getTeamPlayers(teamKey);
+      selectEl.innerHTML = '';
+
+      players.forEach((player, idx) => {
+        const option = document.createElement('option');
+        option.value = String(idx);
+        option.textContent = player?.name || `${teamKey} Player ${idx + 1}`;
+        selectEl.appendChild(option);
+      });
+
+      const maxIdx = Math.max(players.length - 1, 0);
+      const current = gameContext.activePlayerIndex[teamKey] || 0;
+      gameContext.activePlayerIndex[teamKey] = Math.min(current, maxIdx);
+      selectEl.value = String(gameContext.activePlayerIndex[teamKey]);
+      selectEl.disabled = players.length < 2;
+    });
+  }
+
+  function refreshRuleModeUI() {
+    const isTagMode = gameContext.ruleMode === 'tag-team-1v1';
+
+    if (els.gameRuleSelect) {
+      els.gameRuleSelect.value = gameContext.ruleMode;
+      els.gameRuleSelect.disabled = isGameRunning;
+    }
+
+    if (selectorEls.A.assignBtn2) selectorEls.A.assignBtn2.style.display = isTagMode ? 'block' : 'none';
+    if (selectorEls.B.assignBtn2) selectorEls.B.assignBtn2.style.display = isTagMode ? 'block' : 'none';
+    if (els.teamAActivePicker) els.teamAActivePicker.style.display = isTagMode ? 'block' : 'none';
+    if (els.teamBActivePicker) els.teamBActivePicker.style.display = isTagMode ? 'block' : 'none';
+
+    populateActivePlayerSelectors();
+  }
+
+  function setRuleMode(nextMode) {
+    if (isGameRunning) return;
+    gameContext.ruleMode = nextMode === 'tag-team-1v1' ? 'tag-team-1v1' : '1v1';
+
+    if (gameContext.ruleMode !== 'tag-team-1v1') {
+      gameContext.players.A2 = null;
+      gameContext.players.B2 = null;
+      gameContext.activePlayerIndex.A = 0;
+      gameContext.activePlayerIndex.B = 0;
+    }
+
+    refreshRuleModeUI();
+    updateUI();
+
+    if (playersAssigned()) {
+      if (startGameBtn) startGameBtn.disabled = false;
+      showStartError('');
+    } else {
+      if (startGameBtn) startGameBtn.disabled = true;
+      showStartError(`Assign ${requiredPlayersPerTeam()} player(s) to each team before starting the game.`);
+    }
   }
 
   function openShotModal(shotType) {
     pendingShotType = shotType;
     if (shotModal.overlay) shotModal.overlay.style.display = 'flex';
     if (shotModal.title) shotModal.title.textContent = 'Log Shot';
-    if (shotModal.info) shotModal.info.textContent = `${shotType === '3pt' ? '3PT' : '2PT'} attempt`;
+    if (shotModal.info) {
+      const shotTypeLabel = shotType === '4pt' ? '4PT' : shotType === '3pt' ? '3PT' : '2PT';
+      shotModal.info.textContent = `${shotTypeLabel} attempt`;
+    }
   }
 
   function closeShotModal() {
@@ -780,10 +1060,11 @@ document.addEventListener("DOMContentLoaded", async () => {
     if (shotModal.overlay) shotModal.overlay.style.display = 'none';
   }
 
-  function openModal(teamKey) {
-    currentAssignTeam = teamKey;
+  function openModal(teamKey, slotIndex = 1) {
+    currentAssignTarget = { teamKey, slotIndex };
     if (modalEls.overlay) modalEls.overlay.style.display = 'flex';
-    if (modalEls.title) modalEls.title.textContent = `Assign Player (${teamKey})`;
+    const slotLabel = slotIndex === 2 ? 'Tag Partner' : 'Primary Player';
+    if (modalEls.title) modalEls.title.textContent = `Assign ${slotLabel} (${teamKey})`;
     if (modalEls.message) modalEls.message.textContent = '';
     if (modalEls.results) modalEls.results.innerHTML = '';
     if (modalEls.searchInput) {
@@ -794,29 +1075,32 @@ document.addEventListener("DOMContentLoaded", async () => {
     if (modalEls.createIg) modalEls.createIg.value = '';
   }
 
-  function setPlayer(teamKey, player) {
+  function setPlayer(teamKey, player, slotIndex = 1) {
     if (!player || !player._id) return;
-    
-    // Check if player is already assigned to the other team
-    const otherTeamKey = teamKey === 'A' ? 'B' : 'A';
-    const otherTeamPlayer = gameContext.players[otherTeamKey];
-    
-    if (otherTeamPlayer && otherTeamPlayer._id === player._id) {
-      alert(`${player.name} is already assigned to Team ${otherTeamKey}. A player cannot be on both teams.`);
+
+    const existingAssignment = getAssignedPlayerById(player._id);
+    if (existingAssignment && !(existingAssignment.team === teamKey && existingAssignment.slot === slotIndex)) {
+      alert(`${player.name} is already assigned to Team ${existingAssignment.team}. A player cannot be on both teams.`);
       return;
     }
-    
-    // Store full player object for display purposes
-    gameContext.players[teamKey] = player;
-    const btn = selectorEls[teamKey].assignBtn;
+
+    const slotKey = getPlayerSlotKey(teamKey, slotIndex);
+    gameContext.players[slotKey] = player;
+
+    const btn = slotIndex === 2 ? selectorEls[teamKey].assignBtn2 : selectorEls[teamKey].assignBtn;
     if (btn) {
       btn.textContent = player.name || 'Unnamed';
     }
-    // Enable start button if both teams have players
+
     if (playersAssigned()) {
       startGameBtn.disabled = false;
-      showStartError("");
+      showStartError('');
+    } else {
+      startGameBtn.disabled = true;
+      showStartError(`Assign ${requiredPlayersPerTeam()} player(s) to each team before starting the game.`);
     }
+
+    populateActivePlayerSelectors();
     updateUI(); // Update display to show player name
     closeModal();
   }
@@ -827,7 +1111,18 @@ document.addEventListener("DOMContentLoaded", async () => {
     updateShotLogDisplay();  // Update shot log to show this player's shots
   }
 
-  function renderResults(teamKey, players) {
+  function swapActiveTeammate(teamKey = state.active) {
+    if (gameContext.ruleMode !== 'tag-team-1v1') return false;
+    const teammates = getTeamPlayers(teamKey);
+    if (teammates.length < 2) return false;
+
+    gameContext.activePlayerIndex[teamKey] = (gameContext.activePlayerIndex[teamKey] === 0) ? 1 : 0;
+    updateUI();
+    updateShotLogDisplay();
+    return true;
+  }
+
+  function renderResults(teamKey, slotIndex, players) {
     const box = modalEls.results;
     if (!box) return;
     box.innerHTML = '';
@@ -840,39 +1135,37 @@ document.addEventListener("DOMContentLoaded", async () => {
       const btn = document.createElement('button');
       btn.className = 'dropdown-item-btn';
       
-      // Check if player is already assigned to the other team
-      const otherTeamKey = teamKey === 'A' ? 'B' : 'A';
-      const otherTeamPlayer = gameContext.players[otherTeamKey];
-      const isAlreadyAssigned = otherTeamPlayer && otherTeamPlayer._id === p._id;
+      const existingAssignment = getAssignedPlayerById(p._id);
+      const isAlreadyAssigned = !!existingAssignment && !(existingAssignment.team === teamKey && existingAssignment.slot === slotIndex);
       
       if (isAlreadyAssigned) {
-        btn.textContent = `${p.name || p.instagram_handle || 'Unnamed'} (already on Team ${otherTeamKey})`;
+        btn.textContent = `${p.name || p.instagram_handle || 'Unnamed'} (already assigned)`;
         btn.disabled = true;
         btn.style.opacity = '0.5';
         btn.style.cursor = 'not-allowed';
-        btn.title = `This player is already assigned to Team ${otherTeamKey}`;
+        btn.title = 'This player is already assigned in the current game setup';
       } else {
         btn.textContent = p.name || p.instagram_handle || 'Unnamed';
         btn.title = p.instagram_handle ? `@${p.instagram_handle}` : '';
-        btn.addEventListener('click', () => setPlayer(teamKey, p));
+        btn.addEventListener('click', () => setPlayer(teamKey, p, slotIndex));
       }
       box.appendChild(btn);
     });
     box.classList.add('show');
   }
 
-  async function searchAndRender(teamKey, term) {
+  async function searchAndRender(teamKey, slotIndex, term) {
     const value = term ?? modalEls.searchInput?.value ?? '';
     try {
       const players = await apiClient.searchPlayers(value);
-      renderResults(teamKey, players);
+      renderResults(teamKey, slotIndex, players);
     } catch (err) {
       console.error('Search players failed', err);
-      renderResults(teamKey, []);
+      renderResults(teamKey, slotIndex, []);
     }
   }
 
-  async function createAndAssign(teamKey) {
+  async function createAndAssign(teamKey, slotIndex) {
     const name = modalEls.createName?.value?.trim();
     const ig = modalEls.createIg?.value?.trim();
     if (!name) {
@@ -881,7 +1174,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
     try {
       const player = await apiClient.createPlayer({ name, instagram_handle: ig });
-      setPlayer(teamKey, player);
+      setPlayer(teamKey, player, slotIndex);
       if (modalEls.message) {
         modalEls.message.textContent = `Created and assigned ${player.name || 'player'}`;
       }
@@ -894,12 +1187,16 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
 
   function getPlayerId(teamKey) {
-    const player = teamKey === 'A' ? gameContext.players.A : gameContext.players.B;
+    const player = getActivePlayerForTeam(teamKey);
     // Handle both storing full object or just ID
     return player ? (player._id || player) : null;
   }
 
   async function persistGameEvent(teamKey, eventPayload, pos = null) {
+    if (!SYNC_LIVE_EVENTS_TO_BACKEND) {
+      return { skipped: true, reason: 'live-event-sync-disabled' };
+    }
+
     if (!gameContext.gameId) {
       throw new Error('No active game ID. Please start a new game.');
     }
@@ -922,14 +1219,98 @@ document.addEventListener("DOMContentLoaded", async () => {
     return response;
   }
 
+  async function persistBufferedChange(change) {
+    if (!gameContext.gameId || !change || change.persisted) return;
+    if (!change.playerId || !change.team) return;
+
+    const teamField = change.team === 'A' ? 'team_a' : 'team_b';
+    const location = change.pos ? { x: change.pos.xPct, y: change.pos.yPct } : undefined;
+
+    if (change.kind === 'foul') {
+      const foulPayload = {
+        type: 'foul',
+        player_id: change.playerId,
+        team: teamField
+      };
+      if (location) foulPayload.location = location;
+      await apiClient.addGameEvent(gameContext.gameId, foulPayload);
+      change.persisted = true;
+      return;
+    }
+
+    if (change.kind !== 'shot') return;
+
+    const isFT = change.shotType === 'ft';
+    const points = isFT ? 1 : change.shotType === '4pt' ? 4 : change.shotType === '3pt' ? 3 : 2;
+    const baseShotPayload = {
+      type: isFT ? 'free_throw' : 'shot',
+      player_id: change.playerId,
+      team: teamField,
+      made: change.result === 'made',
+      points
+    };
+    if (location) baseShotPayload.location = location;
+
+    // Try native payload first. If backend rejects 4PT, degrade to 3PT + FT (made only) to preserve total points.
+    if (change.shotType !== '4pt') {
+      await apiClient.addGameEvent(gameContext.gameId, baseShotPayload);
+      change.persisted = true;
+      return;
+    }
+
+    try {
+      await apiClient.addGameEvent(gameContext.gameId, baseShotPayload);
+      change.persisted = true;
+    } catch (err) {
+      const fallbackShot = {
+        type: 'shot',
+        player_id: change.playerId,
+        team: teamField,
+        made: change.result === 'made',
+        points: 3
+      };
+      if (location) fallbackShot.location = location;
+      await apiClient.addGameEvent(gameContext.gameId, fallbackShot);
+
+      if (change.result === 'made') {
+        await apiClient.addGameEvent(gameContext.gameId, {
+          type: 'free_throw',
+          player_id: change.playerId,
+          team: teamField,
+          made: true,
+          points: 1
+        });
+      }
+
+      change.persisted = true;
+      console.warn('4PT event persisted via backend compatibility fallback (3PT + FT).', err);
+    }
+  }
+
+  async function flushBufferedEventsToBackend() {
+    if (SYNC_LIVE_EVENTS_TO_BACKEND) return;
+    const pending = state.history.filter((change) =>
+      (change.kind === 'shot' || change.kind === 'foul') && !change.persisted
+    );
+
+    for (const change of pending) {
+      await persistBufferedChange(change);
+    }
+  }
+
   function computePoints(t) {
-    return t.twoPM * 2 + t.threePM * 3 + t.ftM * 1;
+    return t.twoPM * 2 + t.threePM * 3 + t.fourPM * 4 + t.ftM * 1;
   }
 
   function getFGPercentage(t) {
-    const totalFG = t.twoPA + t.threePA;
+    const totalFG = t.twoPA + t.threePA + t.fourPA;
     if (totalFG === 0) return 0;
-    return ((t.twoPM + t.threePM) / totalFG * 100).toFixed(1);
+    return ((t.twoPM + t.threePM + t.fourPM) / totalFG * 100).toFixed(1);
+  }
+
+  function get4PPercentage(t) {
+    if (t.fourPA === 0) return 0;
+    return (t.fourPM / t.fourPA * 100).toFixed(1);
   }
 
   function get3PPercentage(t) {
@@ -944,17 +1325,25 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   function updateUI() {
     const A = state.A, B = state.B;
-    const playerNameA = gameContext.players.A ? (gameContext.players.A.name || 'Player A') : 'Not Assigned';
-    const playerNameB = gameContext.players.B ? (gameContext.players.B.name || 'Player B') : 'Not Assigned';
+    const activePlayerA = getActivePlayerForTeam('A');
+    const activePlayerB = getActivePlayerForTeam('B');
+    const playerNameA = activePlayerA ? (activePlayerA.name || 'Player A') : 'Not Assigned';
+    const playerNameB = activePlayerB ? (activePlayerB.name || 'Player B') : 'Not Assigned';
     
     const pointsA = computePoints(A);
     const pointsB = computePoints(B);
     
     console.log(`Updating UI - A: ${pointsA} pts, B: ${pointsB} pts`);
     console.log(`Elements check - els.a.pts:`, els.a.pts, 'els.b.pts:',  els.b.pts);
+
+    if (selectorEls.A.assignBtn) selectorEls.A.assignBtn.textContent = gameContext.players.A?.name || 'Assign Player';
+    if (selectorEls.B.assignBtn) selectorEls.B.assignBtn.textContent = gameContext.players.B?.name || 'Assign Player';
+    if (selectorEls.A.assignBtn2) selectorEls.A.assignBtn2.textContent = gameContext.players.A2?.name || 'Assign Tag Partner';
+    if (selectorEls.B.assignBtn2) selectorEls.B.assignBtn2.textContent = gameContext.players.B2?.name || 'Assign Tag Partner';
     
     // Team A stats
     if (els.a.pts) els.a.pts.textContent = pointsA;
+    if (els.a.s4) els.a.s4.textContent = `${A.fourPM}/${A.fourPA} (${get4PPercentage(A)}%)`;
     if (els.a.s3) els.a.s3.textContent = `${A.threePM}/${A.threePA} (${get3PPercentage(A)}%)`;
     if (els.a.s2) els.a.s2.textContent = `${A.twoPM}/${A.twoPA} (${getFGPercentage(A)}%)`;
     if (els.a.ft) els.a.ft.textContent = `${A.ftM}/${A.ftA} (${getFTPercentage(A)}%)`;
@@ -963,6 +1352,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     // Team B stats
     if (els.b.pts) els.b.pts.textContent = pointsB;
+    if (els.b.s4) els.b.s4.textContent = `${B.fourPM}/${B.fourPA} (${get4PPercentage(B)}%)`;
     if (els.b.s3) els.b.s3.textContent = `${B.threePM}/${B.threePA} (${get3PPercentage(B)}%)`;
     if (els.b.s2) els.b.s2.textContent = `${B.twoPM}/${B.twoPA} (${getFGPercentage(B)}%)`;
     if (els.b.ft) els.b.ft.textContent = `${B.ftM}/${B.ftA} (${getFTPercentage(B)}%)`;
@@ -983,10 +1373,16 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     // Apply blue gradient only to the active player's button (if assigned)
     if (selectorEls.A.assignBtn) {
-      selectorEls.A.assignBtn.classList.toggle('assigned', state.active === 'A' && gameContext.players.A);
+      selectorEls.A.assignBtn.classList.toggle('assigned', state.active === 'A' && gameContext.activePlayerIndex.A === 0 && !!gameContext.players.A);
+    }
+    if (selectorEls.A.assignBtn2) {
+      selectorEls.A.assignBtn2.classList.toggle('assigned', state.active === 'A' && gameContext.activePlayerIndex.A === 1 && !!gameContext.players.A2);
     }
     if (selectorEls.B.assignBtn) {
-      selectorEls.B.assignBtn.classList.toggle('assigned', state.active === 'B' && gameContext.players.B);
+      selectorEls.B.assignBtn.classList.toggle('assigned', state.active === 'B' && gameContext.activePlayerIndex.B === 0 && !!gameContext.players.B);
+    }
+    if (selectorEls.B.assignBtn2) {
+      selectorEls.B.assignBtn2.classList.toggle('assigned', state.active === 'B' && gameContext.activePlayerIndex.B === 1 && !!gameContext.players.B2);
     }
 
     // Show only the active player's shot markers on the court
@@ -994,6 +1390,8 @@ document.addEventListener("DOMContentLoaded", async () => {
     const teamBMarkers = document.querySelectorAll('.shot-marker.team-b');
     teamAMarkers.forEach(marker => marker.style.display = state.active === 'A' ? 'flex' : 'none');
     teamBMarkers.forEach(marker => marker.style.display = state.active === 'B' ? 'flex' : 'none');
+
+    refreshRuleModeUI();
   }
 
   async function applyShot(teamKey, shotType, result, markerEl = null, pos = null) {
@@ -1012,8 +1410,22 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
 
     const team = teamKey === 'A' ? state.A : state.B;
-    const change = { kind: 'shot', team: teamKey, shotType, result, marker: markerEl };
-    if (shotType === '3pt') {
+    const actionId = `action_${Date.now()}_${Math.random().toString(16).slice(2)}`;
+    const change = {
+      kind: 'shot',
+      team: teamKey,
+      shotType,
+      result,
+      marker: markerEl,
+      actionId,
+      playerId,
+      pos: pos ? { ...pos } : null,
+      persisted: false
+    };
+    if (shotType === '4pt') {
+      team.fourPA += 1;
+      if (result === 'made') team.fourPM += 1;
+    } else if (shotType === '3pt') {
       team.threePA += 1;
       if (result === 'made') team.threePM += 1;
     } else if (shotType === '2pt') {
@@ -1031,20 +1443,25 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     updateUI();
 
-    const actionLabelBase = shotType === '3pt' ? '3PT' : shotType === '2pt' ? '2PT' : 'FT';
+    const actionLabelBase = shotType === '4pt' ? '4PT' : shotType === '3pt' ? '3PT' : shotType === '2pt' ? '2PT' : 'FT';
     const actionLabel = `${actionLabelBase} ${result === 'made' ? 'Made' : 'Missed'}`;
     addActionEntry(teamKey, {
+      id: actionId,
       label: actionLabel,
       type: shotType,
-      gameSeconds: secondsElapsed
+      gameSeconds: secondsElapsed,
+      markerEl: markerEl || null
     });
 
     try {
       const baseEvent = shotType === 'ft'
         ? { type: 'free_throw', made: result === 'made', points: 1 }
-        : { type: 'shot', made: result === 'made', points: shotType === '3pt' ? 3 : 2 };
-      await persistGameEvent(teamKey, baseEvent, pos);
-      console.log(`Shot recorded: ${teamKey} - ${shotType} - ${result}${pos ? ` at (${pos.xPct.toFixed(1)}%, ${pos.yPct.toFixed(1)}%)` : ''}`);
+        : { type: 'shot', made: result === 'made', points: shotType === '4pt' ? 4 : shotType === '3pt' ? 3 : 2 };
+      const persistResult = await persistGameEvent(teamKey, baseEvent, pos);
+      if (!persistResult?.skipped) {
+        change.persisted = true;
+        console.log(`Shot recorded: ${teamKey} - ${shotType} - ${result}${pos ? ` at (${pos.xPct.toFixed(1)}%, ${pos.yPct.toFixed(1)}%)` : ''}`);
+      }
     } catch (err) {
       // Keep local stats even if network/database fails so the UI does not reset
       console.error('Failed to persist shot event (keeping local stats)', err);
@@ -1080,17 +1497,33 @@ document.addEventListener("DOMContentLoaded", async () => {
     const team = teamKey === 'A' ? state.A : state.B;
     team.fouls += 1;
     
+    const actionId = `action_${Date.now()}_${Math.random().toString(16).slice(2)}`;
+
     // Log foul to shot history with cursor position
-    const foulMarker = logFoulToHistory(teamKey, lastCursorPos);
+    const foulMarker = logFoulToHistory(teamKey, lastCursorPos, actionId);
     
     // Store in history with marker reference
-    state.history.push({ kind: 'foul', team: teamKey, marker: foulMarker });
+    state.history.push({
+      kind: 'foul',
+      team: teamKey,
+      marker: foulMarker,
+      actionId,
+      playerId,
+      pos: lastCursorPos ? { ...lastCursorPos } : null,
+      persisted: false
+    });
     
     updateUI();
 
     try {
-      await persistGameEvent(teamKey, { type: 'foul' });
-      console.log(`Foul recorded: ${teamKey}`);
+      const persistResult = await persistGameEvent(teamKey, { type: 'foul' });
+      if (!persistResult?.skipped) {
+        const latest = state.history[state.history.length - 1];
+        if (latest && latest.kind === 'foul' && latest.team === teamKey) {
+          latest.persisted = true;
+        }
+        console.log(`Foul recorded: ${teamKey}`);
+      }
     } catch (err) {
       // Keep local stats even if network/database fails so the UI does not reset
       console.error('Failed to persist foul event (keeping local stats)', err);
@@ -1100,14 +1533,14 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   function openFtModal(teamKey) {
     if (!isGameRunning) {
-      showStartError('Assign both players and press Start Game.');
+      showStartError(`Assign ${requiredPlayersPerTeam()} player(s) to each team and press Start Game.`);
       return;
     }
     if (isPaused || isTimeout) {
       return;
     }
     if (!playersAssigned()) {
-      showStartError('Assign a player to both teams before starting the game.');
+      showStartError(`Assign ${requiredPlayersPerTeam()} player(s) to each team before starting the game.`);
       return;
     }
     pendingFTTeam = teamKey;
@@ -1198,51 +1631,31 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   function undoLast() {
     if (!isGameRunning) {
-      showStartError('Assign both players and press Start Game.');
+      showStartError(`Assign ${requiredPlayersPerTeam()} player(s) to each team and press Start Game.`);
       return;
     }
     const last = state.history.pop();
     if (!last) return;
-    // Remove marker if this was a court-click shot or foul
-    if ((last.kind === 'shot' || last.kind === 'foul') && last.marker) {
-      last.marker.remove();
-    }
-    if (last.kind === 'shot') {
-      const team = last.team === 'A' ? state.A : state.B;
-      if (last.shotType === '3pt') {
-        if (team.threePA > 0) team.threePA -= 1;
-        if (last.result === 'made' && team.threePM > 0) team.threePM -= 1;
-      } else if (last.shotType === '2pt') {
-        if (team.twoPA > 0) team.twoPA -= 1;
-        if (last.result === 'made' && team.twoPM > 0) team.twoPM -= 1;
-      } else if (last.shotType === 'ft') {
-        if (team.ftA > 0) team.ftA -= 1;
-        if (last.result === 'made' && team.ftM > 0) team.ftM -= 1;
-      }
-      // Remove from action history
-      const actionHistory = state.actionHistory[last.team];
-      if (actionHistory && actionHistory.length > 0) {
-        actionHistory.pop();
-        renderActionLog(last.team);
-      }
-    } else if (last.kind === 'foul') {
-      const team = last.team === 'A' ? state.A : state.B;
-      if (team.fouls > 0) team.fouls -= 1;
-      // Remove from action history
+    revertHistoryChange(last);
+
+    if (last.actionId) {
+      removeActionEntryById(last.team, last.actionId);
+    } else {
       const actionHistory = state.actionHistory[last.team];
       if (actionHistory && actionHistory.length > 0) {
         actionHistory.pop();
         renderActionLog(last.team);
       }
     }
+
     updateUI();
   }
 
   // Wire buttons
-  if (els.selectA) els.selectA.addEventListener('click', () => { if (!isGameRunning) return showStartError('Assign both players and press Start Game.'); controller.setActive('A'); });
-  if (els.selectB) els.selectB.addEventListener('click', () => { if (!isGameRunning) return showStartError('Assign both players and press Start Game.'); controller.setActive('B'); });
-  if (els.a.foulPlus) els.a.foulPlus.addEventListener('click', () => { if (!isGameRunning) return showStartError('Assign both players and press Start Game.'); controller.incrementFoul('A'); });
-  if (els.b.foulPlus) els.b.foulPlus.addEventListener('click', () => { if (!isGameRunning) return showStartError('Assign both players and press Start Game.'); controller.incrementFoul('B'); });
+  if (els.selectA) els.selectA.addEventListener('click', () => { if (!isGameRunning) return showStartError(`Assign ${requiredPlayersPerTeam()} player(s) to each team and press Start Game.`); controller.setActive('A'); });
+  if (els.selectB) els.selectB.addEventListener('click', () => { if (!isGameRunning) return showStartError(`Assign ${requiredPlayersPerTeam()} player(s) to each team and press Start Game.`); controller.setActive('B'); });
+  if (els.a.foulPlus) els.a.foulPlus.addEventListener('click', () => { if (!isGameRunning) return showStartError(`Assign ${requiredPlayersPerTeam()} player(s) to each team and press Start Game.`); controller.incrementFoul('A'); });
+  if (els.b.foulPlus) els.b.foulPlus.addEventListener('click', () => { if (!isGameRunning) return showStartError(`Assign ${requiredPlayersPerTeam()} player(s) to each team and press Start Game.`); controller.incrementFoul('B'); });
   if (els.a.ftBtn) els.a.ftBtn.addEventListener('click', () => controller.openFtModal('A'));
   if (els.b.ftBtn) els.b.ftBtn.addEventListener('click', () => controller.openFtModal('B'));
   if (els.undo) els.undo.addEventListener('click', () => controller.undoLast());
@@ -1267,6 +1680,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   // Action log button handlers (delegation)
   if (els.a.actions) {
+    wireActionHover(els.a.actions, 'A');
     els.a.actions.addEventListener('click', (e) => {
       const actionBtn = e.target.closest('[data-action]');
       if (!actionBtn) return;
@@ -1278,11 +1692,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       if (!entry) return;
       
       if (action === 'delete') {
-        const idx = state.actionHistory.A.findIndex(a => a.id === actionId);
-        if (idx !== -1) {
-          state.actionHistory.A.splice(idx, 1);
-          renderActionLog('A');
-        }
+        undoActionById('A', actionId);
       } else if (action === 'highlight') {
         entry.highlighted = !entry.highlighted;
         renderActionLog('A');
@@ -1297,6 +1707,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
 
   if (els.b.actions) {
+    wireActionHover(els.b.actions, 'B');
     els.b.actions.addEventListener('click', (e) => {
       const actionBtn = e.target.closest('[data-action]');
       if (!actionBtn) return;
@@ -1308,11 +1719,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       if (!entry) return;
       
       if (action === 'delete') {
-        const idx = state.actionHistory.B.findIndex(a => a.id === actionId);
-        if (idx !== -1) {
-          state.actionHistory.B.splice(idx, 1);
-          renderActionLog('B');
-        }
+        undoActionById('B', actionId);
       } else if (action === 'highlight') {
         entry.highlighted = !entry.highlighted;
         renderActionLog('B');
@@ -1403,10 +1810,10 @@ document.addEventListener("DOMContentLoaded", async () => {
     if (timeoutModal.overlay) {
       // Update button text to show player names
       if (timeoutModal.playerABtn) {
-        timeoutModal.playerABtn.textContent = gameContext.players.A?.name || 'Player A';
+        timeoutModal.playerABtn.textContent = getActivePlayerForTeam('A')?.name || 'Team A';
       }
       if (timeoutModal.playerBBtn) {
-        timeoutModal.playerBBtn.textContent = gameContext.players.B?.name || 'Player B';
+        timeoutModal.playerBBtn.textContent = getActivePlayerForTeam('B')?.name || 'Team B';
       }
       timeoutModal.overlay.style.display = 'flex';
       console.log('Timeout modal display set to flex');
@@ -1419,7 +1826,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     timeoutBtn.addEventListener('click', () => {
       console.log('Timeout button clicked, isGameRunning:', isGameRunning);
       if (!isGameRunning) {
-        showStartError('Assign both players and press Start Game.');
+        showStartError(`Assign ${requiredPlayersPerTeam()} player(s) to each team and press Start Game.`);
         return;
       }
       if (isTimeout) {
@@ -1435,7 +1842,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   if (timeoutModal.playerABtn) {
     timeoutModal.playerABtn.addEventListener('click', () => {
-      const playerName = gameContext.players.A?.name || 'Team A';
+      const playerName = getActivePlayerForTeam('A')?.name || 'Team A';
       console.log('Timeout called by', playerName);
       state.history.push({ type: 'timeout', team: 'A', timestamp: new Date() });
       // Block stats but keep timer running
@@ -1448,7 +1855,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   if (timeoutModal.playerBBtn) {
     timeoutModal.playerBBtn.addEventListener('click', () => {
-      const playerName = gameContext.players.B?.name || 'Team B';
+      const playerName = getActivePlayerForTeam('B')?.name || 'Team B';
       console.log('Timeout called by', playerName);
       state.history.push({ type: 'timeout', team: 'B', timestamp: new Date() });
       // Block stats but keep timer running
@@ -1472,35 +1879,61 @@ document.addEventListener("DOMContentLoaded", async () => {
         showGameInProgressAlert();
         return;
       }
-      openModal(key);
+      openModal(key, 1);
+    });
+    if (set.assignBtn2) set.assignBtn2.addEventListener('click', () => {
+      if (isGameRunning) {
+        showGameInProgressAlert();
+        return;
+      }
+      openModal(key, 2);
     });
   });
+
+  if (els.teamAActivePlayer) {
+    els.teamAActivePlayer.addEventListener('change', (e) => {
+      gameContext.activePlayerIndex.A = Number(e.target.value) || 0;
+      updateUI();
+    });
+  }
+  if (els.teamBActivePlayer) {
+    els.teamBActivePlayer.addEventListener('change', (e) => {
+      gameContext.activePlayerIndex.B = Number(e.target.value) || 0;
+      updateUI();
+    });
+  }
+
+  if (els.gameRuleSelect) {
+    els.gameRuleSelect.addEventListener('change', (e) => {
+      setRuleMode(e.target.value);
+    });
+  }
 
   if (modalEls.close) modalEls.close.addEventListener('click', closeModal);
   if (modalEls.overlay) modalEls.overlay.addEventListener('click', (e) => {
     if (e.target === modalEls.overlay) closeModal();
   });
   if (modalEls.createBtn) modalEls.createBtn.addEventListener('click', () => {
-    if (!currentAssignTeam) return;
-    createAndAssign(currentAssignTeam);
+    if (!currentAssignTarget) return;
+    createAndAssign(currentAssignTarget.teamKey, currentAssignTarget.slotIndex);
   });
   if (modalEls.searchInput) modalEls.searchInput.addEventListener('input', (e) => {
-    if (!currentAssignTeam) return;
+    if (!currentAssignTarget) return;
     const term = e.target.value;
     if (searchDebounce) clearTimeout(searchDebounce);
-    searchDebounce = setTimeout(() => searchAndRender(currentAssignTeam, term), 200);
+    searchDebounce = setTimeout(() => searchAndRender(currentAssignTarget.teamKey, currentAssignTarget.slotIndex, term), 200);
     if (modalEls.results) modalEls.results.classList.add('show');
   });
   if (modalEls.searchInput) modalEls.searchInput.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter' && currentAssignTeam) {
+    if (e.key === 'Enter' && currentAssignTarget) {
       e.preventDefault();
-      searchAndRender(currentAssignTeam, modalEls.searchInput.value);
+      searchAndRender(currentAssignTarget.teamKey, currentAssignTarget.slotIndex, modalEls.searchInput.value);
     }
   });
   if (modalEls.searchInput) modalEls.searchInput.addEventListener('focus', () => {
-    if (!currentAssignTeam) return;
+    if (!currentAssignTarget) return;
     if (searchDebounce) clearTimeout(searchDebounce);
-    searchDebounce = setTimeout(() => searchAndRender(currentAssignTeam, modalEls.searchInput.value || ''), 50);
+    searchDebounce = setTimeout(() => searchAndRender(currentAssignTarget.teamKey, currentAssignTarget.slotIndex, modalEls.searchInput.value || ''), 50);
     if (modalEls.results) modalEls.results.classList.add('show');
   });
   if (modalEls.searchInput) modalEls.searchInput.addEventListener('blur', (e) => {
@@ -1512,7 +1945,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   document.querySelectorAll('#shot_buttons .btn-stat').forEach(btn => {
     btn.addEventListener('click', () => {
-      if (!isGameRunning) { showStartError('Assign both players and press Start Game.'); return; }
+      if (!isGameRunning) { showStartError(`Assign ${requiredPlayersPerTeam()} player(s) to each team and press Start Game.`); return; }
       if (isPaused || isTimeout) return;
       const shot = btn.getAttribute('data-shot');
       const result = btn.getAttribute('data-result');
@@ -1524,7 +1957,9 @@ document.addEventListener("DOMContentLoaded", async () => {
           return;
         }
         const pos = { ...lastCursorPos }; // Copy position before it changes
-        const shotType = inferShotTypeFromPos(pos);
+        // Auto 2PT/3PT detection temporarily disabled.
+        // const shotType = inferShotTypeFromPos(pos);
+        const shotType = '2pt';
         const markerEl = addShotMarker(controller.getActiveTeam(), shotType, result, pos);
         controller.applyShot(controller.getActiveTeam(), shotType, result, markerEl, pos);
       } else {
@@ -1545,7 +1980,9 @@ document.addEventListener("DOMContentLoaded", async () => {
       // Left click = Make (button 0)
       if (evt.button === 0) {
         evt.preventDefault();
-        const shotType = inferShotTypeFromClick(evt);
+        // Auto 2PT/3PT detection temporarily disabled.
+        // const shotType = inferShotTypeFromClick(evt);
+        const shotType = '2pt';
         const result = 'made';
 
         if (lastCursorPos) {
@@ -1557,7 +1994,9 @@ document.addEventListener("DOMContentLoaded", async () => {
       // Right click = Miss (button 2)
       else if (evt.button === 2) {
         evt.preventDefault();
-        const shotType = inferShotTypeFromClick(evt);
+        // Auto 2PT/3PT detection temporarily disabled.
+        // const shotType = inferShotTypeFromClick(evt);
+        const shotType = '2pt';
         const result = 'missed';
 
         if (lastCursorPos) {
@@ -1611,8 +2050,8 @@ document.addEventListener("DOMContentLoaded", async () => {
   });
 
   // Allow clicking team panels to set possession
-  if (els.a.panel) els.a.panel.addEventListener('click', () => { if (!isGameRunning) return showStartError('Assign both players and press Start Game.'); controller.setActive('A'); });
-  if (els.b.panel) els.b.panel.addEventListener('click', () => { if (!isGameRunning) return showStartError('Assign both players and press Start Game.'); controller.setActive('B'); });
+  if (els.a.panel) els.a.panel.addEventListener('click', () => { if (!isGameRunning) return showStartError(`Assign ${requiredPlayersPerTeam()} player(s) to each team and press Start Game.`); controller.setActive('A'); });
+  if (els.b.panel) els.b.panel.addEventListener('click', () => { if (!isGameRunning) return showStartError(`Assign ${requiredPlayersPerTeam()} player(s) to each team and press Start Game.`); controller.setActive('B'); });
 
   // Post-game modal handlers
   const postGameModal = document.getElementById('postGameModal');
@@ -1660,226 +2099,16 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
 
   function generateGamePDF() {
-    if (!gameContext.finalStats) return;
-    
-    const stats = gameContext.finalStats;
-    const result = gameContext.finalResult;
-    const teamAStats = result.teams.team_a;
-    const teamBStats = result.teams.team_b;
-    
-    // Calculate shooting percentages
-    const calcPercentage = (made, attempted) => {
-      if (!attempted) return "0%";
-      return Math.round((made / attempted) * 100) + "%";
-    };
-    
-    const teamAFG = calcPercentage((teamAStats.two_pm || 0) + (teamAStats.three_pm || 0), (teamAStats.two_pa || 0) + (teamAStats.three_pa || 0));
-    const teamBFG = calcPercentage((teamBStats.two_pm || 0) + (teamBStats.three_pm || 0), (teamBStats.two_pa || 0) + (teamBStats.three_pa || 0));
-    const teamA3PT = calcPercentage(teamAStats.three_pm || 0, teamAStats.three_pa || 0);
-    const teamB3PT = calcPercentage(teamBStats.three_pm || 0, teamBStats.three_pa || 0);
-    const teamAFT = calcPercentage(teamAStats.ft_m || 0, teamAStats.ft_a || 0);
-    const teamBFT = calcPercentage(teamBStats.ft_m || 0, teamBStats.ft_a || 0);
-    
-    // Calculate possessions/attempts
-    const teamAAttempts = (teamAStats.two_pa || 0) + (teamAStats.three_pa || 0) + (teamAStats.ft_a || 0);
-    const teamBAttempts = (teamBStats.two_pa || 0) + (teamBStats.three_pa || 0) + (teamBStats.ft_a || 0);
-    
-    // Get player photos (if available)
-    const playerAPhoto = gameContext.players.A?.photo_url || '';
-    const playerBPhoto = gameContext.players.B?.photo_url || '';
-    
-    // Create HTML content for PDF
-    const htmlContent = `
-      <div style="font-family: Arial, sans-serif; padding: 20px; max-width: 900px;">
-        <h1 style="text-align: center; color: #0e2b62; margin-bottom: 20px; font-size: 28px;">Game Statistics Report</h1>
-        
-        <!-- Player Photos & Final Score -->
-        <div style="display: flex; align-items: center; justify-content: space-around; margin-bottom: 25px; gap: 20px;">
-          <div style="text-align: center; flex: 1;">
-            ${playerAPhoto ? `<img src="${playerAPhoto}" style="width: 120px; height: 120px; border-radius: 50%; border: 3px solid #1f6eeb; object-fit: cover; margin-bottom: 10px;">` : ''}
-            <div style="color: #1f6eeb; font-weight: bold; font-size: 16px; margin-bottom: 5px;">${stats.teamAName}</div>
-            <div style="font-size: 48px; font-weight: bold; color: #1f6eeb;">${stats.teamAScore}</div>
-          </div>
-          
-          <div style="text-align: center; font-size: 24px; color: #666; font-weight: bold;">vs</div>
-          
-          <div style="text-align: center; flex: 1;">
-            ${playerBPhoto ? `<img src="${playerBPhoto}" style="width: 120px; height: 120px; border-radius: 50%; border: 3px solid #ff8800; object-fit: cover; margin-bottom: 10px;">` : ''}
-            <div style="color: #ff8800; font-weight: bold; font-size: 16px; margin-bottom: 5px;">${stats.teamBName}</div>
-            <div style="font-size: 48px; font-weight: bold; color: #ff8800;">${stats.teamBScore}</div>
-          </div>
-        </div>
-        
-        <!-- Winner & Duration -->
-        <div style="background: #e8f0ff; padding: 15px; border-left: 4px solid #0e2b62; margin-bottom: 25px;">
-          <div style="text-align: center;">
-            <div style="font-size: 18px; font-weight: bold; color: #0e2b62; margin-bottom: 5px;">
-              ${stats.winner === 'Tie' ? "Game Ended in a Tie!" : `${stats.winner} Wins!`}
-            </div>
-            <div style="font-size: 14px; color: #555;">Duration: ${formatTime(stats.duration)} | ${new Date().toLocaleDateString()}</div>
-          </div>
-        </div>
+    if (!gameContext.gameId) {
+      alert('No completed game report is available yet.');
+      return;
+    }
 
-        <!-- Shooting Percentages Summary -->
-        <div style="background: #fff3e0; padding: 15px; border-radius: 8px; margin-bottom: 20px;">
-          <h3 style="margin: 0 0 15px 0; color: #0e2b62; font-size: 16px;">Shooting Efficiency</h3>
-          <div style="display: flex; gap: 30px;">
-            <div style="flex: 1;">
-              <h4 style="color: #1f6eeb; margin: 0 0 10px 0; font-size: 14px;">${stats.teamAName}</h4>
-              <table style="width: 100%; font-size: 12px;">
-                <tr style="border-bottom: 1px solid #ddd;">
-                  <td style="padding: 5px;">FG%</td>
-                  <td style="padding: 5px; text-align: right; font-weight: bold;">${teamAFG}</td>
-                </tr>
-                <tr style="border-bottom: 1px solid #ddd;">
-                  <td style="padding: 5px;">3PT%</td>
-                  <td style="padding: 5px; text-align: right; font-weight: bold;">${teamA3PT}</td>
-                </tr>
-                <tr>
-                  <td style="padding: 5px;">FT%</td>
-                  <td style="padding: 5px; text-align: right; font-weight: bold;">${teamAFT}</td>
-                </tr>
-              </table>
-            </div>
-            <div style="flex: 1;">
-              <h4 style="color: #ff8800; margin: 0 0 10px 0; font-size: 14px;">${stats.teamBName}</h4>
-              <table style="width: 100%; font-size: 12px;">
-                <tr style="border-bottom: 1px solid #ddd;">
-                  <td style="padding: 5px;">FG%</td>
-                  <td style="padding: 5px; text-align: right; font-weight: bold;">${teamBFG}</td>
-                </tr>
-                <tr style="border-bottom: 1px solid #ddd;">
-                  <td style="padding: 5px;">3PT%</td>
-                  <td style="padding: 5px; text-align: right; font-weight: bold;">${teamB3PT}</td>
-                </tr>
-                <tr>
-                  <td style="padding: 5px;">FT%</td>
-                  <td style="padding: 5px; text-align: right; font-weight: bold;">${teamBFT}</td>
-                </tr>
-              </table>
-            </div>
-          </div>
-        </div>
-
-        <!-- Shot Chart (Simplified) -->
-        <div style="background: #f5f5f5; padding: 15px; border-radius: 8px; margin-bottom: 20px;">
-          <h3 style="margin: 0 0 15px 0; color: #0e2b62; font-size: 16px;">Shot Chart</h3>
-          <div style="display: flex; gap: 20px;">
-            <div style="flex: 1; text-align: center;">
-              <div style="height: 200px; background: linear-gradient(135deg, #f0f0f0 0%, #ffffff 100%); border: 2px solid #1f6eeb; border-radius: 4px; position: relative; margin-bottom: 10px; display: flex; align-items: center; justify-content: center;">
-                <div style="text-align: center;">
-                  <div style="font-size: 32px; font-weight: bold; color: #1f6eeb;">${(teamAStats.two_pm || 0) + (teamAStats.three_pm || 0)}</div>
-                  <div style="font-size: 12px; color: #666;">Makes</div>
-                </div>
-              </div>
-              <div style="font-size: 12px; color: #555;">Shot Attempts: ${teamAAttempts}</div>
-            </div>
-            <div style="flex: 1; text-align: center;">
-              <div style="height: 200px; background: linear-gradient(135deg, #fff8e1 0%, #fffde7 100%); border: 2px solid #ff8800; border-radius: 4px; position: relative; margin-bottom: 10px; display: flex; align-items: center; justify-content: center;">
-                <div style="text-align: center;">
-                  <div style="font-size: 32px; font-weight: bold; color: #ff8800;">${(teamBStats.two_pm || 0) + (teamBStats.three_pm || 0)}</div>
-                  <div style="font-size: 12px; color: #666;">Makes</div>
-                </div>
-              </div>
-              <div style="font-size: 12px; color: #555;">Shot Attempts: ${teamBAttempts}</div>
-            </div>
-          </div>
-        </div>
-
-        <!-- Detailed Stats Table -->
-        <div style="background: #f5f5f5; padding: 15px; border-radius: 8px; margin-bottom: 20px;">
-          <h3 style="margin: 0 0 15px 0; color: #0e2b62; font-size: 16px;">Detailed Statistics</h3>
-          <div style="display: flex; gap: 20px;">
-            <div style="flex: 1;">
-              <h4 style="color: #1f6eeb; margin: 0 0 10px 0; font-size: 14px;">${stats.teamAName}</h4>
-              <table style="width: 100%; font-size: 12px; border-collapse: collapse;">
-                <tr style="background: #e3f2fd; border-bottom: 1px solid #ddd;">
-                  <td style="padding: 8px; font-weight: bold;">3PT</td>
-                  <td style="padding: 8px; text-align: right;">${teamAStats.three_pm || 0}/${teamAStats.three_pa || 0}</td>
-                </tr>
-                <tr style="border-bottom: 1px solid #ddd;">
-                  <td style="padding: 8px; font-weight: bold;">2PT</td>
-                  <td style="padding: 8px; text-align: right;">${teamAStats.two_pm || 0}/${teamAStats.two_pa || 0}</td>
-                </tr>
-                <tr style="border-bottom: 1px solid #ddd;">
-                  <td style="padding: 8px; font-weight: bold;">FT</td>
-                  <td style="padding: 8px; text-align: right;">${teamAStats.ft_m || 0}/${teamAStats.ft_a || 0}</td>
-                </tr>
-                <tr>
-                  <td style="padding: 8px; font-weight: bold;">Fouls</td>
-                  <td style="padding: 8px; text-align: right;">${teamAStats.fouls || 0}</td>
-                </tr>
-              </table>
-            </div>
-            <div style="flex: 1;">
-              <h4 style="color: #ff8800; margin: 0 0 10px 0; font-size: 14px;">${stats.teamBName}</h4>
-              <table style="width: 100%; font-size: 12px; border-collapse: collapse;">
-                <tr style="background: #fff3e0; border-bottom: 1px solid #ddd;">
-                  <td style="padding: 8px; font-weight: bold;">3PT</td>
-                  <td style="padding: 8px; text-align: right;">${teamBStats.three_pm || 0}/${teamBStats.three_pa || 0}</td>
-                </tr>
-                <tr style="border-bottom: 1px solid #ddd;">
-                  <td style="padding: 8px; font-weight: bold;">2PT</td>
-                  <td style="padding: 8px; text-align: right;">${teamBStats.two_pm || 0}/${teamBStats.two_pa || 0}</td>
-                </tr>
-                <tr style="border-bottom: 1px solid #ddd;">
-                  <td style="padding: 8px; font-weight: bold;">FT</td>
-                  <td style="padding: 8px; text-align: right;">${teamBStats.ft_m || 0}/${teamBStats.ft_a || 0}</td>
-                </tr>
-                <tr>
-                  <td style="padding: 8px; font-weight: bold;">Fouls</td>
-                  <td style="padding: 8px; text-align: right;">${teamBStats.fouls || 0}</td>
-                </tr>
-              </table>
-            </div>
-          </div>
-        </div>
-
-        <!-- Game Timeline Stats (First Half vs Second Half) -->
-        <div style="background: #f0f4ff; padding: 15px; border-radius: 8px; margin-bottom: 20px;">
-          <h3 style="margin: 0 0 15px 0; color: #0e2b62; font-size: 16px;">Game Timeline</h3>
-          <div style="display: flex; gap: 20px;">
-            <div style="flex: 1;">
-              <h4 style="color: #1f6eeb; margin: 0 0 10px 0; font-size: 13px;">${stats.teamAName}</h4>
-              <div style="font-size: 12px;">
-                <div style="padding: 5px 0; border-bottom: 1px solid #ddd;"><strong>Total Possessions:</strong> ${teamAAttempts}</div>
-                <div style="padding: 5px 0;"><strong>Shooting Accuracy:</strong> ${calcPercentage((teamAStats.two_pm || 0) + (teamAStats.three_pm || 0), teamAAttempts)}</div>
-              </div>
-            </div>
-            <div style="flex: 1;">
-              <h4 style="color: #ff8800; margin: 0 0 10px 0; font-size: 13px;">${stats.teamBName}</h4>
-              <div style="font-size: 12px;">
-                <div style="padding: 5px 0; border-bottom: 1px solid #ddd;"><strong>Total Possessions:</strong> ${teamBAttempts}</div>
-                <div style="padding: 5px 0;"><strong>Shooting Accuracy:</strong> ${calcPercentage((teamBStats.two_pm || 0) + (teamBStats.three_pm || 0), teamBAttempts)}</div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div style="text-align: center; margin-top: 30px; padding-top: 15px; border-top: 2px solid #ddd; color: #666; font-size: 11px;">
-          <p style="margin: 5px 0;">Generated on ${new Date().toLocaleString()}</p>
-          <p style="margin: 5px 0;">Next Chapter - Basketball Stats Tracker</p>
-          <p style="margin: 5px 0; font-style: italic;">Official Game Record</p>
-        </div>
-      </div>
-    `;
-
-    // Generate PDF using html2pdf
-    const opt = {
-      margin: 10,
-      filename: `game-stats-${new Date().getTime()}.pdf`,
-      image: { type: 'jpeg', quality: 0.98 },
-      html2canvas: { scale: 2 },
-      jsPDF: { orientation: 'portrait', unit: 'mm', format: 'a4' }
-    };
-
-    try {
-      const element = document.createElement('div');
-      element.innerHTML = htmlContent;
-      html2pdf(element, opt);
-    } catch (err) {
-      console.error('PDF generation error:', err);
-      alert('Error generating PDF. Please try again.');
+    // Use the dedicated report page so downloaded PDFs always match report styling.
+    const reportUrl = `game-report.html?id=${encodeURIComponent(gameContext.gameId)}&autodownload=1`;
+    const reportWindow = window.open(reportUrl, '_blank', 'noopener');
+    if (!reportWindow) {
+      window.location.href = reportUrl;
     }
   }
 
@@ -1891,8 +2120,8 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   function resetGameUI() {
     // Clear all game stats from previous game
-    state.A = { twoPA: 0, twoPM: 0, threePA: 0, threePM: 0, ftA: 0, ftM: 0, fouls: 0 };
-    state.B = { twoPA: 0, twoPM: 0, threePA: 0, threePM: 0, ftA: 0, ftM: 0, fouls: 0 };
+    state.A = { twoPA: 0, twoPM: 0, threePA: 0, threePM: 0, fourPA: 0, fourPM: 0, ftA: 0, ftM: 0, fouls: 0 };
+    state.B = { twoPA: 0, twoPM: 0, threePA: 0, threePM: 0, fourPA: 0, fourPM: 0, ftA: 0, ftM: 0, fouls: 0 };
     state.history = [];
     state.active = 'A';
     isTimeout = false;
@@ -1900,10 +2129,12 @@ document.addEventListener("DOMContentLoaded", async () => {
     // Clear shot markers from court
     const shotMarkersEl = document.getElementById('shot_markers');
     if (shotMarkersEl) shotMarkersEl.innerHTML = '';
+    clearActionLogs();
 
     // Clear game context
     gameContext.gameId = null;
-    gameContext.players = { A: null, B: null };
+    gameContext.players = { A: null, A2: null, B: null, B2: null };
+    gameContext.activePlayerIndex = { A: 0, B: 0 };
     gameContext.teams = {};
     gameContext.finalResult = null;
     gameContext.finalStats = null;
@@ -1916,21 +2147,34 @@ document.addEventListener("DOMContentLoaded", async () => {
     updateUI();
     
     // Re-enable player assignment buttons
-    const assignBtns = document.querySelectorAll('.btn-assign');
-    assignBtns.forEach(btn => {
-      btn.textContent = 'Assign Player';
-      btn.classList.remove('assigned');
-    });
+    if (selectorEls.A.assignBtn) {
+      selectorEls.A.assignBtn.textContent = 'Assign Player';
+      selectorEls.A.assignBtn.classList.remove('assigned');
+    }
+    if (selectorEls.B.assignBtn) {
+      selectorEls.B.assignBtn.textContent = 'Assign Player';
+      selectorEls.B.assignBtn.classList.remove('assigned');
+    }
+    if (selectorEls.A.assignBtn2) {
+      selectorEls.A.assignBtn2.textContent = 'Assign Tag Partner';
+      selectorEls.A.assignBtn2.classList.remove('assigned');
+    }
+    if (selectorEls.B.assignBtn2) {
+      selectorEls.B.assignBtn2.textContent = 'Assign Tag Partner';
+      selectorEls.B.assignBtn2.classList.remove('assigned');
+    }
     
     // Disable start button until players assigned
     startGameBtn.disabled = true;
     startGameBtn.textContent = "Start Game";
+    refreshRuleModeUI();
+    showStartError(`Assign ${requiredPlayersPerTeam()} player(s) to each team before starting the game.`);
   }
 
   function clearGameStats() {
     // Clear stats at the START of a new game (before first shot is logged)
-    state.A = { twoPA: 0, twoPM: 0, threePA: 0, threePM: 0, ftA: 0, ftM: 0, fouls: 0 };
-    state.B = { twoPA: 0, twoPM: 0, threePA: 0, threePM: 0, ftA: 0, ftM: 0, fouls: 0 };
+    state.A = { twoPA: 0, twoPM: 0, threePA: 0, threePM: 0, fourPA: 0, fourPM: 0, ftA: 0, ftM: 0, fouls: 0 };
+    state.B = { twoPA: 0, twoPM: 0, threePA: 0, threePM: 0, fourPA: 0, fourPM: 0, ftA: 0, ftM: 0, fouls: 0 };
     state.history = [];
     state.shotHistory = { A: [], B: [] };  // Clear individual shot histories
     state.active = 'A';
@@ -1938,6 +2182,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     // Clear shot markers
     const shotMarkersEl = document.getElementById('shot_markers');
     if (shotMarkersEl) shotMarkersEl.innerHTML = '';
+    clearActionLogs();
     
     // Reset score displays
     document.getElementById("teamAScore").textContent = "0";
@@ -1945,6 +2190,12 @@ document.addEventListener("DOMContentLoaded", async () => {
     
     updateUI();
     updateShotLogDisplay();  // Reset shot log display
+  }
+
+  function clearActionLogs() {
+    state.actionHistory = { A: [], B: [] };
+    renderActionLog('A');
+    renderActionLog('B');
   }
 
   // Helper function to toggle action buttons based on game state
@@ -1978,30 +2229,50 @@ document.addEventListener("DOMContentLoaded", async () => {
       if (startGameBtn.textContent === 'Start Game') {
         // Preconditions
         if (!playersAssigned()) {
-          showStartError('Assign a player to both teams before starting the game.');
+          showStartError(`Assign ${requiredPlayersPerTeam()} player(s) to each team before starting the game.`);
           return;
         }
         // Ensure a game exists on the backend before starting
         try {
           if (!gameContext.gameId) {
-            const pA = getPlayerId('A');
-            const pB = getPlayerId('B');
-            if (!pA || !pB) {
-              showStartError('Both teams must have an assigned player.');
+            const teamAPlayers = getTeamPlayers('A').map((p) => p._id || p);
+            const teamBPlayers = getTeamPlayers('B').map((p) => p._id || p);
+            const requiredCount = requiredPlayersPerTeam();
+
+            if (teamAPlayers.length < requiredCount || teamBPlayers.length < requiredCount) {
+              showStartError(`Each team requires ${requiredCount} player(s) for ${gameContext.ruleMode === 'tag-team-1v1' ? 'Tag Team 1v1' : '1v1'}.`);
               return;
             }
-            const newGame = await apiClient.createGame({
-              game_type: '1v1',
-              team_a: [pA],
-              team_b: [pB],
-              score_to_win: 50
-            });
+
+            const gameType = gameContext.ruleMode === 'tag-team-1v1' ? '2v2' : '1v1';
+            let newGame;
+
+            // Try legacy payload first, then fallback to nested teams payload.
+            try {
+              newGame = await apiClient.createGame({
+                game_type: gameType,
+                team_a: teamAPlayers,
+                team_b: teamBPlayers,
+                score_to_win: 50
+              });
+            } catch (legacyErr) {
+              console.warn('Legacy create game payload failed, retrying with teams object:', legacyErr);
+              newGame = await apiClient.createGame({
+                game_type: gameType,
+                teams: {
+                  team_a: teamAPlayers,
+                  team_b: teamBPlayers
+                },
+                score_to_win: 50
+              });
+            }
+
             gameContext.gameId = newGame._id;
             console.log('Created new game:', newGame._id);
           }
         } catch (err) {
           console.error('Failed to create game before start:', err);
-          alert('Unable to start. Please ensure you are signed in.');
+          alert(`Unable to start game: ${err?.message || 'Unknown error'}`);
           return;
         }
         // Start
@@ -2013,6 +2284,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         startGameBtn.classList.add('btn-danger');
         isGameRunning = true;
         setActionsEnabled(true);
+        refreshRuleModeUI();
       } else {
         // End Game - finalize and save to database
         stopTimer();
@@ -2023,18 +2295,29 @@ document.addEventListener("DOMContentLoaded", async () => {
           const teamAScore = parseInt(document.getElementById('teamAScore').textContent || 0);
           const teamBScore = parseInt(document.getElementById('teamBScore').textContent || 0);
 
-          const result = await apiClient.finalizeGame(gameContext.gameId);
+          await flushBufferedEventsToBackend();
+
+          const localWinner = teamAScore === teamBScore ? 'draw' : (teamAScore > teamBScore ? 'team_a' : 'team_b');
+          const result = await apiClient.finalizeGame(gameContext.gameId, {
+            final_score: {
+              team_a: teamAScore,
+              team_b: teamBScore
+            },
+            winner: localWinner
+          });
           console.log('Game finalized successfully:', result);
 
           gameContext.finalResult = result;
           gameContext.finalStats = {
             teamAScore,
             teamBScore,
-            teamAName: gameContext.players.A?.name || 'Team A',
-            teamBName: gameContext.players.B?.name || 'Team B',
+            teamAName: getTeamDisplayName('A'),
+            teamBName: getTeamDisplayName('B'),
             duration: secondsElapsed,
-            winner: result.game.winner === 'team_a' ? gameContext.players.A?.name : result.game.winner === 'team_b' ? gameContext.players.B?.name : 'Tie'
+            winner: result.game.winner === 'team_a' ? getTeamDisplayName('A') : result.game.winner === 'team_b' ? getTeamDisplayName('B') : 'Tie'
           };
+
+          clearActionLogs();
 
           const postGameModal = document.getElementById('postGameModal');
           const postGameStats = document.getElementById('postGameStats');
@@ -2061,6 +2344,7 @@ document.addEventListener("DOMContentLoaded", async () => {
           isTimeout = false;
           isGameRunning = false;
           setActionsEnabled(false);
+          refreshRuleModeUI();
         } catch (error) {
           console.error('Error finalizing game:', error);
           alert('Error saving game. Please try again.');
@@ -2123,7 +2407,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
 
     handleCourtClick(evt) {
-      if (!isGameRunning) { showStartError('Assign both players and press Start Game.'); return; }
+      if (!isGameRunning) { showStartError(`Assign ${requiredPlayersPerTeam()} player(s) to each team and press Start Game.`); return; }
       const courtImg = document.getElementById('court_image');
       if (!courtImg) return;
       const rect = courtImg.getBoundingClientRect();
@@ -2170,6 +2454,14 @@ document.addEventListener("DOMContentLoaded", async () => {
       const currentActive = state.active;
       const newActive = currentActive === 'A' ? 'B' : 'A';
       setActive(newActive);
+      return;
+    }
+
+    // S - Swap active teammate (tag-team mode only)
+    if (key === 's' && !e.ctrlKey && !e.metaKey && !e.altKey) {
+      e.preventDefault();
+      if (!isGameRunning) return;
+      swapActiveTeammate(state.active);
       return;
     }
     
@@ -2234,7 +2526,9 @@ document.addEventListener("DOMContentLoaded", async () => {
       // Must have cursor over court to record shot
       if (lastCursorPos) {
         const pos = { ...lastCursorPos }; // Copy position before it changes
-        const shotType = inferShotTypeFromPos(pos);
+        // Auto 2PT/3PT detection temporarily disabled.
+        // const shotType = inferShotTypeFromPos(pos);
+        const shotType = '2pt';
         const markerEl = addShotMarker(controller.getActiveTeam(), shotType, result, pos);
         controller.applyShot(controller.getActiveTeam(), shotType, result, markerEl, pos);
       } else {
@@ -2252,7 +2546,9 @@ document.addEventListener("DOMContentLoaded", async () => {
       // Must have cursor over court to record shot
       if (lastCursorPos) {
         const pos = { ...lastCursorPos }; // Copy position before it changes
-        const shotType = inferShotTypeFromPos(pos);
+        // Auto 2PT/3PT detection temporarily disabled.
+        // const shotType = inferShotTypeFromPos(pos);
+        const shotType = '2pt';
         const markerEl = addShotMarker(controller.getActiveTeam(), shotType, result, pos);
         controller.applyShot(controller.getActiveTeam(), shotType, result, markerEl, pos);
       } else {
@@ -2275,14 +2571,33 @@ document.addEventListener("DOMContentLoaded", async () => {
       }
 
       const pos = { ...lastCursorPos }; // Copy position before it changes
-      const actualZone = inferShotTypeFromPos(pos);
-      const warning = checkZoneContradiction(shotType, actualZone);
-      if (warning) {
-        console.warn(warning);
-        if (!confirm(warning + '\n\nContinue logging anyway?')) {
-          return;
-        }
+      // Zone contradiction warning temporarily disabled.
+      // const actualZone = inferShotTypeFromPos(pos);
+      // const warning = checkZoneContradiction(shotType, actualZone);
+      // if (warning) {
+      //   console.warn(warning);
+      //   if (!confirm(warning + '\n\nContinue logging anyway?')) {
+      //     return;
+      //   }
+      // }
+      const markerEl = addShotMarker(controller.getActiveTeam(), shotType, result, pos);
+      controller.applyShot(controller.getActiveTeam(), shotType, result, markerEl, pos);
+      return;
+    }
+
+    // 4 - 4PT Made, Shift+4 - 4PT Missed
+    if (key === '4' || key === '$') {
+      e.preventDefault();
+      if (isPaused || isTimeout) return;
+      const shotType = '4pt';
+      const result = isShift ? 'missed' : 'made';
+
+      if (!lastCursorPos) {
+        alert('Cannot log shot off court image. Hover cursor over the court first.');
+        return;
       }
+
+      const pos = { ...lastCursorPos }; // Copy position before it changes
       const markerEl = addShotMarker(controller.getActiveTeam(), shotType, result, pos);
       controller.applyShot(controller.getActiveTeam(), shotType, result, markerEl, pos);
       return;
@@ -2302,14 +2617,15 @@ document.addEventListener("DOMContentLoaded", async () => {
       }
 
       const pos = { ...lastCursorPos }; // Copy position before it changes
-      const actualZone = inferShotTypeFromPos(pos);
-      const warning = checkZoneContradiction(shotType, actualZone);
-      if (warning) {
-        console.warn(warning);
-        if (!confirm(warning + '\n\nContinue logging anyway?')) {
-          return;
-        }
-      }
+      // Zone contradiction warning temporarily disabled.
+      // const actualZone = inferShotTypeFromPos(pos);
+      // const warning = checkZoneContradiction(shotType, actualZone);
+      // if (warning) {
+      //   console.warn(warning);
+      //   if (!confirm(warning + '\n\nContinue logging anyway?')) {
+      //     return;
+      //   }
+      // }
       const markerEl = addShotMarker(controller.getActiveTeam(), shotType, result, pos);
       controller.applyShot(controller.getActiveTeam(), shotType, result, markerEl, pos);
       return;
@@ -2331,6 +2647,16 @@ document.addEventListener("DOMContentLoaded", async () => {
   // Hotkey toggle functionality
   const hotkeyToggleBtn = document.getElementById('hotkeyToggleBtn');
   const hotkeyHints = document.querySelectorAll('.hotkey-hint');
+  const topControlsToHide = [
+    document.getElementById('target_side'),
+    document.getElementById('shot_controls_row'),
+    document.getElementById('undo_controls_row')
+  ].filter(Boolean);
+
+  const topControlDefaultDisplay = new Map();
+  topControlsToHide.forEach((el) => {
+    topControlDefaultDisplay.set(el, window.getComputedStyle(el).display || 'block');
+  });
   
   // Load hotkey visibility preference from localStorage
   const hotkeyVisible = localStorage.getItem('hotkeyHintsVisible') !== 'false';
@@ -2341,6 +2667,14 @@ document.addEventListener("DOMContentLoaded", async () => {
         hint.classList.remove('hidden');
       } else {
         hint.classList.add('hidden');
+      }
+    });
+
+    topControlsToHide.forEach((el) => {
+      if (visible) {
+        el.style.display = topControlDefaultDisplay.get(el) || '';
+      } else {
+        el.style.display = 'none';
       }
     });
     

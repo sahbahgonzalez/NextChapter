@@ -2406,6 +2406,14 @@ body.dark-mode .games-table tr:hover {
     box-shadow: 0 0 0 2px rgba(255,160,0,0.35);
 }
 
+.shot-marker.linked-highlight,
+.foul-marker.linked-highlight {
+    display: flex !important;
+    transform: translate(-50%, -50%) scale(1.35);
+    box-shadow: 0 0 0 4px rgba(255, 215, 0, 0.55), 0 0 20px rgba(255, 215, 0, 0.85);
+    z-index: 6;
+}
+
 /* Compact Fullscreen Game Layout */
 :root { --nav-height: 64px; }
 

@@ -1,5 +1,107 @@
 # Project Updates & Changelog
 
+## March 2026 - Action Table Delete as Targeted Undo
+
+### 1. Action Delete Behavior Update
+**Date**: March 13, 2026  
+**Files Modified**: `frontend/js/gameScript.js`, `documentation/gameTracker.md`, `documentation/updates.md`
+
+**Changes:**
+- Updated action-row Delete (X) to act as a targeted undo for the selected action.
+- Delete now reverts only the selected action's stats and removes its linked court marker.
+- Delete removes the selected action row from the proper team action log.
+- Added id-linking between runtime history and action log via `actionId` for precise rollback.
+
+**Implementation Details:**
+```javascript
+// Runtime history entries now carry actionId linkage
+state.history.push({ kind: 'shot' | 'foul', team, marker, actionId });
+
+// Targeted undo path used by action-row delete
+undoActionById(teamKey, actionId);
+revertHistoryChange(change);
+removeActionEntryById(teamKey, actionId);
+```
+
+**Behavior Notes:**
+- Runtime-created actions: full rollback (stats + marker + row).
+- Legacy/preloaded actions without linked runtime history: row removal only.
+
+---
+
+### 2. End-Game PDF Download Reliability + Format Alignment
+**Date**: March 13, 2026  
+**Files Modified**: `frontend/js/gameScript.js`, `frontend/js/game-report.js`, `documentation/updates.md`
+
+**Changes:**
+- Fixed end-game modal PDF download flow so it no longer relies on a separate inline HTML template.
+- End-game "Download PDF" now opens `game-report.html` with `autodownload=1` and exports from the same report layout users see on the report page.
+- Added automatic download support on the report page when `autodownload` query flag is present.
+- Improved PDF generation robustness with explicit `html2pdf().set().from().save()` flow, CORS-aware canvas settings, and error handling.
+
+**Result:**
+- Download works reliably from the end-game modal.
+- Downloaded PDF format now matches the standard Game Report page format.
+
+---
+
+### 3. Temporary UI/Detection Simplification
+**Date**: March 13, 2026  
+**Files Modified**: `frontend/game.html`, `frontend/js/gameScript.js`
+
+**Changes:**
+- Temporarily disabled the in-page warning header (`#startError`) in the game UI.
+- Commented out active 2PT/3PT auto-detection calls during shot logging.
+- "Auto" shot paths now use a temporary fixed shot type (`2pt`) until detection is re-enabled.
+- Commented out zone contradiction warning prompts for forced 2PT/3PT hotkeys.
+
+---
+
+### 4. 4PT Tracking + Hotkeys
+**Date**: March 13, 2026  
+**Files Modified**: `frontend/game.html`, `frontend/js/gameScript.js`
+
+**Changes:**
+- Added 4PT stat tracking to both team stat panels.
+- Added 4PT action buttons in game controls (made/missed).
+- Added keyboard hotkeys: `4` for 4PT made, `Shift+4` for 4PT missed.
+- 4PT attempts/makes now affect points, FG%, action history labels, and undo behavior.
+- 4PT events are persisted as shot events with `points: 4` and restored from saved games.
+
+---
+
+### 5. 4PT Backend Compatibility Fix
+**Date**: March 13, 2026  
+**Files Modified**: `frontend/js/gameScript.js`, `frontend/utils/api.js`
+
+**Changes:**
+- Prevented server-error popups when logging 4PT by handling 4PT as local-only event tracking in the frontend.
+- Updated game finalization call to send explicit local `final_score` and `winner` payload.
+- Updated API client `finalizeGame` to accept an optional payload body.
+
+**Result:**
+- Recording a 4PT no longer triggers: "Saved locally. Network/database error: Server error during game event processing".
+- End-game result/report score is aligned with locally tracked scoreboard even when 4PT events are not persisted by backend event processing.
+
+---
+
+### 6. Undo/Delete Score Sync Guard (Frontend vs Backend)
+**Date**: March 13, 2026  
+**Files Modified**: `frontend/js/gameScript.js`
+
+**Changes:**
+- Kept frontend scoreboard authoritative during gameplay (including undo/delete adjustments).
+- Added buffered event persistence model for local changes.
+- On End Game, buffered (post-undo/delete) actions are flushed to backend before finalize.
+- Game finalization sends explicit `final_score` and `winner` payload.
+- Added 4PT backend compatibility fallback during flush (`4PT` made => `3PT` + `FT made`) when native 4PT event is rejected.
+
+**Why:**
+- Backend currently does not expose an event reversal/delete endpoint.
+- Buffered flush ensures backend receives only the current valid event set after undo/delete, preventing overcount drift.
+
+---
+
 ## January 2026 - Game Tracker Enhancements
 
 ### 1. Action History System
@@ -13,7 +115,7 @@
 - Added three interactive buttons per action:
   - **Add Note**: Prompt for custom text elaboration (pencil icon)
   - **Highlight**: Toggle star icon for important plays
-  - **Delete**: Remove action with confirmation dialog (X icon)
+  - **Delete**: Remove/undo action entry (X icon)
 
 **Implementation Details:**
 ```javascript
