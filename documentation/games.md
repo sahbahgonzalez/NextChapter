@@ -12,8 +12,26 @@ The Games system manages basketball game records, tracks live game events, and s
   2. local live snapshot score (`tnc_live_game_state_active_v1`)
   3. existing score fallback
 - Live game cards include a **Live Report** action that opens `game-report.html?id=<gameId>&live=1`.
+- Live game cards include a **Shot Charts** action that opens `live-shot-chart.html?id=<gameId>&live=1`.
+- Live game cards are clickable and open the live shot-chart page directly.
 - If an active local snapshot exists but backend status has not switched to `live`/`in_progress` yet, that game is promoted into the **Live Games** section.
 - If needed, a snapshot-only live card is synthesized so the currently running local game remains visible.
+
+### Live Shot Chart Page Behavior
+
+- The live shot-chart page supports two render modes:
+  1. Team View
+  2. Individual View
+- Any shot-chart card can be clicked to open an enlarged replay modal.
+- Replay controls include `Prev`, `Play/Pause`, `Next`, and `Close`.
+- Replay tick interval is **1.5 seconds**.
+- Timeline list highlights the active step and auto-scrolls while replay runs.
+- Replay marker semantics are consistent with tracker/report rules:
+  - made shot: player color
+  - missed shot: red
+  - foul committed: yellow triangle
+  - got fouled: yellow square
+- If the game is live, replay data continues updating from backend/snapshot refresh loops.
 
 ---
 

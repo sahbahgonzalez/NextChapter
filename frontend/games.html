@@ -24,6 +24,16 @@
             text-align: center;
         }
 
+        .live-card-clickable {
+            cursor: pointer;
+            transition: transform 0.15s ease, box-shadow 0.15s ease;
+        }
+
+        .live-card-clickable:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 24px rgba(14, 43, 98, 0.18);
+        }
+
         @media (max-width: 768px) {
             .team-players {
                 max-height: 40px;

@@ -9,6 +9,7 @@ const STARRED_PLAYS_STORAGE_PREFIX = 'tnc_starred_plays_';
 const GAME_ACTIONS_STORAGE_PREFIX = 'tnc_game_actions_';
 const LIVE_GAME_STATE_KEY = 'tnc_live_game_state_active_v1';
 let liveReportRefreshTimer = null;
+let liveReportLocalRefreshTimer = null;
 let reportPlaybackTimer = null;
 let reportPlaybackTeam = null;
 let reportPlaybackSteps = [];
@@ -90,6 +91,10 @@ function isLiveGameStatus(status) {
     return status === 'live' || status === 'in_progress';
 }
 
+function isLiveReportActive() {
+    return isLiveReportModeFromUrl() || isLiveGameStatus(gameData?.status);
+}
+
 function computePointsFromStats(stats) {
     if (!stats) return 0;
     return ((stats.twoPM || 0) * 2) + ((stats.threePM || 0) * 3) + ((stats.fourPM || 0) * 4) + (stats.ftM || 0);
@@ -110,8 +115,7 @@ function loadLiveSnapshotForGame() {
 }
 
 function resolveDisplayedScore() {
-    const status = gameData?.status || '';
-    const isLive = isLiveGameStatus(status);
+    const isLive = isLiveReportActive();
 
     if (!isLive) {
         return {
@@ -220,7 +224,7 @@ function buildLiveEventsFromSnapshot(snapshot) {
 
 function getEffectiveGameEvents() {
     const backendEvents = Array.isArray(gameData?.events) ? gameData.events : [];
-    if (!isLiveGameStatus(gameData?.status)) {
+    if (!isLiveReportActive()) {
         return backendEvents;
     }
 
@@ -285,11 +289,41 @@ function stopLiveReportAutoRefresh() {
     }
 }
 
+function stopLiveReportLocalRefresh() {
+    if (liveReportLocalRefreshTimer) {
+        clearInterval(liveReportLocalRefreshTimer);
+        liveReportLocalRefreshTimer = null;
+    }
+}
+
 function startLiveReportAutoRefresh() {
     stopLiveReportAutoRefresh();
     liveReportRefreshTimer = setInterval(() => {
         loadGameReport(true);
     }, 5000);
+}
+
+function startLiveReportLocalRefresh() {
+    stopLiveReportLocalRefresh();
+    liveReportLocalRefreshTimer = setInterval(() => {
+        if (!isLiveReportActive()) return;
+        if (!gameData) return;
+        renderReport();
+    }, 1000);
+}
+
+function setupLiveReportSyncListeners() {
+    window.addEventListener('storage', (event) => {
+        if (event.key === LIVE_GAME_STATE_KEY && isLiveReportActive() && gameData) {
+            renderReport();
+        }
+    });
+
+    document.addEventListener('visibilitychange', () => {
+        if (!document.hidden && isLiveReportActive()) {
+            loadGameReport(true);
+        }
+    });
 }
 
 // Initialize
@@ -303,8 +337,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     await loadGameReport();
+    setupLiveReportSyncListeners();
     window.addEventListener('beforeunload', () => {
         stopLiveReportAutoRefresh();
+        stopLiveReportLocalRefresh();
         stopReportPlaybackTimer();
     });
     wireReportPlaybackControls();
@@ -639,10 +675,12 @@ async function loadGameReport(isBackgroundRefresh = false) {
 
         renderReport();
 
-        if (isLiveGameStatus(gameData.status)) {
+        if (isLiveReportActive()) {
             startLiveReportAutoRefresh();
+            startLiveReportLocalRefresh();
         } else {
             stopLiveReportAutoRefresh();
+            stopLiveReportLocalRefresh();
         }
     } catch (error) {
         if (!isBackgroundRefresh) {
@@ -673,7 +711,7 @@ function renderReport() {
 
     // Set winner
     const winnerBadge = document.getElementById('winnerBadge');
-    if (isLiveGameStatus(gameData.status)) {
+    if (isLiveReportActive()) {
         winnerBadge.textContent = 'Live Game - Auto Updating';
     } else {
         const winnerLabel = gameData.teams?.[gameData.winner]?.name || 'Team Draw';
@@ -682,7 +720,7 @@ function renderReport() {
 
     // Set generated date
     const now = new Date();
-    document.getElementById('generatedDate').textContent = isLiveGameStatus(gameData.status)
+    document.getElementById('generatedDate').textContent = isLiveReportActive()
         ? `Live report updated ${now.toLocaleDateString()} ${now.toLocaleTimeString()}`
         : `Generated on ${now.toLocaleDateString()} at ${now.toLocaleTimeString()}`;
 
@@ -694,7 +732,7 @@ function renderReport() {
     // Render full game actions at the bottom
     renderGameActionsSection();
 
-    if (shouldAutoDownloadFromUrl() && !isLiveGameStatus(gameData.status)) {
+    if (shouldAutoDownloadFromUrl() && !isLiveReportActive()) {
         // Let the browser finish layout before html2pdf snapshots the DOM.
         setTimeout(() => {
             generatePDF(true);

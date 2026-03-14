@@ -7,6 +7,7 @@ let allGames = [];
 let currentEditingId = null;
 const LIVE_GAME_STATE_KEY = 'tnc_live_game_state_active_v1';
 let liveGamesRefreshInterval = null;
+let liveStatsRefreshInterval = null;
 
 // Initialize
 document.addEventListener('DOMContentLoaded', () => {
@@ -14,6 +15,8 @@ document.addEventListener('DOMContentLoaded', () => {
     setupEventListeners();
     setupNavigation();
     startLiveGamesRefresh();
+    startLiveStatsRefresh();
+    setupLiveSyncListeners();
 });
 
 function startLiveGamesRefresh() {
@@ -23,9 +26,68 @@ function startLiveGamesRefresh() {
     }, 5000);
 }
 
+function startLiveStatsRefresh() {
+    if (liveStatsRefreshInterval) clearInterval(liveStatsRefreshInterval);
+    liveStatsRefreshInterval = setInterval(() => {
+        // Re-render from current in-memory games + local snapshot to keep live card stats fresh.
+        categorizeAndRenderGames();
+    }, 1000);
+}
+
+function setupLiveSyncListeners() {
+    window.addEventListener('storage', (event) => {
+        if (event.key === LIVE_GAME_STATE_KEY) {
+            categorizeAndRenderGames();
+        }
+    });
+
+    document.addEventListener('visibilitychange', () => {
+        if (!document.hidden) {
+            loadGames();
+        }
+    });
+
+    window.addEventListener('beforeunload', () => {
+        if (liveGamesRefreshInterval) clearInterval(liveGamesRefreshInterval);
+        if (liveStatsRefreshInterval) clearInterval(liveStatsRefreshInterval);
+    });
+}
+
 function computePointsFromStats(stats) {
     if (!stats) return 0;
     return ((stats.twoPM || 0) * 2) + ((stats.threePM || 0) * 3) + ((stats.fourPM || 0) * 4) + (stats.ftM || 0);
+}
+
+function isGenericTeamName(name, fallbackLabel) {
+    const value = String(name || '').trim().toLowerCase();
+    const fallback = String(fallbackLabel || '').trim().toLowerCase();
+    if (!value) return true;
+    return value === fallback;
+}
+
+function extractPlayerNames(players = []) {
+    if (!Array.isArray(players)) return [];
+    return players
+        .map((player) => {
+            if (!player) return '';
+            if (typeof player === 'string') return '';
+            return String(player.name || '').trim();
+        })
+        .filter(Boolean);
+}
+
+function resolveTeamDisplayName(teamData, fallbackLabel) {
+    const customName = String(teamData?.name || '').trim();
+    if (customName && !isGenericTeamName(customName, fallbackLabel)) {
+        return customName;
+    }
+
+    const playerNames = extractPlayerNames(teamData?.players || []);
+    if (playerNames.length > 0) {
+        return playerNames.join(' & ');
+    }
+
+    return customName || fallbackLabel;
 }
 
 function getLiveSnapshotForGame(gameId) {
@@ -73,11 +135,11 @@ function buildSnapshotOnlyGame(snapshot) {
         },
         teams: {
             team_a: {
-                name: snapshot.gameContext.customTeamNames?.A || 'Team A',
+                name: snapshot.gameContext.customTeamNames?.A || '',
                 players: teamAPlayers
             },
             team_b: {
-                name: snapshot.gameContext.customTeamNames?.B || 'Team B',
+                name: snapshot.gameContext.customTeamNames?.B || '',
                 players: teamBPlayers
             }
         }
@@ -270,6 +332,7 @@ function renderGameSection(games, containerId, emptyStateId) {
 
 function createGameCard(game) {
     const status = game.status || 'scheduled';
+    const isLive = status === 'live' || status === 'in_progress';
     const statusClass = status === 'finished' ? 'status-completed' : status === 'live' || status === 'in_progress' ? 'status-live' : 'status-scheduled';
     const statusText = status === 'finished' ? 'Finished' : status === 'live' || status === 'in_progress' ? 'Live' : 'Scheduled';
 
@@ -279,8 +342,8 @@ function createGameCard(game) {
     const resolvedScore = resolveDisplayedScore(game);
     const teamAScore = resolvedScore.teamA;
     const teamBScore = resolvedScore.teamB;
-    const teamAName = game.teams?.team_a?.name || 'Team A';
-    const teamBName = game.teams?.team_b?.name || 'Team B';
+    const teamAName = resolveTeamDisplayName(game.teams?.team_a, 'Team A');
+    const teamBName = resolveTeamDisplayName(game.teams?.team_b, 'Team B');
     const teamAPlayers = game.teams?.team_a?.players?.length || 0;
     const teamBPlayers = game.teams?.team_b?.players?.length || 0;
 
@@ -293,7 +356,7 @@ function createGameCard(game) {
     }
 
     return `
-        <div class="game-card">
+        <div class="game-card ${isLive ? 'live-card-clickable' : ''}" ${isLive ? `onclick="openLiveShotCharts('${game._id}')"` : ''}>
             <div class="game-status ${statusClass}">${statusText}</div>
             <div class="game-header">
                 <div class="game-date">${dateStr}</div>
@@ -327,12 +390,12 @@ function createGameCard(game) {
             ${apiClient.getToken() ? `
                 <div class="game-actions">
                         ${status === 'finished'
-                        ? `<button class="btn btn-secondary" onclick="viewGameDetails('${game._id}')">View</button>`
+                        ? `<button class="btn btn-secondary" onclick="event.stopPropagation(); viewGameDetails('${game._id}')">View</button>`
                         : status === 'live' || status === 'in_progress'
-                            ? `<button class="btn btn-primary" onclick="viewGameDetails('${game._id}')">Resume Game</button><button class="btn btn-secondary" onclick="viewLiveReport('${game._id}')">Live Report</button>`
-                            : `<button class="btn btn-primary" onclick="viewGameDetails('${game._id}')">Start Game</button>`
+                            ? `<button class="btn btn-primary" onclick="event.stopPropagation(); viewGameDetails('${game._id}')">Resume Game</button><button class="btn btn-secondary" onclick="event.stopPropagation(); viewLiveReport('${game._id}')">Live Report</button><button class="btn btn-secondary" onclick="event.stopPropagation(); openLiveShotCharts('${game._id}')">Shot Charts</button>`
+                            : `<button class="btn btn-primary" onclick="event.stopPropagation(); viewGameDetails('${game._id}')">Start Game</button>`
                     }
-                    ${game.status !== 'finished' ? `<button class="btn btn-danger" onclick="deleteGame('${game._id}')">Delete</button>` : ''}
+                    ${game.status !== 'finished' ? `<button class="btn btn-danger" onclick="event.stopPropagation(); deleteGame('${game._id}')">Delete</button>` : ''}
                 </div>
             ` : ''}
         </div>
@@ -341,6 +404,10 @@ function createGameCard(game) {
 
 function viewLiveReport(id) {
     window.location.href = `game-report.html?id=${id}&live=1`;
+}
+
+function openLiveShotCharts(id) {
+    window.location.href = `live-shot-chart.html?id=${id}&live=1`;
 }
 
 function openCreateGameModal() {

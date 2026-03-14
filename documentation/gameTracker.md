@@ -168,6 +168,27 @@ The game tracker includes team playback modals that replay logged events against
   - Triangle: committed foul
   - Square: got fouled
 
+### 4.3 Standalone Live Shot Chart Replay (Games Page)
+
+In addition to tracker/report playback, the Games page now routes live chart viewing to a dedicated page.
+
+**Entry points:**
+- Click a live game card
+- Click the live card `Shot Charts` action
+
+**Live shot-chart page capabilities:**
+- Team View and Individual View chart rendering
+- Click any chart card to open an enlarged replay modal
+- Replay controls: `Prev`, `Play/Pause`, `Next`, `Close`
+- Replay interval: **1.5 seconds**
+- Active replay step highlights and auto-scrolls in the timeline list
+
+**Marker semantics are unchanged:**
+- Made shots keep player color
+- Missed shots remain red
+- Foul committed = yellow triangle
+- Got fouled = yellow square
+
 ### 4.1 Action Row Delete = Targeted Undo
 
 Deleting an action from the Actions table now undoes that exact action instead of only removing the row.
