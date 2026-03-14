@@ -203,20 +203,38 @@ function drawShotsOnSvg(svg, shots) {
             return;
         }
 
-        const c = document.createElementNS(svgNs, 'circle');
-        c.setAttribute('cx', `${x}`);
-        c.setAttribute('cy', `${y}`);
-        c.setAttribute('r', '8');
         if (shot.made) {
+            const c = document.createElementNS(svgNs, 'circle');
+            c.setAttribute('cx', `${x}`);
+            c.setAttribute('cy', `${y}`);
+            c.setAttribute('r', '8');
             c.setAttribute('fill', rgba(shot.playerColor || '#22C55E', 0.9));
             c.setAttribute('stroke', rgba(shot.playerColor || '#22C55E', 1));
             c.setAttribute('stroke-width', '2');
+            g.appendChild(c);
         } else {
-            c.setAttribute('fill', 'rgba(220, 38, 38, 0.22)');
-            c.setAttribute('stroke', 'rgba(220, 38, 38, 0.9)');
-            c.setAttribute('stroke-width', '2');
+            const size = 8;
+            const line1 = document.createElementNS(svgNs, 'line');
+            line1.setAttribute('x1', `${x - size}`);
+            line1.setAttribute('y1', `${y - size}`);
+            line1.setAttribute('x2', `${x + size}`);
+            line1.setAttribute('y2', `${y + size}`);
+            line1.setAttribute('stroke', 'rgba(220, 38, 38, 0.9)');
+            line1.setAttribute('stroke-width', '4');
+            line1.setAttribute('stroke-linecap', 'round');
+
+            const line2 = document.createElementNS(svgNs, 'line');
+            line2.setAttribute('x1', `${x + size}`);
+            line2.setAttribute('y1', `${y - size}`);
+            line2.setAttribute('x2', `${x - size}`);
+            line2.setAttribute('y2', `${y + size}`);
+            line2.setAttribute('stroke', 'rgba(220, 38, 38, 0.9)');
+            line2.setAttribute('stroke-width', '4');
+            line2.setAttribute('stroke-linecap', 'round');
+
+            g.appendChild(line1);
+            g.appendChild(line2);
         }
-        g.appendChild(c);
     });
 
     svg.appendChild(g);
@@ -454,7 +472,7 @@ function renderIndividualView(container, events) {
                 <div class="chart-wrapper"><svg id="playerChart_${id}" class="chart-svg" preserveAspectRatio="xMidYMid meet"></svg></div>
                 <div class="legend">
                     <span class="legend-item"><span class="dot" style="background:${rgba(colorMap.get(id) || '#22C55E', 0.9)}; border:2px solid ${rgba(colorMap.get(id) || '#22C55E', 1)};"></span>Made</span>
-                    <span class="legend-item"><span class="dot" style="background:rgba(220,38,38,0.22); border:2px solid rgba(220,38,38,0.9);"></span>Missed</span>
+                    <span class="legend-item"><span class="legend-x">X</span>Missed</span>
                     <span class="legend-item">Triangle = Foul Committed</span>
                     <span class="legend-item">Square = Got Fouled</span>
                 </div>

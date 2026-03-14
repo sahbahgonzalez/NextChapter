@@ -28,7 +28,7 @@ The Games system manages basketball game records, tracks live game events, and s
 - Timeline list highlights the active step and auto-scrolls while replay runs.
 - Replay marker semantics are consistent with tracker/report rules:
   - made shot: player color
-  - missed shot: red
+  - missed shot: red X
   - foul committed: yellow triangle
   - got fouled: yellow square
 - If the game is live, replay data continues updating from backend/snapshot refresh loops.

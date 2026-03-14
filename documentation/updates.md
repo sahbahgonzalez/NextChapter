@@ -394,10 +394,20 @@ removeActionEntryById(teamKey, actionId);
   - Replay timeline advances every **1.5 seconds** and highlights/auto-scrolls active steps.
 - Replay includes shot and foul events with existing marker semantics preserved:
   - made shots = player color
-  - missed shots = red
+  - missed shots = red **X**
   - foul committed = yellow triangle
   - got fouled = yellow square
 - Replay modal remains in sync with live refresh updates while open.
+
+---
+
+### 27. Missed Marker Visibility Tweak (Thicker Red X)
+**Date**: March 14, 2026  
+**Files Modified**: `frontend/js/live-shot-chart.js`, `frontend/live-shot-chart.html`
+
+**Changes:**
+- Updated missed-shot chart markers from red circles to red **X** markers on the live shot-chart page.
+- Increased missed-shot X stroke thickness to improve readability on both normal chart cards and enlarged replay modal.
 
 ---
 
