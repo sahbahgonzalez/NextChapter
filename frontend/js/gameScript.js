@@ -8,9 +8,11 @@ let isPaused = false;
 let isTimeout = false;
 let pendingShotType = null;
 let isGameRunning = false;
+let liveSaveDebounceTimer = null;
 // Backend currently has no event-reversal endpoint, so live event sync can overcount after undo/delete.
 // Keep scoreboard authoritative in frontend and persist final score/winner at game end.
 const SYNC_LIVE_EVENTS_TO_BACKEND = false;
+const LIVE_GAME_STATE_KEY = 'tnc_live_game_state_active_v1';
 
 const timerDisplay = document.getElementById("gameTimer");
 const startGameBtn = document.getElementById("startGameBtn");
@@ -50,6 +52,7 @@ const gameContext = {
   customTeamNames: { A: '', B: '' },
   teams: { team_a: [], team_b: [] }
 };
+let liveState = null;
 
 let currentAssignTarget = null;
 let searchDebounce = null;
@@ -72,12 +75,138 @@ function startTimer() {
   timerInterval = setInterval(() => {
     secondsElapsed++;
     timerDisplay.textContent = formatTime(secondsElapsed);
+    if (secondsElapsed % 5 === 0) {
+      persistLiveGameSnapshot('timer');
+    }
   }, 1000);
 }
 
 /** Stop the game timer */
 function stopTimer() {
   clearInterval(timerInterval);
+}
+
+function safeClone(value, fallback) {
+  return value && typeof value === 'object' ? JSON.parse(JSON.stringify(value)) : fallback;
+}
+
+function buildHistorySnapshot(history = []) {
+  if (!Array.isArray(history)) return [];
+  return history.map((entry) => ({
+    kind: entry.kind || null,
+    team: entry.team || null,
+    shotType: entry.shotType || null,
+    result: entry.result || null,
+    actionId: entry.actionId || null,
+    playerId: entry.playerId || null,
+    pos: entry.pos ? { ...entry.pos } : null,
+    persisted: !!entry.persisted,
+    type: entry.type || null,
+    timestamp: entry.timestamp || null
+  }));
+}
+
+function buildActionHistorySnapshot(actionHistory = { A: [], B: [] }) {
+  const normalize = (entries = [], teamKey) => {
+    if (!Array.isArray(entries)) return [];
+    return entries.map((entry) => ({
+      id: entry.id,
+      teamKey,
+      playerId: entry.playerId || '',
+      playerName: entry.playerName || `Team ${teamKey}`,
+      label: entry.label || 'Play',
+      gameSeconds: typeof entry.gameSeconds === 'number' ? entry.gameSeconds : null,
+      timeLabel: entry.timeLabel || (typeof entry.gameSeconds === 'number' ? formatTime(entry.gameSeconds) : '—'),
+      timestamp: entry.timestamp || Date.now(),
+      highlighted: !!entry.highlighted,
+      type: entry.type || 'action',
+      note: entry.note || '',
+      markerId: entry.markerId || null
+    }));
+  };
+
+  return {
+    A: normalize(actionHistory.A, 'A'),
+    B: normalize(actionHistory.B, 'B')
+  };
+}
+
+function buildMarkerSnapshot() {
+  const container = document.getElementById('shot_markers');
+  if (!container) return [];
+  const nodes = container.querySelectorAll('.shot-marker, .foul-marker');
+  return Array.from(nodes).map((marker) => ({
+    classes: marker.className,
+    left: marker.style.left,
+    top: marker.style.top,
+    text: marker.textContent || '',
+    title: marker.title || '',
+    playerName: marker.dataset.player || '',
+    playerId: marker.dataset.playerId || '',
+    shotType: marker.dataset.shotType || '',
+    result: marker.dataset.result || '',
+    type: marker.dataset.type || '',
+    foulRole: marker.dataset.foulRole || '',
+    markerId: marker.dataset.markerId || ''
+  }));
+}
+
+function persistLiveGameSnapshot(reason = 'auto') {
+  if (typeof localStorage === 'undefined') return;
+  if (!liveState) return;
+
+  const payload = {
+    version: 1,
+    reason,
+    updatedAt: Date.now(),
+    gameContext: {
+      gameId: gameContext.gameId || null,
+      players: safeClone(gameContext.players, { A: null, A2: null, B: null, B2: null }),
+      activePlayerIndex: safeClone(gameContext.activePlayerIndex, { A: 0, B: 0 }),
+      ruleMode: gameContext.ruleMode || '1v1',
+      customTeamNames: safeClone(gameContext.customTeamNames, { A: '', B: '' })
+    },
+    runtime: {
+      secondsElapsed,
+      isPaused,
+      isTimeout,
+      isGameRunning,
+      activeTeam: liveState.active || 'A'
+    },
+    state: {
+      A: safeClone(liveState.A, { twoPA: 0, twoPM: 0, threePA: 0, threePM: 0, fourPA: 0, fourPM: 0, ftA: 0, ftM: 0, fouls: 0 }),
+      B: safeClone(liveState.B, { twoPA: 0, twoPM: 0, threePA: 0, threePM: 0, fourPA: 0, fourPM: 0, ftA: 0, ftM: 0, fouls: 0 }),
+      playerStats: safeClone(liveState.playerStats, {}),
+      teamPlayerIds: safeClone(liveState.teamPlayerIds, { A: [], B: [] }),
+      statsView: safeClone(liveState.statsView, { A: 'player', B: 'player' }),
+      shotHistory: safeClone(liveState.shotHistory, { A: [], B: [] }),
+      history: buildHistorySnapshot(liveState.history),
+      actionHistory: buildActionHistorySnapshot(liveState.actionHistory)
+    },
+    markers: buildMarkerSnapshot()
+  };
+
+  try {
+    localStorage.setItem(LIVE_GAME_STATE_KEY, JSON.stringify(payload));
+  } catch (err) {
+    console.warn('Failed to persist live game snapshot.', err);
+  }
+}
+
+function scheduleLiveGameSnapshot(reason = 'auto') {
+  if (liveSaveDebounceTimer) clearTimeout(liveSaveDebounceTimer);
+  liveSaveDebounceTimer = setTimeout(() => {
+    persistLiveGameSnapshot(reason);
+    liveSaveDebounceTimer = null;
+  }, 250);
+}
+
+function clearLiveGameSnapshot() {
+  try {
+    localStorage.removeItem(LIVE_GAME_STATE_KEY);
+  } catch (err) {
+    console.warn('Failed to clear live game snapshot.', err);
+  }
 }
 
 /**
@@ -223,7 +352,7 @@ function restoreGameEvents(game) {
   const shotMarkersEl = document.getElementById('shot_markers');
   if (!shotMarkersEl) return;
 
-  const palette = ['#2563EB', '#059669', '#D97706', '#7C3AED', '#DB2777', '#0891B2', '#65A30D', '#14B8A6'];
+  const palette = ['#22C55E', '#2563EB', '#EC4899', '#F97316'];
   const idToColor = (id) => {
     const source = String(id || 'player');
     let hash = 0;
@@ -431,6 +560,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     A: { twoPA: 0, twoPM: 0, threePA: 0, threePM: 0, fourPA: 0, fourPM: 0, ftA: 0, ftM: 0, fouls: 0 },
     B: { twoPA: 0, twoPM: 0, threePA: 0, threePM: 0, fourPA: 0, fourPM: 0, ftA: 0, ftM: 0, fouls: 0 },
     playerStats: {},
+    teamPlayerIds: { A: [], B: [] },
     statsView: { A: 'player', B: 'player' },
     history: [],
     shotHistory: {
@@ -442,6 +572,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       B: []
     }
   };
+  liveState = state;
 
   // If we loaded an existing game, restore the stats from events
   if (gameContext.loadedGame && gameContext.loadedGame.events) {
@@ -464,17 +595,20 @@ document.addEventListener("DOMContentLoaded", async () => {
         }
         if (eventPlayerId) {
           applyPlayerShotDelta(eventPlayerId, event.points === 4 ? '4pt' : event.points === 3 ? '3pt' : '2pt', event.made ? 'made' : 'missed', 1);
+          if (!state.teamPlayerIds[teamKey].includes(eventPlayerId)) state.teamPlayerIds[teamKey].push(eventPlayerId);
         }
       } else if (event.type === 'free_throw') {
         team.ftA += 1;
         if (event.made) team.ftM += 1;
         if (eventPlayerId) {
           applyPlayerShotDelta(eventPlayerId, 'ft', event.made ? 'made' : 'missed', 1);
+          if (!state.teamPlayerIds[teamKey].includes(eventPlayerId)) state.teamPlayerIds[teamKey].push(eventPlayerId);
         }
       } else if (event.type === 'foul') {
         team.fouls += 1;
         if (eventPlayerId) {
           applyPlayerFoulDelta(eventPlayerId, 1);
+          if (!state.teamPlayerIds[teamKey].includes(eventPlayerId)) state.teamPlayerIds[teamKey].push(eventPlayerId);
         }
       }
 
@@ -580,15 +714,153 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   const shotMarkersEl = document.getElementById('shot_markers');
 
+  function applyPlayerAssignmentsToButtons() {
+    if (selectorEls.A.assignBtn) selectorEls.A.assignBtn.textContent = gameContext.players.A?.name || 'Assign Player';
+    if (selectorEls.B.assignBtn) selectorEls.B.assignBtn.textContent = gameContext.players.B?.name || 'Assign Player';
+    if (selectorEls.A.assignBtn2) selectorEls.A.assignBtn2.textContent = gameContext.players.A2?.name || 'Assign Tag Partner';
+    if (selectorEls.B.assignBtn2) selectorEls.B.assignBtn2.textContent = gameContext.players.B2?.name || 'Assign Tag Partner';
+  }
+
+  function createMarkerFromSnapshot(snapshot) {
+    if (!shotMarkersEl || !snapshot) return null;
+    const marker = document.createElement('div');
+    marker.className = snapshot.classes || '';
+    marker.style.left = snapshot.left || '0%';
+    marker.style.top = snapshot.top || '0%';
+    marker.textContent = snapshot.text || '';
+    marker.title = snapshot.title || '';
+    marker.dataset.player = snapshot.playerName || '';
+    marker.dataset.playerId = snapshot.playerId || '';
+    marker.dataset.shotType = snapshot.shotType || '';
+    marker.dataset.result = snapshot.result || '';
+    marker.dataset.type = snapshot.type || '';
+    marker.dataset.foulRole = snapshot.foulRole || '';
+    if (snapshot.markerId) marker.dataset.markerId = snapshot.markerId;
+
+    if (marker.classList.contains('shot-marker')) {
+      const result = snapshot.result || (marker.classList.contains('made') ? 'made' : 'missed');
+      styleShotMarker(marker, { _id: snapshot.playerId || '', name: snapshot.playerName || 'Player' }, result);
+      marker.style.display = 'flex';
+      marker.style.alignItems = 'center';
+      marker.style.justifyContent = 'center';
+      if (!marker.style.fontSize) marker.style.fontSize = '10px';
+      if (!marker.style.fontWeight) marker.style.fontWeight = 'bold';
+    }
+
+    if (marker.classList.contains('foul-marker')) {
+      styleFoulMarker(marker, { _id: snapshot.playerId || '', name: snapshot.playerName || 'Player' });
+      marker.style.display = 'flex';
+      marker.style.alignItems = 'center';
+      marker.style.justifyContent = 'center';
+      marker.style.color = '#fff';
+      if (snapshot.foulRole === 'committed') {
+        marker.style.borderRadius = '0';
+        marker.style.clipPath = 'polygon(50% 0%, 0% 100%, 100% 100%)';
+      } else {
+        marker.style.borderRadius = '4px';
+        marker.style.clipPath = '';
+      }
+    }
+
+    shotMarkersEl.appendChild(marker);
+    return marker;
+  }
+
+  function restoreLiveGameSnapshotIfAvailable() {
+    let parsed;
+    try {
+      const raw = localStorage.getItem(LIVE_GAME_STATE_KEY);
+      if (!raw) return false;
+      parsed = JSON.parse(raw);
+    } catch (err) {
+      console.warn('Invalid live game snapshot payload. Clearing.', err);
+      clearLiveGameSnapshot();
+      return false;
+    }
+
+    if (!parsed || typeof parsed !== 'object' || !parsed.state || !parsed.gameContext) return false;
+
+    const snapshotGameId = parsed.gameContext.gameId || null;
+    if (gameContext.gameId && snapshotGameId && String(gameContext.gameId) !== String(snapshotGameId)) {
+      return false;
+    }
+
+    gameContext.gameId = snapshotGameId || gameContext.gameId || null;
+    gameContext.players = safeClone(parsed.gameContext.players, gameContext.players);
+    gameContext.activePlayerIndex = safeClone(parsed.gameContext.activePlayerIndex, gameContext.activePlayerIndex);
+    gameContext.ruleMode = parsed.gameContext.ruleMode === 'tag-team-1v1' ? 'tag-team-1v1' : '1v1';
+    gameContext.customTeamNames = safeClone(parsed.gameContext.customTeamNames, gameContext.customTeamNames);
+
+    const savedState = parsed.state;
+    state.A = safeClone(savedState.A, state.A);
+    state.B = safeClone(savedState.B, state.B);
+    state.playerStats = safeClone(savedState.playerStats, {});
+    state.teamPlayerIds = safeClone(savedState.teamPlayerIds, { A: [], B: [] });
+    state.statsView = safeClone(savedState.statsView, { A: 'player', B: 'player' });
+    state.shotHistory = safeClone(savedState.shotHistory, { A: [], B: [] });
+    state.history = safeClone(savedState.history, []);
+    state.actionHistory = safeClone(savedState.actionHistory, { A: [], B: [] });
+
+    const runtime = parsed.runtime || {};
+    secondsElapsed = Number(runtime.secondsElapsed || 0);
+    isPaused = !!runtime.isPaused;
+    isTimeout = !!runtime.isTimeout;
+    isGameRunning = !!runtime.isGameRunning;
+    state.active = runtime.activeTeam === 'B' ? 'B' : 'A';
+
+    if (shotMarkersEl) shotMarkersEl.innerHTML = '';
+    const markerIndex = new Map();
+    (parsed.markers || []).forEach((markerSnapshot) => {
+      const markerEl = createMarkerFromSnapshot(markerSnapshot);
+      if (markerEl && markerSnapshot.markerId) markerIndex.set(markerSnapshot.markerId, markerEl);
+    });
+
+    ['A', 'B'].forEach((teamKey) => {
+      const entries = state.actionHistory[teamKey] || [];
+      entries.forEach((entry) => {
+        if (entry.markerId && markerIndex.has(entry.markerId)) {
+          entry.markerEl = markerIndex.get(entry.markerId);
+          entry.markerEl.dataset.actionId = entry.id;
+        }
+      });
+    });
+
+    applyPlayerAssignmentsToButtons();
+    populateActivePlayerSelectors();
+    timerDisplay.textContent = formatTime(secondsElapsed);
+
+    if (startGameBtn) {
+      if (isGameRunning) {
+        startGameBtn.textContent = 'End Game';
+        startGameBtn.classList.remove('btn-primary');
+        startGameBtn.classList.add('btn-danger');
+      } else {
+        startGameBtn.textContent = 'Start Game';
+        startGameBtn.classList.remove('btn-danger');
+        startGameBtn.classList.add('btn-primary');
+      }
+      startGameBtn.disabled = false;
+    }
+
+    if (pauseGameBtn) {
+      pauseGameBtn.innerHTML = (isPaused || isTimeout)
+        ? 'Resume <span class="hotkey-hint">P</span>'
+        : 'Pause <span class="hotkey-hint">P</span>';
+    }
+
+    updateUI();
+    updateShotLogDisplay();
+    setActionsEnabled(isGameRunning);
+    if (isGameRunning && !isPaused && !isTimeout) startTimer();
+    showStartError('');
+    return true;
+  }
+
   const playerColorPalette = [
+    '#22C55E',
     '#2563EB',
-    '#059669',
-    '#D97706',
-    '#7C3AED',
-    '#DB2777',
-    '#0891B2',
-    '#65A30D',
-    '#14B8A6'
+    '#EC4899',
+    '#F97316'
   ];
 
   function hexToRgba(hex, alpha) {
@@ -609,7 +881,15 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   function getPlayerColor(player) {
     if (!player) return playerColorPalette[0];
-    const idSource = String(player._id || player.id || player.name || 'player');
+
+    const playerId = String(player._id || player.id || player.playerId || '');
+    const assigned = playerId ? getAssignedPlayerById(playerId) : null;
+    if (assigned?.key === 'A') return playerColorPalette[0];
+    if (assigned?.key === 'A2') return playerColorPalette[1];
+    if (assigned?.key === 'B') return playerColorPalette[2];
+    if (assigned?.key === 'B2') return playerColorPalette[3];
+
+    const idSource = playerId || String(player.name || 'player');
     let hash = 0;
     for (let i = 0; i < idSource.length; i += 1) {
       hash = ((hash << 5) - hash) + idSource.charCodeAt(i);
@@ -629,13 +909,14 @@ document.addEventListener("DOMContentLoaded", async () => {
       return;
     }
 
-    // Reserve red styling for missed shots.
+    // Misses are always red.
     marker.style.borderColor = 'rgba(198, 40, 40, 0.95)';
     marker.style.color = '#b91c1c';
     marker.style.background = 'rgba(239, 68, 68, 0.18)';
   }
 
   function styleFoulMarker(marker, player) {
+    // Fouls are always yellow.
     marker.style.boxShadow = '0 0 0 2px rgba(245, 158, 11, 0.45), 0 2px 6px rgba(0,0,0,0.25)';
     marker.style.borderColor = '#92400E';
     marker.style.background = '#F59E0B';
@@ -1082,6 +1363,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     const isTagMode = gameContext.ruleMode === 'tag-team-1v1';
 
     const applyVisibility = (selector, teamKey, activePlayerId) => {
+      const isTeamView = (state.statsView[teamKey] || 'player') === 'team';
       document.querySelectorAll(selector).forEach((marker) => {
         const isActiveTeam = state.active === teamKey;
         if (!isActiveTeam) {
@@ -1089,11 +1371,13 @@ document.addEventListener("DOMContentLoaded", async () => {
           return;
         }
 
-        if (!isTagMode) {
+        // In team view, show all markers for this team
+        if (isTeamView || !isTagMode) {
           marker.style.display = 'flex';
           return;
         }
 
+        // In player view + tag mode, only show active player's markers
         const markerPlayerId = String(marker.dataset.playerId || '');
         marker.style.display = !activePlayerId || markerPlayerId === activePlayerId ? 'flex' : 'none';
       });
@@ -1560,11 +1844,27 @@ document.addEventListener("DOMContentLoaded", async () => {
     stats.fouls = Math.max(0, stats.fouls + delta);
   }
 
+  function computeTeamTotals(teamKey) {
+    const ids = state.teamPlayerIds[teamKey] || [];
+    if (ids.length === 0) return teamKey === 'A' ? state.A : state.B;
+    const totals = createEmptyStats();
+    for (const id of ids) {
+      const ps = state.playerStats[id];
+      if (!ps) continue;
+      totals.twoPA += ps.twoPA; totals.twoPM += ps.twoPM;
+      totals.threePA += ps.threePA; totals.threePM += ps.threePM;
+      totals.fourPA += ps.fourPA; totals.fourPM += ps.fourPM;
+      totals.ftA += ps.ftA; totals.ftM += ps.ftM;
+      totals.fouls += ps.fouls;
+    }
+    return totals;
+  }
+
   function getDisplayStatsForTeam(teamKey) {
     const viewMode = state.statsView[teamKey] || 'player';
     if (viewMode === 'team') {
       return {
-        stats: teamKey === 'A' ? state.A : state.B,
+        stats: computeTeamTotals(teamKey),
         scopeLabel: `Showing: ${getTeamDisplayName(teamKey)} Team Totals`
       };
     }
@@ -1688,6 +1988,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     updateShotLogDisplay();
 
     refreshRuleModeUI();
+    scheduleLiveGameSnapshot('ui');
   }
 
   async function applyShot(teamKey, shotType, result, markerEl = null, pos = null) {
@@ -1732,6 +2033,8 @@ document.addEventListener("DOMContentLoaded", async () => {
       if (result === 'made') team.ftM += 1;
     }
     applyPlayerShotDelta(playerId, shotType, result, 1);
+    const playerIdStr = String(playerId);
+    if (!state.teamPlayerIds[teamKey].includes(playerIdStr)) state.teamPlayerIds[teamKey].push(playerIdStr);
     state.history.push(change);
 
     // DEBUG: Log the state after update
@@ -1796,7 +2099,9 @@ document.addEventListener("DOMContentLoaded", async () => {
     const team = teamKey === 'A' ? state.A : state.B;
     team.fouls += 1;
     applyPlayerFoulDelta(playerId, 1);
-    
+    const foulPlayerIdStr = String(playerId);
+    if (!state.teamPlayerIds[teamKey].includes(foulPlayerIdStr)) state.teamPlayerIds[teamKey].push(foulPlayerIdStr);
+
     const actionId = `action_${Date.now()}_${Math.random().toString(16).slice(2)}`;
 
     const fouledTeamKey = teamKey === 'A' ? 'B' : 'A';
@@ -2485,10 +2790,12 @@ document.addEventListener("DOMContentLoaded", async () => {
     state.A = { twoPA: 0, twoPM: 0, threePA: 0, threePM: 0, fourPA: 0, fourPM: 0, ftA: 0, ftM: 0, fouls: 0 };
     state.B = { twoPA: 0, twoPM: 0, threePA: 0, threePM: 0, fourPA: 0, fourPM: 0, ftA: 0, ftM: 0, fouls: 0 };
     state.playerStats = {};
+    state.teamPlayerIds = { A: [], B: [] };
     state.statsView = { A: 'player', B: 'player' };
     state.history = [];
     state.active = 'A';
     isTimeout = false;
+    clearLiveGameSnapshot();
     
     // Clear shot markers from court
     const shotMarkersEl = document.getElementById('shot_markers');
@@ -2541,10 +2848,12 @@ document.addEventListener("DOMContentLoaded", async () => {
     state.A = { twoPA: 0, twoPM: 0, threePA: 0, threePM: 0, fourPA: 0, fourPM: 0, ftA: 0, ftM: 0, fouls: 0 };
     state.B = { twoPA: 0, twoPM: 0, threePA: 0, threePM: 0, fourPA: 0, fourPM: 0, ftA: 0, ftM: 0, fouls: 0 };
     state.playerStats = {};
+    state.teamPlayerIds = { A: [], B: [] };
     state.statsView = { A: 'player', B: 'player' };
     state.history = [];
     state.shotHistory = { A: [], B: [] };  // Clear individual shot histories
     state.active = 'A';
+    clearLiveGameSnapshot();
     
     // Clear shot markers
     const shotMarkersEl = document.getElementById('shot_markers');
@@ -2736,6 +3045,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         isGameRunning = true;
         setActionsEnabled(true);
         refreshRuleModeUI();
+        persistLiveGameSnapshot('game-started');
       } else {
         // End Game - finalize and save to database
         stopTimer();
@@ -2799,6 +3109,7 @@ document.addEventListener("DOMContentLoaded", async () => {
           isGameRunning = false;
           setActionsEnabled(false);
           refreshRuleModeUI();
+          clearLiveGameSnapshot();
         } catch (error) {
           console.error('Error finalizing game:', error);
           alert('Error saving game. Please try again.');
@@ -2904,6 +3215,35 @@ document.addEventListener("DOMContentLoaded", async () => {
   controller.init();
   controller.state = state;
   controller.gameContext = gameContext;
+
+  const autosaveIntervalMs = 5000;
+  setInterval(() => {
+    if (isGameRunning) {
+      persistLiveGameSnapshot('interval');
+    }
+  }, autosaveIntervalMs);
+
+  window.addEventListener('beforeunload', () => {
+    if (isGameRunning || state.history.length > 0) {
+      persistLiveGameSnapshot('beforeunload');
+    }
+  });
+
+  window.addEventListener('pagehide', () => {
+    if (isGameRunning || state.history.length > 0) {
+      persistLiveGameSnapshot('pagehide');
+    }
+  });
+
+  window.addEventListener('offline', () => {
+    persistLiveGameSnapshot('offline');
+  });
+
+  window.addEventListener('online', () => {
+    if (isGameRunning) {
+      persistLiveGameSnapshot('online');
+    }
+  });
 
   // Keyboard shortcuts handler
   document.addEventListener('keydown', (e) => {
@@ -3164,10 +3504,13 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
 
   // Initial UI sync
-  updateUI();
-  // Lock all controls until game starts
-  isGameRunning = false;
-  setActionsEnabled(false);
+  const restoredLiveGame = restoreLiveGameSnapshotIfAvailable();
+  if (!restoredLiveGame) {
+    updateUI();
+    // Lock all controls until game starts
+    isGameRunning = false;
+    setActionsEnabled(false);
+  }
 });
 
 // Controller now lives within DOMContentLoaded for local state access

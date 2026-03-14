@@ -248,6 +248,70 @@ removeActionEntryById(teamKey, actionId);
 
 ---
 
+### 17. Team Stats View Aggregation + Team Shot-Chart Visibility
+**Date**: March 13, 2026  
+**Files Modified**: `frontend/js/gameScript.js`
+
+**Changes:**
+- Added explicit team aggregation for stat panels by summing player-level stat objects for all players who logged stats on each team.
+- Added `teamPlayerIds` tracking per team so team view uses full team contribution, not only active player data.
+- Team stat view now reflects combined 2PT/3PT/4PT/FT/foul totals from all tracked teammates.
+- Updated marker visibility rules so Team stat view shows all markers for the active team on the court.
+
+---
+
+### 18. Live Game Recovery (Close/Reload/Offline Safety)
+**Date**: March 13, 2026  
+**Files Modified**: `frontend/js/gameScript.js`
+
+**Changes:**
+- Added live snapshot persistence key: `tnc_live_game_state_active_v1`.
+- Added periodic autosave while game is running plus save hooks for `beforeunload`, `pagehide`, and `offline` events.
+- Added restore flow on page load that recovers:
+  - runtime flags (running/paused/timeout)
+  - timer value
+  - team and player stat state
+  - action history and shot history
+  - court markers (shot + foul) and marker/action linkage
+- Added snapshot cleanup on reset/new game/finalized game to prevent stale restore state.
+
+---
+
+### 19. Player Color Standardization + Marker Color Rules
+**Date**: March 13, 2026  
+**Files Modified**: `frontend/js/gameScript.js`
+
+**Changes:**
+- Standardized unique player palette to:
+  - Green (`#22C55E`)
+  - Blue (`#2563EB`)
+  - Pink (`#EC4899`)
+  - Orange (`#F97316`)
+- Mapped assigned slots to deterministic colors (`A`, `A2`, `B`, `B2`) to keep identity consistent.
+- Preserved visual constraints:
+  - Missed shots remain red.
+  - Fouls remain yellow.
+- Updated restored markers to carry player IDs into color resolution so recovered sessions keep consistent player colors.
+
+---
+
+### 20. Live Games List Score Refresh + Live Report Mode
+**Date**: March 13, 2026  
+**Files Modified**: `frontend/js/games.js`, `frontend/js/game-report.js`
+
+**Changes:**
+- Games page now refreshes game cards on an interval for live score visibility.
+- Live game card score resolution now prefers:
+  1. backend `current_score`
+  2. local live snapshot score fallback
+  3. existing score fallback
+- Added **Live Report** button for live/in-progress games.
+- Game report page now supports live/in-progress rendering with periodic auto-refresh.
+- Live report score/header now show active live context (auto-updating badge and timestamp).
+- Live report event/shot sources now support fallback reconstruction from local live snapshot when backend events are not yet complete.
+
+---
+
 ## January 2026 - Game Tracker Enhancements
 
 ### 1. Action History System

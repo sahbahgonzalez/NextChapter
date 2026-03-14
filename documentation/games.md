@@ -4,6 +4,15 @@
 
 The Games system manages basketball game records, tracks live game events, and stores final statistics. Games can be in various states (in progress, finished, canceled) and support multiple game formats (1v1, 2v2, 3v3, 5v5).
 
+### Live UI Behavior
+
+- Live game cards on the Games page refresh periodically and display live scores.
+- Live score display uses this fallback order:
+  1. backend `current_score`
+  2. local live snapshot score (`tnc_live_game_state_active_v1`)
+  3. existing score fallback
+- Live game cards include a **Live Report** action that opens `game-report.html?id=<gameId>&live=1`.
+
 ---
 
 ## Game Structure
@@ -318,6 +327,37 @@ Array of game objects with basic information
 ```
 GET /game/:id
 ```
+
+---
+
+## Live Report Mode
+
+The report page supports both finished and active games.
+
+### URL
+
+```
+game-report.html?id=<gameId>&live=1
+```
+
+### Behavior
+
+- Live reports auto-refresh on an interval while game status is `live` or `in_progress`.
+- Header displays live update context (auto-updating indicator + updated timestamp).
+- Score section uses live score resolution (backend first, local snapshot fallback).
+- Event/shot rendering uses backend events when available, with snapshot-based reconstruction fallback for active games.
+- PDF auto-download flow remains intended for completed reports (live mode is for monitoring).
+
+### Local Snapshot Fallback
+
+If backend live events/scores are delayed or unavailable, live report pages can use local active-game snapshot data from the tracker:
+
+- Storage key: `tnc_live_game_state_active_v1`
+- Includes:
+  - team/player stats
+  - action history
+  - timeline metadata
+  - marker/event reconstruction data
 
 **Response:**
 Complete game object including:

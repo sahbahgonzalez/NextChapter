@@ -19,6 +19,7 @@ Each side stat panel can now display either individual active-player stats or fu
   - `Team`: team aggregate stats
 - Scope label is shown in each side panel to indicate the current view.
 - Center game score display remains team-based and is not affected by this toggle.
+- Team aggregate view sums stat output from all tracked players on the team (not just currently active player).
 
 **Features:**
 - **Timestamps**: Each action shows game time in MM:SS format
@@ -100,7 +101,8 @@ Visual indicators placed on the court for all shots and fouls (except free throw
 
 **Shot Markers:**
 - Display player initials
-- Color-coded per player and result (made/missed)
+- Made shots use fixed per-player colors (Green/Blue/Pink/Orange)
+- Missed shots remain red (reserved miss color)
 - Positioned at exact click/cursor location
 - Removed when action is undone
 - Created via `addShotMarker()`
@@ -116,7 +118,8 @@ Visual indicators placed on the court for all shots and fouls (except free throw
 
 **Tag-Team Visibility Rules:**
 - Only the active team's markers are shown.
-- In tag-team mode, only the currently active teammate's markers are shown.
+- In tag-team mode + Player view, only the currently active teammate's markers are shown.
+- In Team view, all markers for the active team are shown.
 - Action log and latest-shot panel are filtered to the active individual player.
 - Action panels are not forcibly hidden just because a team is inactive.
 
@@ -271,6 +274,7 @@ state = {
   A: { twoPM, twoPA, threePM, threePA, fourPM, fourPA, ftM, ftA, fouls },
   B: { twoPM, twoPA, threePM, threePA, fourPM, fourPA, ftM, ftA, fouls },
   playerStats: { [playerId]: { twoPM, twoPA, threePM, threePA, fourPM, fourPA, ftM, ftA, fouls } },
+  teamPlayerIds: { A: [playerId...], B: [playerId...] },
   statsView: { A: 'player' | 'team', B: 'player' | 'team' },
   history: [{ kind, team, shotType, result, marker, secondaryMarker, actionId, playerId, pos, persisted }],
   actionHistory: {
@@ -297,7 +301,8 @@ state = {
 - `applyPlayerFoulDelta(playerId, delta)` - Updates individual player foul totals
 
 **Stats Scope Rendering:**
-- `getDisplayStatsForTeam(teamKey)` - Resolves whether panel should show active player stats or team totals
+- `computeTeamTotals(teamKey)` - Sums tracked player stat objects for team view
+- `getDisplayStatsForTeam(teamKey)` - Resolves whether panel should show active player stats or computed team totals
 - `updateUI()` - Renders side panels from selected scope while keeping center scoreboard on team totals
 
 **Action History:**
@@ -322,6 +327,13 @@ state = {
 - Action-log UI events are local-only and are not posted as backend game events.
 - Finalization sends explicit `final_score` and `winner`.
 - If native 4PT backend event persistence is rejected, compatibility fallback persists equivalent total points (`3PT` + made `FT` for made 4PT).
+
+**Live Recovery (Local Persistence):**
+- Active game state is persisted under `tnc_live_game_state_active_v1`.
+- Snapshot includes timer/runtime flags, team/player stats, action/shot history, and court marker metadata.
+- Autosave triggers during active play and on page lifecycle events (`beforeunload`, `pagehide`, `offline`).
+- On reload, tracker restores active session state (including markers and linked action metadata) when game ID matches.
+- Snapshot is cleared when game is reset or finalized.
 
 ---
 

@@ -7,6 +7,8 @@ let gameId = null;
 let gameData = null;
 const STARRED_PLAYS_STORAGE_PREFIX = 'tnc_starred_plays_';
 const GAME_ACTIONS_STORAGE_PREFIX = 'tnc_game_actions_';
+const LIVE_GAME_STATE_KEY = 'tnc_live_game_state_active_v1';
+let liveReportRefreshTimer = null;
 
 const PLAYER_CHART_COLORS = [
     '#1D4ED8',
@@ -72,6 +74,198 @@ function shouldAutoDownloadFromUrl() {
     return value === '1' || value === 'true' || value === 'yes';
 }
 
+function isLiveReportModeFromUrl() {
+    const params = new URLSearchParams(window.location.search);
+    const value = (params.get('live') || '').toLowerCase();
+    return value === '1' || value === 'true' || value === 'yes';
+}
+
+function isLiveGameStatus(status) {
+    return status === 'live' || status === 'in_progress';
+}
+
+function computePointsFromStats(stats) {
+    if (!stats) return 0;
+    return ((stats.twoPM || 0) * 2) + ((stats.threePM || 0) * 3) + ((stats.fourPM || 0) * 4) + (stats.ftM || 0);
+}
+
+function loadLiveSnapshotForGame() {
+    try {
+        const raw = localStorage.getItem(LIVE_GAME_STATE_KEY);
+        if (!raw) return null;
+        const parsed = JSON.parse(raw);
+        const snapshotGameId = String(parsed?.gameContext?.gameId || '');
+        if (!snapshotGameId || snapshotGameId !== String(gameId || '')) return null;
+        return parsed;
+    } catch (err) {
+        console.warn('Failed to load live snapshot for report.', err);
+        return null;
+    }
+}
+
+function resolveDisplayedScore() {
+    const status = gameData?.status || '';
+    const isLive = isLiveGameStatus(status);
+
+    if (!isLive) {
+        return {
+            teamA: gameData?.final_score?.team_a || 0,
+            teamB: gameData?.final_score?.team_b || 0
+        };
+    }
+
+    if (gameData?.current_score && typeof gameData.current_score === 'object') {
+        return {
+            teamA: Number(gameData.current_score.team_a || 0),
+            teamB: Number(gameData.current_score.team_b || 0)
+        };
+    }
+
+    const snapshot = loadLiveSnapshotForGame();
+    if (snapshot?.state) {
+        return {
+            teamA: computePointsFromStats(snapshot.state.A),
+            teamB: computePointsFromStats(snapshot.state.B)
+        };
+    }
+
+    return {
+        teamA: gameData?.final_score?.team_a || 0,
+        teamB: gameData?.final_score?.team_b || 0
+    };
+}
+
+function getPlayerNameLookup() {
+    const lookup = new Map();
+    (gameData?.all_player_ids || []).forEach((player) => {
+        const id = String(player?._id || player?.id || '');
+        if (id) lookup.set(id, player?.name || 'Player');
+    });
+
+    const snapshot = loadLiveSnapshotForGame();
+    const players = snapshot?.gameContext?.players || {};
+    Object.keys(players).forEach((key) => {
+        const player = players[key];
+        const id = String(player?._id || '');
+        if (id && !lookup.has(id)) {
+            lookup.set(id, player?.name || 'Player');
+        }
+    });
+
+    return lookup;
+}
+
+function buildLiveEventsFromSnapshot(snapshot) {
+    if (!snapshot?.state?.history || !Array.isArray(snapshot.state.history)) return [];
+    const names = getPlayerNameLookup();
+
+    return snapshot.state.history
+        .filter((change) => !!change && (change.kind === 'shot' || change.kind === 'foul'))
+        .map((change, index) => {
+            const team = change.team === 'A' ? 'team_a' : 'team_b';
+            const playerId = String(change.playerId || '');
+            const playerName = names.get(playerId) || 'Player';
+            const isFt = change.kind === 'shot' && change.shotType === 'ft';
+            const shotPoints = change.shotType === '4pt' ? 4 : change.shotType === '3pt' ? 3 : change.shotType === '2pt' ? 2 : 1;
+
+            if (change.kind === 'foul') {
+                return {
+                    _id: String(change.actionId || `live_foul_${index}`),
+                    type: 'foul',
+                    team,
+                    player_id: { _id: playerId, name: playerName },
+                    timestamp: change.timestamp || Date.now(),
+                    location: change.pos ? { x: change.pos.xPct, y: change.pos.yPct } : null
+                };
+            }
+
+            return {
+                _id: String(change.actionId || `live_shot_${index}`),
+                type: isFt ? 'free_throw' : 'shot',
+                team,
+                player_id: { _id: playerId, name: playerName },
+                timestamp: change.timestamp || Date.now(),
+                made: change.result === 'made',
+                points: shotPoints,
+                location: change.pos ? { x: change.pos.xPct, y: change.pos.yPct } : null
+            };
+        });
+}
+
+function getEffectiveGameEvents() {
+    const backendEvents = Array.isArray(gameData?.events) ? gameData.events : [];
+    if (!isLiveGameStatus(gameData?.status)) {
+        return backendEvents;
+    }
+
+    if (backendEvents.length > 0) {
+        return backendEvents;
+    }
+
+    const snapshot = loadLiveSnapshotForGame();
+    return buildLiveEventsFromSnapshot(snapshot);
+}
+
+function getReportPlayers() {
+    const backendPlayers = Array.isArray(gameData?.all_player_ids) ? gameData.all_player_ids : [];
+    if (backendPlayers.length > 0) return backendPlayers;
+
+    const snapshotPlayers = Object.values(loadLiveSnapshotForGame()?.gameContext?.players || {}).filter(Boolean);
+    const deduped = [];
+    const seen = new Set();
+    snapshotPlayers.forEach((player) => {
+        const id = String(player?._id || '');
+        if (!id || seen.has(id)) return;
+        seen.add(id);
+        deduped.push(player);
+    });
+    return deduped;
+}
+
+function mapLivePlayerStatsToSummary(playerStats = {}) {
+    const twoPM = Number(playerStats.twoPM || 0);
+    const twoPA = Number(playerStats.twoPA || 0);
+    const threePM = Number(playerStats.threePM || 0);
+    const threePA = Number(playerStats.threePA || 0);
+    const fourPM = Number(playerStats.fourPM || 0);
+    const fourPA = Number(playerStats.fourPA || 0);
+    const ftM = Number(playerStats.ftM || 0);
+    const ftA = Number(playerStats.ftA || 0);
+
+    return {
+        pts: (twoPM * 2) + (threePM * 3) + (fourPM * 4) + ftM,
+        reb: 0,
+        oreb: 0,
+        dreb: 0,
+        ast: 0,
+        stl: 0,
+        blk: 0,
+        tov: 0,
+        pf: Number(playerStats.fouls || 0),
+        fgm: twoPM + threePM + fourPM,
+        fga: twoPA + threePA + fourPA,
+        '3pm': threePM,
+        '3pa': threePA,
+        ftm: ftM,
+        fta: ftA,
+        plus_minus: 0
+    };
+}
+
+function stopLiveReportAutoRefresh() {
+    if (liveReportRefreshTimer) {
+        clearInterval(liveReportRefreshTimer);
+        liveReportRefreshTimer = null;
+    }
+}
+
+function startLiveReportAutoRefresh() {
+    stopLiveReportAutoRefresh();
+    liveReportRefreshTimer = setInterval(() => {
+        loadGameReport(true);
+    }, 5000);
+}
+
 // Initialize
 document.addEventListener('DOMContentLoaded', async () => {
     setupNavigation();
@@ -83,6 +277,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     await loadGameReport();
+    window.addEventListener('beforeunload', () => stopLiveReportAutoRefresh());
 });
 
 function getGameIdFromUrl() {
@@ -166,18 +361,38 @@ function showLoginModal() {
     };
 }
 
-async function loadGameReport() {
+async function loadGameReport(isBackgroundRefresh = false) {
     try {
         gameData = await apiClient.getGameById(gameId);
 
-        if (!gameData || gameData.status !== 'finished') {
-            showError('Game is not completed or not found');
+        if (!gameData) {
+            if (!isBackgroundRefresh) showError('Game not found');
+            return;
+        }
+
+        if (gameData.status === 'canceled') {
+            stopLiveReportAutoRefresh();
+            if (!isBackgroundRefresh) showError('Game is canceled');
+            return;
+        }
+
+        if (!isLiveReportModeFromUrl() && !isLiveGameStatus(gameData.status) && gameData.status !== 'finished') {
+            stopLiveReportAutoRefresh();
+            if (!isBackgroundRefresh) showError('Game report unavailable for this status');
             return;
         }
 
         renderReport();
+
+        if (isLiveGameStatus(gameData.status)) {
+            startLiveReportAutoRefresh();
+        } else {
+            stopLiveReportAutoRefresh();
+        }
     } catch (error) {
-        showError('Failed to load game: ' + (error.message || 'Unknown error'));
+        if (!isBackgroundRefresh) {
+            showError('Failed to load game: ' + (error.message || 'Unknown error'));
+        }
     }
 }
 
@@ -190,8 +405,9 @@ function renderReport() {
     document.getElementById('gameDate').textContent = formatDate(gameData.createdAt);
 
     // Set scores
-    const teamAScore = gameData.final_score?.team_a || 0;
-    const teamBScore = gameData.final_score?.team_b || 0;
+    const resolvedScore = resolveDisplayedScore();
+    const teamAScore = resolvedScore.teamA;
+    const teamBScore = resolvedScore.teamB;
 
     document.getElementById('teamAScore').textContent = teamAScore;
     document.getElementById('teamBScore').textContent = teamBScore;
@@ -201,12 +417,19 @@ function renderReport() {
     document.getElementById('teamBLabel').textContent = gameData.teams?.team_b?.name || 'Team B';
 
     // Set winner
-    const winnerLabel = gameData.teams?.[gameData.winner]?.name || 'Team Draw';
-    document.getElementById('winnerBadge').textContent = `${winnerLabel} Wins`;
+    const winnerBadge = document.getElementById('winnerBadge');
+    if (isLiveGameStatus(gameData.status)) {
+        winnerBadge.textContent = 'Live Game - Auto Updating';
+    } else {
+        const winnerLabel = gameData.teams?.[gameData.winner]?.name || 'Team Draw';
+        winnerBadge.textContent = `${winnerLabel} Wins`;
+    }
 
     // Set generated date
     const now = new Date();
-    document.getElementById('generatedDate').textContent = `Generated on ${now.toLocaleDateString()} at ${now.toLocaleTimeString()}`;
+    document.getElementById('generatedDate').textContent = isLiveGameStatus(gameData.status)
+        ? `Live report updated ${now.toLocaleDateString()} ${now.toLocaleTimeString()}`
+        : `Generated on ${now.toLocaleDateString()} at ${now.toLocaleTimeString()}`;
 
     renderStarredPlaysSection();
 
@@ -216,7 +439,7 @@ function renderReport() {
     // Render full game actions at the bottom
     renderGameActionsSection();
 
-    if (shouldAutoDownloadFromUrl()) {
+    if (shouldAutoDownloadFromUrl() && !isLiveGameStatus(gameData.status)) {
         // Let the browser finish layout before html2pdf snapshots the DOM.
         setTimeout(() => {
             generatePDF(true);
@@ -244,7 +467,7 @@ function loadStoredStarredPlays() {
 }
 
 function loadBackendStarredPlaysFallback() {
-    const events = gameData?.events || [];
+    const events = getEffectiveGameEvents();
     return events
         .filter((event) => event && (event.highlighted === true || (event.note && String(event.note).trim().length > 0)))
         .map((event) => {
@@ -365,7 +588,7 @@ function loadStoredGameActions() {
 }
 
 function loadBackendGameActionsFallback() {
-    const events = gameData?.events || [];
+    const events = getEffectiveGameEvents();
     return events
         .filter((event) => !!event)
         .sort((a, b) => Number(new Date(a.timestamp || 0)) - Number(new Date(b.timestamp || 0)))
@@ -428,9 +651,10 @@ function renderPlayerReports() {
     const container = document.getElementById('playerReportsContainer');
     container.innerHTML = '';
 
-    const allPlayers = gameData.all_player_ids || [];
+    const allPlayers = getReportPlayers();
     const teamAPlayerIds = normalizeTeamPlayerIds(gameData.teams?.team_a);
     const teamBPlayerIds = normalizeTeamPlayerIds(gameData.teams?.team_b);
+    const livePlayerStats = loadLiveSnapshotForGame()?.state?.playerStats || {};
     const teamMembership = new Map();
     teamAPlayerIds.forEach((id) => teamMembership.set(id, 'team_a'));
     teamBPlayerIds.forEach((id) => teamMembership.set(id, 'team_b'));
@@ -514,6 +738,13 @@ function renderPlayerReports() {
             } else {
                 // It's a plain object
                 stats = gameData.game_stats_summary[player._id] || {};
+            }
+        }
+
+        if (!stats || Object.keys(stats).length === 0) {
+            const fallbackStats = livePlayerStats[String(player._id || '')];
+            if (fallbackStats) {
+                stats = mapLivePlayerStatsToSummary(fallbackStats);
             }
         }
 
@@ -644,7 +875,7 @@ function renderPlayerReports() {
 
 function getPlayerShots(playerId) {
     const shots = [];
-    const events = gameData.events || [];
+    const events = getEffectiveGameEvents();
 
     events.forEach(event => {
         // Compare player IDs as strings to handle both ObjectId and string formats
@@ -670,7 +901,7 @@ function getPlayerShots(playerId) {
 }
 
 function getPlayerFourPointStats(playerId) {
-    const events = gameData?.events || [];
+    const events = getEffectiveGameEvents();
     const targetPlayerId = String(playerId || '');
     let attempts = 0;
     let made = 0;
@@ -690,7 +921,7 @@ function getPlayerFourPointStats(playerId) {
 
 function getTeamShots(teamKey, playerColorMap) {
     const shots = [];
-    const events = gameData.events || [];
+    const events = getEffectiveGameEvents();
 
     events.forEach((event) => {
         if ((event.type === 'shot' || event.type === 'free_throw' || event.type === 'foul') &&

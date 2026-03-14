@@ -5,13 +5,76 @@
 
 let allGames = [];
 let currentEditingId = null;
+const LIVE_GAME_STATE_KEY = 'tnc_live_game_state_active_v1';
+let liveGamesRefreshInterval = null;
 
 // Initialize
 document.addEventListener('DOMContentLoaded', () => {
     loadGames();
     setupEventListeners();
     setupNavigation();
+    startLiveGamesRefresh();
 });
+
+function startLiveGamesRefresh() {
+    if (liveGamesRefreshInterval) clearInterval(liveGamesRefreshInterval);
+    liveGamesRefreshInterval = setInterval(() => {
+        loadGames();
+    }, 5000);
+}
+
+function computePointsFromStats(stats) {
+    if (!stats) return 0;
+    return ((stats.twoPM || 0) * 2) + ((stats.threePM || 0) * 3) + ((stats.fourPM || 0) * 4) + (stats.ftM || 0);
+}
+
+function getLiveSnapshotForGame(gameId) {
+    try {
+        const raw = localStorage.getItem(LIVE_GAME_STATE_KEY);
+        if (!raw) return null;
+        const snapshot = JSON.parse(raw);
+        const snapshotGameId = String(snapshot?.gameContext?.gameId || '');
+        if (!snapshotGameId || snapshotGameId !== String(gameId || '')) return null;
+        return snapshot;
+    } catch (err) {
+        console.warn('Failed to parse live game snapshot for games list.', err);
+        return null;
+    }
+}
+
+function resolveDisplayedScore(game) {
+    if (!game) return { teamA: 0, teamB: 0 };
+
+    const status = game.status || '';
+    const isLive = status === 'live' || status === 'in_progress';
+
+    if (!isLive) {
+        return {
+            teamA: game.final_score?.team_a || 0,
+            teamB: game.final_score?.team_b || 0
+        };
+    }
+
+    if (game.current_score && typeof game.current_score === 'object') {
+        return {
+            teamA: Number(game.current_score.team_a || 0),
+            teamB: Number(game.current_score.team_b || 0)
+        };
+    }
+
+    const snapshot = getLiveSnapshotForGame(game._id);
+    if (snapshot?.state) {
+        return {
+            teamA: computePointsFromStats(snapshot.state.A),
+            teamB: computePointsFromStats(snapshot.state.B)
+        };
+    }
+
+    return {
+        teamA: game.final_score?.team_a || 0,
+        teamB: game.final_score?.team_b || 0
+    };
+}
 
 function setupEventListeners() {
     document.getElementById('createGameBtn').addEventListener('click', openCreateGameModal);
@@ -161,8 +224,9 @@ function createGameCard(game) {
     const gameDate = new Date(game.createdAt);
     const dateStr = gameDate.toLocaleDateString() + ' ' + gameDate.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
 
-    const teamAScore = game.final_score?.team_a || 0;
-    const teamBScore = game.final_score?.team_b || 0;
+    const resolvedScore = resolveDisplayedScore(game);
+    const teamAScore = resolvedScore.teamA;
+    const teamBScore = resolvedScore.teamB;
     const teamAName = game.teams?.team_a?.name || 'Team A';
     const teamBName = game.teams?.team_b?.name || 'Team B';
     const teamAPlayers = game.teams?.team_a?.players?.length || 0;
@@ -210,10 +274,10 @@ function createGameCard(game) {
             ` : ''}
             ${apiClient.getToken() ? `
                 <div class="game-actions">
-                    ${status === 'finished'
+                        ${status === 'finished'
                         ? `<button class="btn btn-secondary" onclick="viewGameDetails('${game._id}')">View</button>`
                         : status === 'live' || status === 'in_progress'
-                            ? `<button class="btn btn-primary" onclick="viewGameDetails('${game._id}')">Resume Game</button>`
+                            ? `<button class="btn btn-primary" onclick="viewGameDetails('${game._id}')">Resume Game</button><button class="btn btn-secondary" onclick="viewLiveReport('${game._id}')">Live Report</button>`
                             : `<button class="btn btn-primary" onclick="viewGameDetails('${game._id}')">Start Game</button>`
                     }
                     ${game.status !== 'finished' ? `<button class="btn btn-danger" onclick="deleteGame('${game._id}')">Delete</button>` : ''}
@@ -221,6 +285,10 @@ function createGameCard(game) {
             ` : ''}
         </div>
     `;
+}
+
+function viewLiveReport(id) {
+    window.location.href = `game-report.html?id=${id}&live=1`;
 }
 
 function openCreateGameModal() {
