@@ -44,16 +44,27 @@
   <div class="container-fluid">
     <div class="row">
       <div class="col" id="main-content">
-        <!-- Error message for player assignment -->
+        <!-- Error message header temporarily disabled -->
+        <!--
         <div class="row mt-2">
           <div class="col text-center">
             <div id="startError" style="margin-top:12px; padding:12px 16px; background-color:#ffe0e0; color:#d14343; font-weight:700; font-size:15px; border-radius:4px; border-left:4px solid #d14343; display:none; text-align:center; min-height:20px;"></div>
           </div>
         </div>
+        -->
 
         <!-- Stat Selector under Timer -->
         <div class="row mt-2" id="stat_selector" style="justify-content: center;">
           <div class="col-auto">
+            <!-- Game Rules Selector -->
+            <div id="rule_selector" class="d-flex justify-content-center" style="margin-bottom: 12px;">
+              <label for="gameRuleSelect" style="align-self:center; margin-right:8px; font-weight:600; color:#0e2b62;">Game Rules</label>
+              <select id="gameRuleSelect" class="form-control" style="max-width:220px;">
+                <option value="1v1" selected>1v1</option>
+                <option value="tag-team-1v1">Tag Team 1v1</option>
+              </select>
+            </div>
+
             <!-- Start and Pause Game Buttons -->
             <div class="d-flex justify-content-center gap-2" style="margin-bottom: 12px;">
               <button id="startGameBtn" class="btn btn-outline-tnc" disabled>Start Game</button>
@@ -68,39 +79,45 @@
               <button class="btn btn-outline-tnc" id="selectTeamB" style="flex: 0 0 auto;">Select Right (B) <span class="hotkey-hint">Tab</span></button>
             </div>
 
-            <!-- Shot Buttons (5 columns: Auto + 3PT + 2PT + FT + Fouls) -->
-            <div class="d-flex justify-content-center" style="margin-bottom: 12px;">
+            <!-- Shot Buttons (6 columns: Auto + 4PT + 3PT + 2PT + FT + Fouls) -->
+            <div id="shot_controls_row" class="d-flex justify-content-center" style="margin-bottom: 12px;">
               <div id="shot_buttons" class="d-flex" style="width: fit-content; gap: 16px;">
                 <!-- Column 1: Made/Missed (auto-detect 2PT/3PT) -->
                 <div class="d-flex flex-column" style="gap: 12px;">
                   <button class="btn btn-stat" data-shot="auto" data-result="made">Shot Made <span class="hotkey-hint">M</span></button>
                   <button class="btn btn-stat" data-shot="auto" data-result="missed">Shot Missed <span class="hotkey-hint">X</span></button>
                 </div>
-                <!-- Column 2: 3PT -->
+                <!-- Column 2: 4PT -->
+                <div class="d-flex flex-column" style="gap: 12px;">
+                  <button class="btn btn-stat" data-shot="4pt" data-result="made">4PT Made <span class="hotkey-hint">4</span></button>
+                  <button class="btn btn-stat" data-shot="4pt" data-result="missed">4PT Missed <span class="hotkey-hint">Shift+4</span></button>
+                </div>
+                <!-- Column 3: 3PT -->
                 <div class="d-flex flex-column" style="gap: 12px;">
                   <button class="btn btn-stat" data-shot="3pt" data-result="made">3PT Made <span class="hotkey-hint">3</span></button>
                   <button class="btn btn-stat" data-shot="3pt" data-result="missed">3PT Missed <span class="hotkey-hint">Shift+3</span></button>
                 </div>
-                <!-- Column 3: 2PT -->
+                <!-- Column 4: 2PT -->
                 <div class="d-flex flex-column" style="gap: 12px;">
                   <button class="btn btn-stat" data-shot="2pt" data-result="made">2PT Made <span class="hotkey-hint">2</span></button>
                   <button class="btn btn-stat" data-shot="2pt" data-result="missed">2PT Missed <span class="hotkey-hint">Shift+2</span></button>
                 </div>
-                <!-- Column 4: FT -->
+                <!-- Column 5: FT -->
                 <div class="d-flex flex-column" style="gap: 12px;">
                   <button class="btn btn-stat" data-shot="ft" data-result="made">FT Made <span class="hotkey-hint">F</span></button>
                   <button class="btn btn-stat" data-shot="ft" data-result="missed">FT Missed <span class="hotkey-hint">Shift+F</span></button>
                 </div>
-                <!-- Column 5: Fouls -->
+                <!-- Column 6: Fouls -->
                 <div class="d-flex flex-column" style="gap: 12px;">
-                  <button class="btn btn-stat" id="teamAFoulPlus" title="Add foul to Left (A)">Foul A <span class="hotkey-hint">A</span></button>
-                  <button class="btn btn-stat" id="teamBFoulPlus" title="Add foul to Right (B)">Foul B <span class="hotkey-hint">B</span></button>
+                  <button class="btn btn-stat" id="teamAFoulPlus" title="Log foul for Team A active player">Foul A <span class="hotkey-hint">A</span></button>
+                  <button class="btn btn-stat" id="teamBFoulPlus" title="Log foul for Team B active player">Foul B <span class="hotkey-hint">B</span></button>
+                  <small style="color:#475569; font-weight:600; text-align:center;">Hotkeys: A = Team A foul, B = Team B foul</small>
                 </div>
               </div>
             </div>
 
             <!-- Undo Button -->
-            <div class="d-flex justify-content-center">
+            <div id="undo_controls_row" class="d-flex justify-content-center">
               <button id="undoStatBtn" class="btn btn-outline-tnc">Undo Last <span class="hotkey-hint">U</span></button>
             </div>
           </div>
@@ -112,7 +129,7 @@
             <div id="teamAScoreDisplay" style="font-size: 3rem; font-weight: 800; color: #0e2b62; line-height: 1;">
               <span id="teamAScore">0</span>
             </div>
-            <div style="font-size: 0.85rem; font-weight: 600; color: #666; text-transform: uppercase; letter-spacing: 1px;">Player A</div>
+            <div id="teamAScoreName" style="font-size: 0.85rem; font-weight: 600; color: #666; text-transform: uppercase; letter-spacing: 1px;">Player A</div>
           </div>
           <div class="col-auto text-center" style="padding: 0 2rem;">
             <span id="gameTimer" style="font-size: 2.5rem; font-weight: 700; color: #0e2b62;">00:00</span>
@@ -121,7 +138,7 @@
             <div id="teamBScoreDisplay" style="font-size: 3rem; font-weight: 800; color: #0e2b62; line-height: 1;">
               <span id="teamBScore">0</span>
             </div>
-            <div style="font-size: 0.85rem; font-weight: 600; color: #666; text-transform: uppercase; letter-spacing: 1px;">Player B</div>
+            <div id="teamBScoreName" style="font-size: 0.85rem; font-weight: 600; color: #666; text-transform: uppercase; letter-spacing: 1px;">Player B</div>
           </div>
         </div>
 
@@ -129,15 +146,35 @@
         <div class="row" id="court_section">
           <div class="col-2" id="team_a_players">
             <button id="teamAAssignBtn" class="btn btn-outline-tnc btn-assign">Assign Player</button>
+            <button id="teamAAssignBtn2" class="btn btn-outline-tnc btn-assign tag-only" style="display:none;">Assign Tag Partner</button>
+            <div style="margin: 8px 0 10px;">
+              <input id="teamANameInput" class="form-control" type="text" placeholder="Custom team name (optional)" aria-label="Custom team name for Team A">
+            </div>
+            <div id="teamAActivePicker" class="tag-only" style="display:none; margin: 8px 0 10px;">
+              <label for="teamAActivePlayer" style="font-size: 12px; font-weight: 700; color: #0e2b62; text-transform: uppercase;">Active Player (A)</label>
+              <select id="teamAActivePlayer" class="form-control" style="margin-top: 4px;"></select>
+            </div>
             <div id="teamAStats" class="player-stats">
+              <div style="display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:8px;">
+                <label for="teamAStatsView" style="font-size:11px; font-weight:700; color:#475569; text-transform:uppercase; letter-spacing:0.4px;">Stats View</label>
+                <select id="teamAStatsView" class="form-control" style="max-width:120px; height:30px; padding:2px 8px; font-size:12px;">
+                  <option value="player" selected>Player</option>
+                  <option value="team">Team</option>
+                </select>
+              </div>
+              <div id="teamAStatsScope" style="font-size:11px; font-weight:700; color:#334155; margin-bottom:6px;">Showing: Active Player</div>
               <div><strong>PTS: </strong><span id="teamAPts">0</span></div>
+              <div>4PT: <span id="teamA4pt">0/0</span></div>
               <div>3PT: <span id="teamA3pt">0/0</span></div>
               <div>2PT: <span id="teamA2pt">0/0</span></div>
               <div>FT: <span id="teamAft">0/0</span> <button class="btn btn-small btn-ft" id="teamAFtBtn" title="Log FT for A">FT</button></div>
-              <div>Fouls: <span id="teamAFouls">0</span> <button class="btn btn-small btn-foul" id="teamAFoulBtn" title="Add foul to A">+</button></div>
+              <div>Fouls: <span id="teamAFouls">0</span> <button class="btn btn-small btn-foul" id="teamAFoulBtn" title="Add foul to Team A active player">+</button></div>
             </div>
             <div class="player-actions" aria-live="polite">
-              <div class="player-actions__header">Actions</div>
+              <div class="player-actions__header-row">
+                <div class="player-actions__header">Actions</div>
+                <button id="teamAPlaybackBtn" class="btn btn-small btn-outline-tnc playback-trigger-btn" title="Playback Team A shots">Playback</button>
+              </div>
               <div id="action_log_A" class="player-actions__list"></div>
             </div>
           </div>
@@ -155,15 +192,35 @@
           </div>
           <div class="col-2" id="team_b_players">
             <button id="teamBAssignBtn" class="btn btn-outline-tnc btn-assign">Assign Player</button>
+            <button id="teamBAssignBtn2" class="btn btn-outline-tnc btn-assign tag-only" style="display:none;">Assign Tag Partner</button>
+            <div style="margin: 8px 0 10px;">
+              <input id="teamBNameInput" class="form-control" type="text" placeholder="Custom team name (optional)" aria-label="Custom team name for Team B">
+            </div>
+            <div id="teamBActivePicker" class="tag-only" style="display:none; margin: 8px 0 10px;">
+              <label for="teamBActivePlayer" style="font-size: 12px; font-weight: 700; color: #0e2b62; text-transform: uppercase;">Active Player (B)</label>
+              <select id="teamBActivePlayer" class="form-control" style="margin-top: 4px;"></select>
+            </div>
             <div id="teamBStats" class="player-stats">
+              <div style="display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:8px;">
+                <label for="teamBStatsView" style="font-size:11px; font-weight:700; color:#475569; text-transform:uppercase; letter-spacing:0.4px;">Stats View</label>
+                <select id="teamBStatsView" class="form-control" style="max-width:120px; height:30px; padding:2px 8px; font-size:12px;">
+                  <option value="player" selected>Player</option>
+                  <option value="team">Team</option>
+                </select>
+              </div>
+              <div id="teamBStatsScope" style="font-size:11px; font-weight:700; color:#334155; margin-bottom:6px;">Showing: Active Player</div>
               <div><strong>PTS: </strong><span id="teamBPts">0</span></div>
+              <div>4PT: <span id="teamB4pt">0/0</span></div>
               <div>3PT: <span id="teamB3pt">0/0</span></div>
               <div>2PT: <span id="teamB2pt">0/0</span></div>
               <div>FT: <span id="teamBft">0/0</span> <button class="btn btn-small btn-ft" id="teamBFtBtn" title="Log FT for B">FT</button></div>
-              <div>Fouls: <span id="teamBFouls">0</span> <button class="btn btn-small btn-foul" id="teamBFoulBtn" title="Add foul to B">+</button></div>
+              <div>Fouls: <span id="teamBFouls">0</span> <button class="btn btn-small btn-foul" id="teamBFoulBtn" title="Add foul to Team B active player">+</button></div>
             </div>
             <div class="player-actions" aria-live="polite">
-              <div class="player-actions__header">Actions</div>
+              <div class="player-actions__header-row">
+                <div class="player-actions__header">Actions</div>
+                <button id="teamBPlaybackBtn" class="btn btn-small btn-outline-tnc playback-trigger-btn" title="Playback Team B shots">Playback</button>
+              </div>
               <div id="action_log_B" class="player-actions__list"></div>
             </div>
           </div>
@@ -272,6 +329,32 @@
         <div class="d-flex gap-2" style="justify-content:center; flex-wrap:wrap;">
           <button id="downloadPdfBtn" class="btn btn-primary">Download PDF</button>
           <button id="newGameBtn" class="btn btn-success">New Game</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Team playback modal -->
+  <div id="playbackModal" class="modal-overlay" style="display:none;">
+    <div class="modal-card" style="max-width:900px; width:min(900px, 100%);">
+      <div class="modal-header">
+        <span id="playbackTitle">Team Playback</span>
+        <button id="playbackClose" class="btn btn-sm" aria-label="Close">&#10005;</button>
+      </div>
+      <div class="modal-body" style="gap:10px;">
+        <div id="playbackMeta" style="font-size:0.9rem; color:#475569; font-weight:600;">Step 0 of 0</div>
+        <div id="playbackCurrent" style="padding:10px; background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; font-weight:600; color:#0f172a; min-height:48px; display:flex; align-items:center;">No sequence loaded.</div>
+        <div style="display:flex; gap:8px; justify-content:center; flex-wrap:wrap;">
+          <button id="playbackPrev" class="btn btn-outline-tnc" style="color:#0e2b62; border-color:#0e2b62;">Prev</button>
+          <button id="playbackPlayPause" class="btn btn-primary">Play</button>
+          <button id="playbackNext" class="btn btn-outline-tnc" style="color:#0e2b62; border-color:#0e2b62;">Next</button>
+        </div>
+        <div class="playback-layout">
+          <div id="playbackList" class="playback-list-panel"></div>
+          <div class="playback-court-panel">
+            <img src="assets/basketballcourt.svg" alt="Replay Court" class="playback-court-image" />
+            <div id="playbackCourtOverlay" class="playback-court-overlay"></div>
+          </div>
         </div>
       </div>
     </div>

@@ -209,8 +209,8 @@
     return _fetchWithToken(`/game/${gameId}/event`, 'POST', eventData);
   };
 
-  apiClient.finalizeGame = async function(gameId) {
-    return _fetchWithToken(`/game/${gameId}/finish`, 'PATCH');
+  apiClient.finalizeGame = async function(gameId, payload = null) {
+    return _fetchWithToken(`/game/${gameId}/finish`, 'PATCH', payload);
   };
 
   apiClient.cancelGame = async function(gameId) {

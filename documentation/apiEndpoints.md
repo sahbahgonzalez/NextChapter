@@ -403,6 +403,11 @@ Authorization: Bearer <token>
 - `foul`
 - `free_throw` - Requires `made`, `points`
 
+**Scoring Points Values:**
+- `free_throw`: `points = 1`
+- `shot`: typically `points = 2` or `3`
+- frontend can also emit `points = 4` for 4PT tracking where backend supports it
+
 **Response (200):**
 ```json
 {
@@ -423,6 +428,19 @@ End a game and calculate final stats.
 ```
 Authorization: Bearer <token>
 ```
+
+**Request Body (Optional but supported):**
+```json
+{
+    "final_score": {
+        "team_a": 50,
+        "team_b": 47
+    },
+    "winner": "team_a"
+}
+```
+
+Supplying `final_score` and `winner` is recommended for frontend-authoritative score flows (for example when undo/delete modifies tracked local state before finish).
 
 **Response (200):**
 ```json

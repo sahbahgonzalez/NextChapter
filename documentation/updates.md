@@ -1,5 +1,385 @@
 # Project Updates & Changelog
 
+## March 2026 - Action Table Delete as Targeted Undo
+
+### 1. Action Delete Behavior Update
+**Date**: March 13, 2026  
+**Files Modified**: `frontend/js/gameScript.js`, `documentation/gameTracker.md`, `documentation/updates.md`
+
+**Changes:**
+- Updated action-row Delete (X) to act as a targeted undo for the selected action.
+- Delete now reverts only the selected action's stats and removes its linked court marker.
+- Delete removes the selected action row from the proper team action log.
+- Added id-linking between runtime history and action log via `actionId` for precise rollback.
+
+**Implementation Details:**
+```javascript
+// Runtime history entries now carry actionId linkage
+state.history.push({ kind: 'shot' | 'foul', team, marker, actionId });
+
+// Targeted undo path used by action-row delete
+undoActionById(teamKey, actionId);
+revertHistoryChange(change);
+removeActionEntryById(teamKey, actionId);
+```
+
+**Behavior Notes:**
+- Runtime-created actions: full rollback (stats + marker + row).
+- Legacy/preloaded actions without linked runtime history: row removal only.
+
+---
+
+### 2. End-Game PDF Download Reliability + Format Alignment
+**Date**: March 13, 2026  
+**Files Modified**: `frontend/js/gameScript.js`, `frontend/js/game-report.js`, `documentation/updates.md`
+
+**Changes:**
+- Fixed end-game modal PDF download flow so it no longer relies on a separate inline HTML template.
+- End-game "Download PDF" now opens `game-report.html` with `autodownload=1` and exports from the same report layout users see on the report page.
+- Added automatic download support on the report page when `autodownload` query flag is present.
+- Improved PDF generation robustness with explicit `html2pdf().set().from().save()` flow, CORS-aware canvas settings, and error handling.
+
+**Result:**
+- Download works reliably from the end-game modal.
+- Downloaded PDF format now matches the standard Game Report page format.
+
+---
+
+### 3. Temporary UI/Detection Simplification
+**Date**: March 13, 2026  
+**Files Modified**: `frontend/game.html`, `frontend/js/gameScript.js`
+
+**Changes:**
+- Temporarily disabled the in-page warning header (`#startError`) in the game UI.
+- Commented out active 2PT/3PT auto-detection calls during shot logging.
+- "Auto" shot paths now use a temporary fixed shot type (`2pt`) until detection is re-enabled.
+- Commented out zone contradiction warning prompts for forced 2PT/3PT hotkeys.
+
+---
+
+### 4. 4PT Tracking + Hotkeys
+**Date**: March 13, 2026  
+**Files Modified**: `frontend/game.html`, `frontend/js/gameScript.js`
+
+**Changes:**
+- Added 4PT stat tracking to both team stat panels.
+- Added 4PT action buttons in game controls (made/missed).
+- Added keyboard hotkeys: `4` for 4PT made, `Shift+4` for 4PT missed.
+- 4PT attempts/makes now affect points, FG%, action history labels, and undo behavior.
+- 4PT events are persisted as shot events with `points: 4` and restored from saved games.
+
+---
+
+### 5. 4PT Backend Compatibility Fix
+**Date**: March 13, 2026  
+**Files Modified**: `frontend/js/gameScript.js`, `frontend/utils/api.js`
+
+**Changes:**
+- Prevented server-error popups when logging 4PT by handling 4PT as local-only event tracking in the frontend.
+- Updated game finalization call to send explicit local `final_score` and `winner` payload.
+- Updated API client `finalizeGame` to accept an optional payload body.
+
+**Result:**
+- Recording a 4PT no longer triggers: "Saved locally. Network/database error: Server error during game event processing".
+- End-game result/report score is aligned with locally tracked scoreboard even when 4PT events are not persisted by backend event processing.
+
+---
+
+### 6. Undo/Delete Score Sync Guard (Frontend vs Backend)
+**Date**: March 13, 2026  
+**Files Modified**: `frontend/js/gameScript.js`
+
+**Changes:**
+- Kept frontend scoreboard authoritative during gameplay (including undo/delete adjustments).
+- Added buffered event persistence model for local changes.
+- On End Game, buffered (post-undo/delete) actions are flushed to backend before finalize.
+- Game finalization sends explicit `final_score` and `winner` payload.
+- Added 4PT backend compatibility fallback during flush (`4PT` made => `3PT` + `FT made`) when native 4PT event is rejected.
+
+**Why:**
+- Backend currently does not expose an event reversal/delete endpoint.
+- Buffered flush ensures backend receives only the current valid event set after undo/delete, preventing overcount drift.
+
+---
+
+### 7. Editable Team Display Names
+**Date**: March 13, 2026  
+**Files Modified**: `frontend/game.html`, `frontend/js/gameScript.js`
+
+**Changes:**
+- Added optional custom team-name inputs for left (A) and right (B) sides.
+- Scoreboard/team display names now use custom team names when provided.
+- If custom name is empty, team display defaults to assigned player names (single player or joined tag-team names).
+- Loaded games initialize custom name fields from `teams.team_a.name` / `teams.team_b.name` when available.
+
+---
+
+### 8. Player-Scoped Tracker Visibility + Individual Marker Colors
+**Date**: March 13, 2026  
+**Files Modified**: `frontend/js/gameScript.js`, `frontend/css/shared.css`
+
+**Changes:**
+- Court markers now use deterministic per-player colors instead of shared team color styling.
+- Tag-team tracker visibility is now player-scoped:
+  - Only the active team's markers are shown.
+  - In tag mode, only the currently active teammate's markers are visible.
+- Action and latest-shot panels are now filtered to the active individual player in tag mode.
+- Inactive team action panel is hidden with a placeholder state.
+- Court layout alignment was stabilized so adding action rows does not nudge the court position.
+
+---
+
+### 9. Team/Player Shot Chart Enhancements (Game Report)
+**Date**: March 13, 2026  
+**Files Modified**: `frontend/js/game-report.js`
+
+**Changes:**
+- Individual player shot charts now use unique player colors for made/missed markers and legends.
+- For multi-player teams, report includes team-combined shot charts where each shot still keeps the shooter's individual color.
+- Added per-team player color legends for combined charts.
+- Added explicit "Individual player shot chart" labeling for multi-player team player pages.
+
+---
+
+### 10. Foul Attribution Modal + Unified Foul Hotkey
+**Date**: March 13, 2026  
+**Files Modified**: `frontend/game.html`, `frontend/js/gameScript.js`
+
+**Changes:**
+- Replaced direct A/B foul assignment flow with a foul picker modal.
+- Foul action now asks who committed the foul using active player names for Team A and Team B.
+- Unified foul hotkey to a single key: `G`.
+- Top foul buttons and side foul buttons now open the same foul picker flow.
+- Action log entries now include foul labels with player identity (for example: `John Doe Foul`).
+
+---
+
+### 11. Hotkey Actions Logged to Action History
+**Date**: March 13, 2026  
+**Files Modified**: `frontend/js/gameScript.js`
+
+**Changes:**
+- Added action-log tracking for hotkey-driven control actions:
+  - Team switch (Tab)
+  - Teammate swap (S)
+  - Pause/Resume (P)
+  - Resume from timeout flow
+  - Undo (U)
+  - Timeout called (T flow)
+- Automatic possession flips on missed shots are not logged as manual/hotkey team-switch actions.
+
+---
+
+### 12. Foul Flow Finalization (Direct Team Hotkeys + Dual Marker Roles)
+**Date**: March 13, 2026  
+**Files Modified**: `frontend/game.html`, `frontend/js/gameScript.js`, `frontend/js/game-report.js`
+
+**Changes:**
+- Removed foul picker modal flow from runtime logging.
+- Added direct foul assignment controls and hotkeys:
+  - `A` = foul committed by Team A active player
+  - `B` = foul committed by Team B active player
+- Foul marker semantics finalized:
+  - **Triangle** = player who committed the foul
+  - **Square** = player who got fouled
+- Logging a foul now creates paired court markers (committer + fouled player) and links both markers to undo history.
+- Undo removes both foul markers for the paired foul action.
+
+---
+
+### 13. Action Log Behavior Update
+**Date**: March 13, 2026  
+**Files Modified**: `frontend/js/gameScript.js`
+
+**Changes:**
+- Removed inactive-team action-panel hard hide state so action lists remain visible by team/player context.
+- Removed "Undo Last Event" logging from action history.
+- Undo still reverts stats and removes the reverted action row/markers, but does not create a new action entry.
+
+---
+
+### 14. Game Report Additions (4PT + Starred Plays + Full Action Timeline)
+**Date**: March 13, 2026  
+**Files Modified**: `frontend/game-report.html`, `frontend/js/game-report.js`, `frontend/js/gameScript.js`
+
+**Changes:**
+- Added **4PT stat** to each player's report card and full stat table (`made/attempts`).
+- Added **Starred Plays** section with action label, player, and optional comments.
+- Added full **Game Actions** section at the bottom of the report.
+- Game Actions now include:
+  - Highlight/star indicator
+  - Comment/note text
+  - In-game clock time
+  - Local wall-clock time
+- Tracker now persists report-side snapshots for:
+  - starred plays (`tnc_starred_plays_*`)
+  - full game actions (`tnc_game_actions_*`)
+
+---
+
+### 15. Report Shot Chart Foul Legend + Shape Mapping
+**Date**: March 13, 2026  
+**Files Modified**: `frontend/js/game-report.js`
+
+**Changes:**
+- Updated per-player chart legend to explicitly show both foul roles.
+- Added report-side foul role rendering:
+  - committed foul -> triangle marker
+  - fouled player -> square marker
+- Team-combined shot charts now display both foul roles consistently.
+
+---
+
+### 16. In-Game Stats View Toggle (Player Default + Team Option)
+**Date**: March 13, 2026  
+**Files Modified**: `frontend/game.html`, `frontend/js/gameScript.js`
+
+**Changes:**
+- Team A and Team B side stat panels now default to showing the **active player's individual stats**.
+- Added per-side selector to switch stat panel scope:
+  - `Player` (active player only)
+  - `Team` (team totals)
+- Added scope labels in each side panel to clarify what is being displayed.
+- Added per-player stat accumulation during live game tracking (shots, free throws, fouls), including undo/targeted delete rollback support.
+
+**Important Behavior:**
+- **Overall game score tracking is unchanged.**
+- The center scoreboard continues to use team totals; only the side stat panel view changes.
+
+---
+
+### 17. Team Stats View Aggregation + Team Shot-Chart Visibility
+**Date**: March 13, 2026  
+**Files Modified**: `frontend/js/gameScript.js`
+
+**Changes:**
+- Added explicit team aggregation for stat panels by summing player-level stat objects for all players who logged stats on each team.
+- Added `teamPlayerIds` tracking per team so team view uses full team contribution, not only active player data.
+- Team stat view now reflects combined 2PT/3PT/4PT/FT/foul totals from all tracked teammates.
+- Updated marker visibility rules so Team stat view shows all markers for the active team on the court.
+
+---
+
+### 18. Live Game Recovery (Close/Reload/Offline Safety)
+**Date**: March 13, 2026  
+**Files Modified**: `frontend/js/gameScript.js`
+
+**Changes:**
+- Added live snapshot persistence key: `tnc_live_game_state_active_v1`.
+- Added periodic autosave while game is running plus save hooks for `beforeunload`, `pagehide`, and `offline` events.
+- Added restore flow on page load that recovers:
+  - runtime flags (running/paused/timeout)
+  - timer value
+  - team and player stat state
+  - action history and shot history
+  - court markers (shot + foul) and marker/action linkage
+- Added snapshot cleanup on reset/new game/finalized game to prevent stale restore state.
+
+---
+
+### 19. Player Color Standardization + Marker Color Rules
+**Date**: March 13, 2026  
+**Files Modified**: `frontend/js/gameScript.js`
+
+**Changes:**
+- Standardized unique player palette to:
+  - Green (`#22C55E`)
+  - Blue (`#2563EB`)
+  - Pink (`#EC4899`)
+  - Orange (`#F97316`)
+- Mapped assigned slots to deterministic colors (`A`, `A2`, `B`, `B2`) to keep identity consistent.
+- Preserved visual constraints:
+  - Missed shots remain red.
+  - Fouls remain yellow.
+- Updated restored markers to carry player IDs into color resolution so recovered sessions keep consistent player colors.
+
+---
+
+### 20. Live Games List Score Refresh + Live Report Mode
+**Date**: March 13, 2026  
+**Files Modified**: `frontend/js/games.js`, `frontend/js/game-report.js`
+
+**Changes:**
+- Games page now refreshes game cards on an interval for live score visibility.
+- Live game card score resolution now prefers:
+  1. backend `current_score`
+  2. local live snapshot score fallback
+  3. existing score fallback
+- Added **Live Report** button for live/in-progress games.
+- Game report page now supports live/in-progress rendering with periodic auto-refresh.
+- Live report score/header now show active live context (auto-updating badge and timestamp).
+- Live report event/shot sources now support fallback reconstruction from local live snapshot when backend events are not yet complete.
+
+---
+
+### 21. Playback UI + Replay Timeline Enhancements
+**Date**: March 14, 2026  
+**Files Modified**: `frontend/game.html`, `frontend/game-report.html`, `frontend/css/shared.css`, `frontend/js/gameScript.js`, `frontend/js/game-report.js`
+
+**Changes:**
+- Added Team A/Team B playback triggers to both game tracker and report pages.
+- Added playback modals with split layout:
+  - left: action timeline
+  - right: court image with replay marker overlay
+- Playback now advances at **1.5 second** intervals.
+- Active replay step auto-highlights and auto-scrolls in the action list.
+- Court overlay now renders progressive replay markers (all previous + active).
+
+**Visual Replay Rules Preserved:**
+- Made shots keep unique player color.
+- Missed shots remain red.
+- Fouls remain yellow.
+- Foul shapes remain role-based:
+  - triangle = committed foul
+  - square = got fouled
+
+---
+
+### 22. Live Playback Uses Full Action Events
+**Date**: March 14, 2026  
+**Files Modified**: `frontend/js/gameScript.js`
+
+**Changes:**
+- Live playback source changed from shot-history-only to full action history.
+- Replay now includes control and context events in the left timeline, not only shots/fouls.
+- Marker replay remains position-based and still renders for marker-bearing events.
+
+---
+
+### 23. Dual-Player Foul Action Labels
+**Date**: March 14, 2026  
+**Files Modified**: `frontend/js/gameScript.js`, `frontend/js/game-report.js`
+
+**Changes:**
+- Foul logging now records action rows for both participants.
+- Action labels now include explicit opponent context:
+  - `Committed Foul on <Player Name>`
+  - `Got Fouled by <Player Name>`
+- Snapshot-based report event reconstruction now carries both committed and drawn foul events when available.
+
+---
+
+### 24. Team Name Lock During Active Game
+**Date**: March 14, 2026  
+**Files Modified**: `frontend/js/gameScript.js`
+
+**Changes:**
+- Team name inputs are locked while a game is running.
+- Inputs automatically unlock when the game ends or tracker returns to non-running state.
+
+---
+
+### 25. Live Games Section Fallback From Active Local Snapshot
+**Date**: March 14, 2026  
+**Files Modified**: `frontend/js/games.js`
+
+**Changes:**
+- Games page now promotes the active local snapshot game into the **Live Games** tab when backend status has not yet switched to `live`/`in_progress`.
+- If backend game exists but is still non-live, it is rendered as live in the list while snapshot is active.
+- If only local snapshot context is available, a snapshot-only live card is synthesized so the game remains visible.
+
+---
+
 ## January 2026 - Game Tracker Enhancements
 
 ### 1. Action History System
@@ -13,7 +393,7 @@
 - Added three interactive buttons per action:
   - **Add Note**: Prompt for custom text elaboration (pencil icon)
   - **Highlight**: Toggle star icon for important plays
-  - **Delete**: Remove action with confirmation dialog (X icon)
+  - **Delete**: Remove/undo action entry (X icon)
 
 **Implementation Details:**
 ```javascript
