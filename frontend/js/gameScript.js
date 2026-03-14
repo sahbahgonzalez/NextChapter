@@ -620,10 +620,9 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
 
   function styleFoulMarker(marker, player) {
-    const color = getPlayerColor(player);
-    marker.style.boxShadow = `0 0 0 2px ${hexToRgba(color, 0.4)}, 0 2px 6px rgba(0,0,0,0.25)`;
-    marker.style.borderColor = hexToRgba(color, 0.95);
-    marker.style.background = hexToRgba(color, 0.2);
+    marker.style.boxShadow = '0 0 0 2px rgba(245, 158, 11, 0.45), 0 2px 6px rgba(0,0,0,0.25)';
+    marker.style.borderColor = '#92400E';
+    marker.style.background = '#F59E0B';
   }
 
   /**
@@ -633,7 +632,7 @@ document.addEventListener("DOMContentLoaded", async () => {
    * @param {'made'|'missed'} result
    * @param {{xPct:number,yPct:number}} pos
    */
-  function addFoulMarker(teamKey, pos) {
+  function addFoulMarker(teamKey, pos, role = 'drawn') {
     if (!shotMarkersEl || !pos) return null;
     
     const marker = document.createElement('div');
@@ -643,19 +642,30 @@ document.addEventListener("DOMContentLoaded", async () => {
     // Add player initials to the marker
     const player = getActivePlayerForTeam(teamKey);
     const initials = player?.name ? player.name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) : teamKey;
-    marker.textContent = '⚠️';  // Warning symbol for foul
-    marker.style.fontSize = '14px';
+    marker.textContent = '!';
+    marker.style.fontSize = '12px';
+    marker.style.fontWeight = '800';
+    marker.style.width = '26px';
+    marker.style.height = '26px';
+    marker.style.borderRadius = role === 'committed' ? '0' : '4px';
+    if (role === 'committed') {
+      marker.style.clipPath = 'polygon(50% 0%, 0% 100%, 100% 100%)';
+    }
     marker.style.display = 'flex';
     marker.style.alignItems = 'center';
     marker.style.justifyContent = 'center';
+    marker.style.color = '#fff';
     styleFoulMarker(marker, player);
     
-    marker.title = `${player?.name || teamKey} - Foul`;
+    marker.title = role === 'committed'
+      ? `${player?.name || teamKey} - Foul Committed`
+      : `${player?.name || teamKey} - Got Fouled`;
     marker.style.left = `${pos.xPct}%`;
     marker.style.top = `${pos.yPct}%`;
     marker.dataset.player = player?.name || teamKey;
     marker.dataset.playerId = player ? String(player._id || player) : '';
     marker.dataset.type = 'foul';
+    marker.dataset.foulRole = role;
     shotMarkersEl.appendChild(marker);
     
     return marker;
@@ -753,6 +763,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       teamKey: teamKey,
       shotType: 'FOUL',
       result: 'recorded',
+      foulRole: 'committed',
       gameTime: gameTime,
       resultColor: '#ff6f00',
       shotEmoji: '🚫',
@@ -765,7 +776,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     // Add foul marker on court if position is available
     let foulMarker = null;
     if (pos) {
-      foulMarker = addFoulMarker(teamKey, pos);
+      foulMarker = addFoulMarker(teamKey, pos, 'committed');
     }
     
     // Also log to new action history system
@@ -809,6 +820,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       playerId: resolvedPlayerId,
       playerName: resolvedPlayerName,
       label: entry.label,
+      gameSeconds: typeof entry.gameSeconds === 'number' ? entry.gameSeconds : null,
       timeLabel: entry.timeLabel || formatGameTime(entry.gameSeconds),
       timestamp: entry.timestamp || Date.now(),
       highlighted: !!entry.highlighted,
@@ -848,6 +860,9 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     if ((change.kind === 'shot' || change.kind === 'foul') && change.marker) {
       change.marker.remove();
+    }
+    if ((change.kind === 'shot' || change.kind === 'foul') && change.secondaryMarker) {
+      change.secondaryMarker.remove();
     }
 
     if (change.kind === 'shot') {
@@ -960,16 +975,10 @@ document.addEventListener("DOMContentLoaded", async () => {
     const actions = state.actionHistory[teamKey] || [];
     const activePlayer = getActivePlayerForTeam(teamKey);
     const activePlayerId = activePlayer ? String(activePlayer._id || activePlayer) : '';
-    const isInactiveTeam = state.active !== teamKey;
     const visibleActions = gameContext.ruleMode === 'tag-team-1v1'
       ? actions.filter((action) => !activePlayerId || String(action.playerId || '') === activePlayerId)
       : actions;
     container.innerHTML = '';
-
-    if (isInactiveTeam) {
-      container.innerHTML = '<div class="action-item"><div class="action-item__content"><div class="action-item__label">Actions hidden while team is inactive</div></div></div>';
-      return;
-    }
 
     if (visibleActions.length === 0) {
       container.innerHTML = '<div class="action-item"><div class="action-item__content"><div class="action-item__label">No actions for current player</div></div></div>';
@@ -1697,14 +1706,19 @@ document.addEventListener("DOMContentLoaded", async () => {
     
     const actionId = `action_${Date.now()}_${Math.random().toString(16).slice(2)}`;
 
-    // Log foul to shot history with cursor position
+    const fouledTeamKey = teamKey === 'A' ? 'B' : 'A';
+
+    // Log committing foul to shot history and marker
     const foulMarker = logFoulToHistory(teamKey, lastCursorPos, actionId);
+    // Draw victim marker on opposing active player
+    const fouledMarker = addFoulMarker(fouledTeamKey, lastCursorPos, 'drawn');
     
     // Store in history with marker reference
     state.history.push({
       kind: 'foul',
       team: teamKey,
       marker: foulMarker,
+      secondaryMarker: fouledMarker || null,
       actionId,
       playerId,
       pos: lastCursorPos ? { ...lastCursorPos } : null,
@@ -1847,33 +1861,29 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
 
     updateUI();
-
-    addActionEntry(state.active, {
-      label: 'Undo Last Event',
-      type: 'hotkey',
-      gameSeconds: secondsElapsed,
-      playerId: getPlayerId(state.active),
-      playerName: getActivePlayerForTeam(state.active)?.name || `Team ${state.active}`
-    });
   }
 
   function getDefendingTeamKey() {
     return state.active === 'A' ? 'B' : 'A';
   }
 
-  function logDefensiveFoul() {
-    openFoulModal();
+  function logFoulForTeam(teamKey) {
+    if (!isGameRunning) {
+      showStartError(`Assign ${requiredPlayersPerTeam()} player(s) to each team and press Start Game.`);
+      return;
+    }
+    controller.incrementFoul(teamKey);
   }
 
   // Wire buttons
   if (els.selectA) els.selectA.addEventListener('click', () => { if (!isGameRunning) return showStartError(`Assign ${requiredPlayersPerTeam()} player(s) to each team and press Start Game.`); controller.setActive('A'); });
   if (els.selectB) els.selectB.addEventListener('click', () => { if (!isGameRunning) return showStartError(`Assign ${requiredPlayersPerTeam()} player(s) to each team and press Start Game.`); controller.setActive('B'); });
-  if (els.a.foulPlus) els.a.foulPlus.addEventListener('click', () => logDefensiveFoul());
-  if (els.b.foulPlus) els.b.foulPlus.addEventListener('click', () => logDefensiveFoul());
+  if (els.a.foulPlus) els.a.foulPlus.addEventListener('click', () => logFoulForTeam('A'));
+  if (els.b.foulPlus) els.b.foulPlus.addEventListener('click', () => logFoulForTeam('B'));
   const sideFoulABtn = document.getElementById('teamAFoulBtn');
   const sideFoulBBtn = document.getElementById('teamBFoulBtn');
-  if (sideFoulABtn) sideFoulABtn.addEventListener('click', () => logDefensiveFoul());
-  if (sideFoulBBtn) sideFoulBBtn.addEventListener('click', () => logDefensiveFoul());
+  if (sideFoulABtn) sideFoulABtn.addEventListener('click', () => logFoulForTeam('A'));
+  if (sideFoulBBtn) sideFoulBBtn.addEventListener('click', () => logFoulForTeam('B'));
   if (els.a.ftBtn) els.a.ftBtn.addEventListener('click', () => controller.openFtModal('A'));
   if (els.b.ftBtn) els.b.ftBtn.addEventListener('click', () => controller.openFtModal('B'));
   if (els.undo) els.undo.addEventListener('click', () => controller.undoLast());
@@ -1895,63 +1905,6 @@ document.addEventListener("DOMContentLoaded", async () => {
   if (ftModal.overlay) ftModal.overlay.addEventListener('click', (e) => {
     if (e.target === ftModal.overlay) closeFtModal();
   });
-
-  const foulModal = {
-    overlay: document.getElementById('foulModal'),
-    playerABtn: document.getElementById('foulPlayerABtn'),
-    playerBBtn: document.getElementById('foulPlayerBBtn'),
-    closeBtn: document.getElementById('foulCloseBtn')
-  };
-
-  function closeFoulModal() {
-    if (foulModal.overlay) foulModal.overlay.style.display = 'none';
-  }
-
-  function openFoulModal() {
-    if (!isGameRunning) {
-      showStartError(`Assign ${requiredPlayersPerTeam()} player(s) to each team and press Start Game.`);
-      return;
-    }
-    if (isPaused || isTimeout) return;
-
-    const activeA = getActivePlayerForTeam('A');
-    const activeB = getActivePlayerForTeam('B');
-
-    if (!activeA || !activeB) {
-      showStartError('Both teams need an active player before logging a foul.');
-      return;
-    }
-
-    if (foulModal.playerABtn) {
-      foulModal.playerABtn.textContent = `${activeA.name || 'Player A'} (Team A)`;
-    }
-    if (foulModal.playerBBtn) {
-      foulModal.playerBBtn.textContent = `${activeB.name || 'Player B'} (Team B)`;
-    }
-
-    if (foulModal.overlay) foulModal.overlay.style.display = 'flex';
-  }
-
-  if (foulModal.playerABtn) {
-    foulModal.playerABtn.addEventListener('click', () => {
-      controller.incrementFoul('A');
-      closeFoulModal();
-    });
-  }
-
-  if (foulModal.playerBBtn) {
-    foulModal.playerBBtn.addEventListener('click', () => {
-      controller.incrementFoul('B');
-      closeFoulModal();
-    });
-  }
-
-  if (foulModal.closeBtn) foulModal.closeBtn.addEventListener('click', closeFoulModal);
-  if (foulModal.overlay) {
-    foulModal.overlay.addEventListener('click', (e) => {
-      if (e.target === foulModal.overlay) closeFoulModal();
-    });
-  }
 
   // Action log button handlers (delegation)
   if (els.a.actions) {
@@ -2501,6 +2454,90 @@ document.addEventListener("DOMContentLoaded", async () => {
     renderActionLog('B');
   }
 
+  const STARRED_PLAYS_STORAGE_PREFIX = 'tnc_starred_plays_';
+  const GAME_ACTIONS_STORAGE_PREFIX = 'tnc_game_actions_';
+
+  function buildGameActionsSnapshot() {
+    const combined = [
+      ...(state.actionHistory.A || []),
+      ...(state.actionHistory.B || [])
+    ];
+
+    return combined
+      .filter((action) => !!action)
+      .sort((a, b) => Number(a.timestamp || 0) - Number(b.timestamp || 0))
+      .map((action) => ({
+        id: action.id,
+        teamKey: action.teamKey,
+        playerId: action.playerId || '',
+        playerName: action.playerName || `Team ${action.teamKey || ''}`,
+        label: action.label || 'Play',
+        type: action.type || 'action',
+        gameSeconds: typeof action.gameSeconds === 'number' ? action.gameSeconds : null,
+        gameTimeLabel: action.timeLabel || '—',
+        timeLabel: action.timeLabel || '—',
+        timestamp: action.timestamp || Date.now(),
+        note: action.note || '',
+        highlighted: !!action.highlighted
+      }));
+  }
+
+  function buildStarredPlaysSnapshot() {
+    const combined = [
+      ...(state.actionHistory.A || []),
+      ...(state.actionHistory.B || [])
+    ];
+
+    return combined
+      .filter((action) => action && action.highlighted)
+      .sort((a, b) => {
+        const aTs = Number(a.timestamp || 0);
+        const bTs = Number(b.timestamp || 0);
+        return aTs - bTs;
+      })
+      .map((action) => ({
+        id: action.id,
+        teamKey: action.teamKey,
+        playerId: action.playerId || '',
+        playerName: action.playerName || `Team ${action.teamKey || ''}`,
+        label: action.label || 'Play',
+        type: action.type || 'action',
+        timeLabel: action.timeLabel || '—',
+        timestamp: action.timestamp || Date.now(),
+        note: action.note || ''
+      }));
+  }
+
+  function persistStarredPlaysForGame(gameId) {
+    if (!gameId) return;
+    try {
+      const key = `${STARRED_PLAYS_STORAGE_PREFIX}${gameId}`;
+      const payload = {
+        gameId,
+        updatedAt: Date.now(),
+        plays: buildStarredPlaysSnapshot()
+      };
+      localStorage.setItem(key, JSON.stringify(payload));
+    } catch (err) {
+      console.warn('Failed to persist starred plays snapshot for report.', err);
+    }
+  }
+
+  function persistGameActionsForGame(gameId) {
+    if (!gameId) return;
+    try {
+      const key = `${GAME_ACTIONS_STORAGE_PREFIX}${gameId}`;
+      const payload = {
+        gameId,
+        updatedAt: Date.now(),
+        actions: buildGameActionsSnapshot()
+      };
+      localStorage.setItem(key, JSON.stringify(payload));
+    } catch (err) {
+      console.warn('Failed to persist game actions snapshot for report.', err);
+    }
+  }
+
   // Helper function to toggle action buttons based on game state
   function setActionsEnabled(enabled) {
     // Toggle all in-game action controls
@@ -2619,6 +2656,9 @@ document.addEventListener("DOMContentLoaded", async () => {
             duration: secondsElapsed,
             winner: result.game.winner === 'team_a' ? getTeamDisplayName('A') : result.game.winner === 'team_b' ? getTeamDisplayName('B') : 'Tie'
           };
+
+          persistStarredPlaysForGame(gameContext.gameId);
+          persistGameActionsForGame(gameContext.gameId);
 
           clearActionLogs();
 
@@ -2761,11 +2801,9 @@ document.addEventListener("DOMContentLoaded", async () => {
     
     const assignModal = document.getElementById('assignPlayerModal');
     const timeoutModal = document.getElementById('timeoutModal');
-    const foulModalEl = document.getElementById('foulModal');
     const postGameModal = document.getElementById('postGameModal');
     const isModalOpen = (assignModal && assignModal.style.display === 'flex') ||
                         (timeoutModal && timeoutModal.style.display === 'flex') ||
-              (foulModalEl && foulModalEl.style.display === 'flex') ||
                         (postGameModal && postGameModal.style.display === 'flex');
     
     if (isModalOpen) return;
@@ -2821,10 +2859,17 @@ document.addEventListener("DOMContentLoaded", async () => {
       return;
     }
     
-    // G - Defensive foul (assigned to opposing team)
-    if (key === 'g') {
+    // A - Foul on active player Team A
+    if (key === 'a') {
       e.preventDefault();
-      logDefensiveFoul();
+      logFoulForTeam('A');
+      return;
+    }
+
+    // B - Foul on active player Team B
+    if (key === 'b') {
+      e.preventDefault();
+      logFoulForTeam('B');
       return;
     }
     

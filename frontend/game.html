@@ -109,8 +109,9 @@
                 </div>
                 <!-- Column 6: Fouls -->
                 <div class="d-flex flex-column" style="gap: 12px;">
-                  <button class="btn btn-stat" id="teamAFoulPlus" title="Choose who committed the foul">Foul <span class="hotkey-hint">G</span></button>
-                  <button class="btn btn-stat" id="teamBFoulPlus" title="Choose who committed the foul">Foul <span class="hotkey-hint">G</span></button>
+                  <button class="btn btn-stat" id="teamAFoulPlus" title="Log foul for Team A active player">Foul A <span class="hotkey-hint">A</span></button>
+                  <button class="btn btn-stat" id="teamBFoulPlus" title="Log foul for Team B active player">Foul B <span class="hotkey-hint">B</span></button>
+                  <small style="color:#475569; font-weight:600; text-align:center;">Hotkeys: A = Team A foul, B = Team B foul</small>
                 </div>
               </div>
             </div>
@@ -159,7 +160,7 @@
               <div>3PT: <span id="teamA3pt">0/0</span></div>
               <div>2PT: <span id="teamA2pt">0/0</span></div>
               <div>FT: <span id="teamAft">0/0</span> <button class="btn btn-small btn-ft" id="teamAFtBtn" title="Log FT for A">FT</button></div>
-              <div>Fouls: <span id="teamAFouls">0</span> <button class="btn btn-small btn-foul" id="teamAFoulBtn" title="Choose who committed the foul">+</button></div>
+              <div>Fouls: <span id="teamAFouls">0</span> <button class="btn btn-small btn-foul" id="teamAFoulBtn" title="Add foul to Team A active player">+</button></div>
             </div>
             <div class="player-actions" aria-live="polite">
               <div class="player-actions__header">Actions</div>
@@ -194,7 +195,7 @@
               <div>3PT: <span id="teamB3pt">0/0</span></div>
               <div>2PT: <span id="teamB2pt">0/0</span></div>
               <div>FT: <span id="teamBft">0/0</span> <button class="btn btn-small btn-ft" id="teamBFtBtn" title="Log FT for B">FT</button></div>
-              <div>Fouls: <span id="teamBFouls">0</span> <button class="btn btn-small btn-foul" id="teamBFoulBtn" title="Choose who committed the foul">+</button></div>
+              <div>Fouls: <span id="teamBFouls">0</span> <button class="btn btn-small btn-foul" id="teamBFoulBtn" title="Add foul to Team B active player">+</button></div>
             </div>
             <div class="player-actions" aria-live="polite">
               <div class="player-actions__header">Actions</div>
@@ -275,19 +276,6 @@
         <button id="timeoutPlayerBBtn" class="btn btn-outline-tnc" style="color:#0e2b62; border-color:#0e2b62;">Player B</button>
       </div>
       <button id="timeoutCloseBtn" class="btn btn-outline-tnc" style="margin-top:12px; color:#0e2b62; border-color:#0e2b62;">Cancel</button>
-    </div>
-  </div>
-
-  <!-- Foul picker modal -->
-  <div id="foulModal" class="modal-overlay" style="display:none;">
-    <div class="modal-card" style="width:360px; text-align:center;">
-      <h5 style="font-size:1.5rem; font-weight:700; margin-bottom:12px;">Log Foul</h5>
-      <p style="margin:8px 0; font-size:1rem; font-weight:600; color:#0e2b62;">Who committed the foul?</p>
-      <div style="display:flex; gap:12px; justify-content:center; margin-top:16px; flex-wrap:wrap;">
-        <button id="foulPlayerABtn" class="btn btn-outline-tnc" style="color:#0e2b62; border-color:#0e2b62;">Player A</button>
-        <button id="foulPlayerBBtn" class="btn btn-outline-tnc" style="color:#0e2b62; border-color:#0e2b62;">Player B</button>
-      </div>
-      <button id="foulCloseBtn" class="btn btn-outline-tnc" style="margin-top:12px; color:#0e2b62; border-color:#0e2b62;">Cancel</button>
     </div>
   </div>
 

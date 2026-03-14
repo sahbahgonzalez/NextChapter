@@ -170,6 +170,66 @@ removeActionEntryById(teamKey, actionId);
 
 ---
 
+### 12. Foul Flow Finalization (Direct Team Hotkeys + Dual Marker Roles)
+**Date**: March 13, 2026  
+**Files Modified**: `frontend/game.html`, `frontend/js/gameScript.js`, `frontend/js/game-report.js`
+
+**Changes:**
+- Removed foul picker modal flow from runtime logging.
+- Added direct foul assignment controls and hotkeys:
+  - `A` = foul committed by Team A active player
+  - `B` = foul committed by Team B active player
+- Foul marker semantics finalized:
+  - **Triangle** = player who committed the foul
+  - **Square** = player who got fouled
+- Logging a foul now creates paired court markers (committer + fouled player) and links both markers to undo history.
+- Undo removes both foul markers for the paired foul action.
+
+---
+
+### 13. Action Log Behavior Update
+**Date**: March 13, 2026  
+**Files Modified**: `frontend/js/gameScript.js`
+
+**Changes:**
+- Removed inactive-team action-panel hard hide state so action lists remain visible by team/player context.
+- Removed "Undo Last Event" logging from action history.
+- Undo still reverts stats and removes the reverted action row/markers, but does not create a new action entry.
+
+---
+
+### 14. Game Report Additions (4PT + Starred Plays + Full Action Timeline)
+**Date**: March 13, 2026  
+**Files Modified**: `frontend/game-report.html`, `frontend/js/game-report.js`, `frontend/js/gameScript.js`
+
+**Changes:**
+- Added **4PT stat** to each player's report card and full stat table (`made/attempts`).
+- Added **Starred Plays** section with action label, player, and optional comments.
+- Added full **Game Actions** section at the bottom of the report.
+- Game Actions now include:
+  - Highlight/star indicator
+  - Comment/note text
+  - In-game clock time
+  - Local wall-clock time
+- Tracker now persists report-side snapshots for:
+  - starred plays (`tnc_starred_plays_*`)
+  - full game actions (`tnc_game_actions_*`)
+
+---
+
+### 15. Report Shot Chart Foul Legend + Shape Mapping
+**Date**: March 13, 2026  
+**Files Modified**: `frontend/js/game-report.js`
+
+**Changes:**
+- Updated per-player chart legend to explicitly show both foul roles.
+- Added report-side foul role rendering:
+  - committed foul -> triangle marker
+  - fouled player -> square marker
+- Team-combined shot charts now display both foul roles consistently.
+
+---
+
 ## January 2026 - Game Tracker Enhancements
 
 ### 1. Action History System

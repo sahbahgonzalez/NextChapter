@@ -272,6 +272,131 @@
             padding: 40px;
             font-size: 1.1rem;
         }
+
+        .starred-plays-section {
+            margin-bottom: 32px;
+            padding: 20px;
+            background: #fff;
+            border: 1px solid #e5e7eb;
+            border-radius: 12px;
+            box-shadow: 0 8px 20px rgba(15, 23, 42, 0.05);
+        }
+
+        .starred-plays-section h3 {
+            font-size: 1.2rem;
+            color: #1f2937;
+            margin-bottom: 14px;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 0.4px;
+        }
+
+        .starred-plays-list {
+            display: grid;
+            gap: 10px;
+        }
+
+        .starred-play-item {
+            border: 1px solid #e5e7eb;
+            border-left: 4px solid #f59e0b;
+            border-radius: 10px;
+            padding: 10px 12px;
+            background: #fffbeb;
+        }
+
+        .starred-play-head {
+            display: flex;
+            justify-content: space-between;
+            gap: 10px;
+            align-items: center;
+            margin-bottom: 4px;
+        }
+
+        .starred-play-title {
+            font-weight: 700;
+            color: #92400e;
+        }
+
+        .starred-play-time {
+            font-family: 'Courier New', monospace;
+            font-weight: 700;
+            color: #374151;
+            background: #fff;
+            border: 1px solid #e5e7eb;
+            border-radius: 999px;
+            padding: 2px 8px;
+            font-size: 0.85rem;
+        }
+
+        .starred-play-comment {
+            color: #374151;
+            font-size: 0.95rem;
+        }
+
+        .game-actions-section {
+            margin: 36px 0 24px;
+            padding: 20px;
+            background: #fff;
+            border: 1px solid #e5e7eb;
+            border-radius: 12px;
+            box-shadow: 0 8px 20px rgba(15, 23, 42, 0.05);
+        }
+
+        .game-actions-section h3 {
+            font-size: 1.2rem;
+            color: #1f2937;
+            margin-bottom: 14px;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 0.4px;
+        }
+
+        .game-actions-list {
+            display: grid;
+            gap: 10px;
+        }
+
+        .game-action-item {
+            border: 1px solid #e5e7eb;
+            border-radius: 10px;
+            padding: 10px 12px;
+            background: #f8fafc;
+        }
+
+        .game-action-head {
+            display: flex;
+            justify-content: space-between;
+            gap: 10px;
+            align-items: center;
+            margin-bottom: 4px;
+        }
+
+        .game-action-title {
+            font-weight: 700;
+            color: #0f172a;
+        }
+
+        .game-action-time {
+            font-family: 'Courier New', monospace;
+            font-weight: 700;
+            color: #374151;
+            background: #fff;
+            border: 1px solid #e5e7eb;
+            border-radius: 999px;
+            padding: 2px 8px;
+            font-size: 0.85rem;
+        }
+
+        .game-action-meta {
+            color: #64748b;
+            font-size: 0.85rem;
+            margin-bottom: 4px;
+        }
+
+        .game-action-comment {
+            color: #374151;
+            font-size: 0.95rem;
+        }
     </style>
 </head>
 <body>
@@ -348,8 +473,20 @@
                 <div class="winner-badge" id="winnerBadge">Team A Wins</div>
             </div>
 
+            <!-- Starred Plays -->
+            <div id="starredPlaysSection" class="starred-plays-section" style="display: none;">
+                <h3>Starred Plays</h3>
+                <div id="starredPlaysList" class="starred-plays-list"></div>
+            </div>
+
             <!-- Player Reports -->
             <div id="playerReportsContainer"></div>
+
+            <!-- Game Actions (bottom) -->
+            <div id="gameActionsSection" class="game-actions-section" style="display: none;">
+                <h3>Game Actions</h3>
+                <div id="gameActionsList" class="game-actions-list"></div>
+            </div>
 
             <!-- Footer -->
             <div class="report-footer">

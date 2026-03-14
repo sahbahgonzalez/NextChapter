@@ -5,6 +5,8 @@
 
 let gameId = null;
 let gameData = null;
+const STARRED_PLAYS_STORAGE_PREFIX = 'tnc_starred_plays_';
+const GAME_ACTIONS_STORAGE_PREFIX = 'tnc_game_actions_';
 
 const PLAYER_CHART_COLORS = [
     '#1D4ED8',
@@ -206,8 +208,13 @@ function renderReport() {
     const now = new Date();
     document.getElementById('generatedDate').textContent = `Generated on ${now.toLocaleDateString()} at ${now.toLocaleTimeString()}`;
 
+    renderStarredPlaysSection();
+
     // Render player reports
     renderPlayerReports();
+
+    // Render full game actions at the bottom
+    renderGameActionsSection();
 
     if (shouldAutoDownloadFromUrl()) {
         // Let the browser finish layout before html2pdf snapshots the DOM.
@@ -215,6 +222,206 @@ function renderReport() {
             generatePDF(true);
         }, 300);
     }
+}
+
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text || '';
+    return div.innerHTML;
+}
+
+function loadStoredStarredPlays() {
+    try {
+        const raw = localStorage.getItem(`${STARRED_PLAYS_STORAGE_PREFIX}${gameId}`);
+        if (!raw) return [];
+        const parsed = JSON.parse(raw);
+        if (!parsed || !Array.isArray(parsed.plays)) return [];
+        return parsed.plays;
+    } catch (err) {
+        console.warn('Failed to load stored starred plays.', err);
+        return [];
+    }
+}
+
+function loadBackendStarredPlaysFallback() {
+    const events = gameData?.events || [];
+    return events
+        .filter((event) => event && (event.highlighted === true || (event.note && String(event.note).trim().length > 0)))
+        .map((event) => {
+            const playerName = event.player_id?.name || event.player_name || 'Player';
+            const actionLabel = event.type === 'shot'
+                ? `${event.points || 2}PT ${event.made ? 'Made' : 'Missed'}`
+                : event.type === 'free_throw'
+                    ? `FT ${event.made ? 'Made' : 'Missed'}`
+                    : event.type === 'foul'
+                        ? 'Foul'
+                        : (event.type || 'Play');
+            return {
+                id: String(event._id || event.timestamp || Math.random()),
+                playerName,
+                label: actionLabel,
+                timeLabel: event.timestamp ? formatDate(event.timestamp).split(' ')[1] || '—' : '—',
+                note: event.note || ''
+            };
+        });
+}
+
+function renderStarredPlaysSection() {
+    const section = document.getElementById('starredPlaysSection');
+    const list = document.getElementById('starredPlaysList');
+    if (!section || !list) return;
+
+    const storedPlays = loadStoredStarredPlays();
+    const fallbackPlays = loadBackendStarredPlaysFallback();
+    const plays = storedPlays.length > 0 ? storedPlays : fallbackPlays;
+
+    if (!plays || plays.length === 0) {
+        section.style.display = 'none';
+        list.innerHTML = '';
+        return;
+    }
+
+    section.style.display = 'block';
+    list.innerHTML = plays.map((play) => {
+        const playerName = escapeHtml(play.playerName || 'Player');
+        const label = escapeHtml(play.label || 'Starred Play');
+        const timeLabel = escapeHtml(play.timeLabel || '—');
+        const note = String(play.note || '').trim();
+        const noteHtml = note ? `<div class="starred-play-comment">${escapeHtml(note)}</div>` : '';
+
+        return `
+            <div class="starred-play-item">
+                <div class="starred-play-head">
+                    <div class="starred-play-title">${playerName} • ${label}</div>
+                    <div class="starred-play-time">${timeLabel}</div>
+                </div>
+                ${noteHtml}
+            </div>
+        `;
+    }).join('');
+}
+
+function getEventActionLabel(event) {
+    if (!event) return 'Play';
+    if (event.type === 'shot') {
+        return `${event.points || 2}PT ${event.made ? 'Made' : 'Missed'}`;
+    }
+    if (event.type === 'free_throw') {
+        return `FT ${event.made ? 'Made' : 'Missed'}`;
+    }
+    if (event.type === 'foul') {
+        return 'Foul';
+    }
+    return event.type || 'Play';
+}
+
+function formatLocalTime(value) {
+    if (!value) return '—';
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return '—';
+    return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+}
+
+function formatGameClock(seconds) {
+    if (typeof seconds !== 'number' || Number.isNaN(seconds) || seconds < 0) return '—';
+    const mins = Math.floor(seconds / 60);
+    const secs = Math.floor(seconds % 60);
+    return `${mins}:${String(secs).padStart(2, '0')}`;
+}
+
+function deriveGameSecondsFromTimestamp(value) {
+    if (!value || !gameData?.createdAt) return null;
+    const actionTime = new Date(value).getTime();
+    const gameStart = new Date(gameData.createdAt).getTime();
+    if (Number.isNaN(actionTime) || Number.isNaN(gameStart) || actionTime < gameStart) return null;
+    return Math.floor((actionTime - gameStart) / 1000);
+}
+
+function resolveInGameTimeLabel(action) {
+    if (!action) return '—';
+
+    if (typeof action.gameSeconds === 'number' && !Number.isNaN(action.gameSeconds)) {
+        return formatGameClock(action.gameSeconds);
+    }
+
+    const direct = String(action.gameTimeLabel || action.timeLabel || '').trim();
+    if (direct) return direct;
+
+    const derivedSeconds = deriveGameSecondsFromTimestamp(action.timestamp);
+    return formatGameClock(derivedSeconds);
+}
+
+function loadStoredGameActions() {
+    try {
+        const raw = localStorage.getItem(`${GAME_ACTIONS_STORAGE_PREFIX}${gameId}`);
+        if (!raw) return [];
+        const parsed = JSON.parse(raw);
+        if (!parsed || !Array.isArray(parsed.actions)) return [];
+        return parsed.actions;
+    } catch (err) {
+        console.warn('Failed to load stored game actions.', err);
+        return [];
+    }
+}
+
+function loadBackendGameActionsFallback() {
+    const events = gameData?.events || [];
+    return events
+        .filter((event) => !!event)
+        .sort((a, b) => Number(new Date(a.timestamp || 0)) - Number(new Date(b.timestamp || 0)))
+        .map((event) => ({
+            id: String(event._id || event.timestamp || Math.random()),
+            teamKey: event.team || '',
+            playerId: getEventPlayerId(event),
+            playerName: event.player_id?.name || event.player_name || 'Player',
+            label: getEventActionLabel(event),
+            type: event.type || 'action',
+            gameSeconds: deriveGameSecondsFromTimestamp(event.timestamp),
+            gameTimeLabel: '—',
+            timeLabel: '—',
+            timestamp: event.timestamp || '',
+            note: event.note || '',
+            highlighted: !!event.highlighted
+        }));
+}
+
+function renderGameActionsSection() {
+    const section = document.getElementById('gameActionsSection');
+    const list = document.getElementById('gameActionsList');
+    if (!section || !list) return;
+
+    const storedActions = loadStoredGameActions();
+    const fallbackActions = loadBackendGameActionsFallback();
+    const actions = storedActions.length > 0 ? storedActions : fallbackActions;
+
+    if (!actions || actions.length === 0) {
+        section.style.display = 'none';
+        list.innerHTML = '';
+        return;
+    }
+
+    section.style.display = 'block';
+    list.innerHTML = actions.map((action) => {
+        const playerName = escapeHtml(action.playerName || 'Player');
+        const label = escapeHtml(action.label || 'Play');
+        const gameTimeLabel = escapeHtml(resolveInGameTimeLabel(action));
+        const localTimeLabel = escapeHtml(action.localTimeLabel || formatLocalTime(action.timestamp));
+        const teamLabel = action.teamKey ? escapeHtml(String(action.teamKey).toUpperCase()) : '—';
+        const note = String(action.note || '').trim();
+        const noteHtml = note ? `<div class="game-action-comment">${escapeHtml(note)}</div>` : '';
+        const star = action.highlighted ? '⭐ ' : '';
+
+        return `
+            <div class="game-action-item">
+                <div class="game-action-head">
+                    <div class="game-action-title">${star}${playerName} • ${label}</div>
+                    <div class="game-action-time">In-Game: ${gameTimeLabel}</div>
+                </div>
+                <div class="game-action-meta">Team: ${teamLabel} | Local: ${localTimeLabel}</div>
+                ${noteHtml}
+            </div>
+        `;
+    }).join('');
 }
 
 function renderPlayerReports() {
@@ -310,6 +517,8 @@ function renderPlayerReports() {
             }
         }
 
+        const fourPointStats = getPlayerFourPointStats(player._id);
+
         const reportHtml = `
             <div class="player-report-page" style="page-break-after: ${index < allPlayers.length - 1 ? 'always' : 'avoid'};">
                 <div class="player-header">
@@ -330,6 +539,10 @@ function renderPlayerReports() {
                         <div class="player-stat-box">
                             <div class="player-stat-label">FG%</div>
                             <div class="player-stat-value">${calculateFGPercentage(stats.fgm, stats.fga)}</div>
+                        </div>
+                        <div class="player-stat-box">
+                            <div class="player-stat-label">4PT</div>
+                            <div class="player-stat-value">${fourPointStats.made}/${fourPointStats.attempts}</div>
                         </div>
                     </div>
                 </div>
@@ -389,6 +602,10 @@ function renderPlayerReports() {
                                 <td class="stat-number">${stats['3pm'] || 0}/${stats['3pa'] || 0}</td>
                             </tr>
                             <tr>
+                                <td class="player-name">4-Pointers Made</td>
+                                <td class="stat-number">${fourPointStats.made}/${fourPointStats.attempts}</td>
+                            </tr>
+                            <tr>
                                 <td class="player-name">Free Throws Made</td>
                                 <td class="stat-number">${stats.ftm || 0}/${stats.fta || 0}</td>
                             </tr>
@@ -411,6 +628,8 @@ function renderPlayerReports() {
                     <div style="margin-top: 15px; font-size: 0.9rem; color: #6B7280; display: flex; justify-content: center; gap: 20px; flex-wrap: wrap;">
                         <span><span style="display: inline-block; width: 20px; height: 20px; background: ${getRgba(playerColor, 0.85)}; border-radius: 50%; vertical-align: middle; margin-right: 5px; border: 2px solid ${getRgba(playerColor, 1)};"></span> <span style="color: ${playerColor}; font-weight: 600;">Made (${player.name || 'Player'})</span></span>
                         <span><span style="display: inline-block; width: 20px; height: 20px; background: rgba(229, 62, 62, 0.2); border-radius: 50%; vertical-align: middle; margin-right: 5px; border: 2px solid rgba(229, 62, 62, 0.7);"></span> <span style="color: #E53E3E; font-weight: 600;">Missed (${player.name || 'Player'})</span></span>
+                        <span><span style="display: inline-block; width: 0; height: 0; border-left: 11px solid transparent; border-right: 11px solid transparent; border-bottom: 22px solid #F59E0B; vertical-align: middle; margin-right: 5px;"></span> <span style="color: #92400E; font-weight: 600;">Foul Committed (${player.name || 'Player'})</span></span>
+                        <span><span style="display: inline-block; width: 22px; height: 22px; background: #F59E0B; border-radius: 4px; vertical-align: middle; margin-right: 5px; border: 2px solid #92400E;"></span> <span style="color: #92400E; font-weight: 600;">Got Fouled (${player.name || 'Player'})</span></span>
                     </div>
                 </div>
             </div>
@@ -432,15 +651,16 @@ function getPlayerShots(playerId) {
         const eventPlayerId = getEventPlayerId(event);
 
         // Include both shots and free throws
-        if ((event.type === 'shot' || event.type === 'free_throw') && eventPlayerId === String(playerId)) {
+        if ((event.type === 'shot' || event.type === 'free_throw' || event.type === 'foul') && eventPlayerId === String(playerId)) {
             // Only include shots that have valid location data
             if (event.location && typeof event.location.x === 'number' && typeof event.location.y === 'number') {
                 shots.push({
                     x: event.location.x,
                     y: event.location.y,
-                    made: event.made || false,
-                    points: event.points || (event.type === 'free_throw' ? 1 : 2),
-                    type: event.type
+                    made: event.type === 'foul' ? false : (event.made || false),
+                    points: event.type === 'foul' ? 0 : (event.points || (event.type === 'free_throw' ? 1 : 2)),
+                    type: event.type,
+                    foulRole: event.type === 'foul' ? 'committed' : null
                 });
             }
         }
@@ -449,22 +669,67 @@ function getPlayerShots(playerId) {
     return shots;
 }
 
+function getPlayerFourPointStats(playerId) {
+    const events = gameData?.events || [];
+    const targetPlayerId = String(playerId || '');
+    let attempts = 0;
+    let made = 0;
+
+    events.forEach((event) => {
+        if (!event || event.type !== 'shot') return;
+        const eventPlayerId = getEventPlayerId(event);
+        if (eventPlayerId !== targetPlayerId) return;
+        if (Number(event.points) !== 4) return;
+
+        attempts += 1;
+        if (event.made) made += 1;
+    });
+
+    return { made, attempts };
+}
+
 function getTeamShots(teamKey, playerColorMap) {
     const shots = [];
     const events = gameData.events || [];
 
     events.forEach((event) => {
-        if ((event.type === 'shot' || event.type === 'free_throw') &&
-            event.team === teamKey &&
+        if ((event.type === 'shot' || event.type === 'free_throw' || event.type === 'foul') &&
             event.location && typeof event.location.x === 'number' && typeof event.location.y === 'number') {
             const eventPlayerId = getEventPlayerId(event);
             const playerColor = playerColorMap.get(eventPlayerId) || '#6B7280';
 
+            if (event.type === 'foul') {
+                if (event.team === teamKey) {
+                    shots.push({
+                        x: event.location.x,
+                        y: event.location.y,
+                        made: false,
+                        points: 0,
+                        type: 'foul',
+                        foulRole: 'committed',
+                        colorSet: getPlayerChartColors(playerColor)
+                    });
+                } else {
+                    shots.push({
+                        x: event.location.x,
+                        y: event.location.y,
+                        made: false,
+                        points: 0,
+                        type: 'foul',
+                        foulRole: 'drawn',
+                        colorSet: getPlayerChartColors(playerColor)
+                    });
+                }
+                return;
+            }
+
+            if (event.team !== teamKey) return;
+
             shots.push({
                 x: event.location.x,
                 y: event.location.y,
-                made: event.made || false,
-                points: event.points || (event.type === 'free_throw' ? 1 : 2),
+                made: event.type === 'foul' ? false : (event.made || false),
+                points: event.type === 'foul' ? 0 : (event.points || (event.type === 'free_throw' ? 1 : 2)),
                 type: event.type,
                 colorSet: getPlayerChartColors(playerColor)
             });
@@ -516,6 +781,44 @@ function drawShotsOnSVG(overlayId, shots, colorSet = getPlayerChartColors('#38A1
         const shotColors = shot.colorSet || colorSet;
         const svgX = (shot.x / 100) * 500;
         const svgY = (shot.y / 100) * 470;
+
+        if (shot.type === 'foul') {
+            const foulRole = shot.foulRole || 'committed';
+            const size = 26;
+
+            if (foulRole === 'committed') {
+                const triangle = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
+                const points = `${svgX},${svgY - (size / 2)} ${svgX - (size / 2)},${svgY + (size / 2)} ${svgX + (size / 2)},${svgY + (size / 2)}`;
+                triangle.setAttribute('points', points);
+                triangle.setAttribute('fill', '#F59E0B');
+                triangle.setAttribute('stroke', '#92400E');
+                triangle.setAttribute('stroke-width', '2');
+                shotsGroup.appendChild(triangle);
+            } else {
+                const square = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+                square.setAttribute('x', svgX - (size / 2));
+                square.setAttribute('y', svgY - (size / 2));
+                square.setAttribute('width', size);
+                square.setAttribute('height', size);
+                square.setAttribute('rx', '4');
+                square.setAttribute('ry', '4');
+                square.setAttribute('fill', '#F59E0B');
+                square.setAttribute('stroke', '#92400E');
+                square.setAttribute('stroke-width', '2');
+                shotsGroup.appendChild(square);
+            }
+
+            const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+            text.setAttribute('x', svgX);
+            text.setAttribute('y', svgY + 6);
+            text.setAttribute('text-anchor', 'middle');
+            text.setAttribute('fill', 'white');
+            text.setAttribute('font-size', '12');
+            text.setAttribute('font-weight', 'bold');
+            text.textContent = '!';
+            shotsGroup.appendChild(text);
+            return;
+        }
 
         if (shot.made) {
             // Made shot - player color circle with point value

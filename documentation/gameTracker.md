@@ -11,7 +11,7 @@ Every game event is logged with detailed information and displayed in action car
 **Features:**
 - **Timestamps**: Each action shows game time in MM:SS format
 - **Action Types**: Shots (2PT, 3PT, 4PT, FT), fouls, timeouts
-- **Control Actions**: Team switch, teammate swap, pause/resume, timeout calls, and undo actions are also tracked in action history
+- **Control Actions**: Team switch, teammate swap, pause/resume, and timeout calls are tracked in action history
 - **Interactive Elements**:
   - **Notes**: Add custom text descriptions to any action (button displays pencil icon)
   - **Highlight**: Mark important actions for post-game review (toggles between star outline and filled star)
@@ -94,16 +94,19 @@ Visual indicators placed on the court for all shots and fouls (except free throw
 - Created via `addShotMarker()`
 
 **Foul Markers:**
-- Display warning symbol (⚠) to visually distinguish fouls from shots
-- Uses selected fouling player's individual color styling
-- Positioned at exact cursor location
-- Removed when action is undone
-- Created via `addFoulMarker()`
+- Yellow marker style reserved for fouls (red remains reserved for missed shots)
+- Role-based foul shapes:
+  - Triangle = player who committed the foul
+  - Square = player who got fouled
+- Logging a foul creates both markers at the same cursor location (committer + fouled player)
+- Both markers are removed when the foul action is undone
+- Created via `addFoulMarker(teamKey, pos, role)`
 
 **Tag-Team Visibility Rules:**
 - Only the active team's markers are shown.
 - In tag-team mode, only the currently active teammate's markers are shown.
 - Action log and latest-shot panel are filtered to the active individual player.
+- Action panels are not forcibly hidden just because a team is inactive.
 
 **Free Throw Handling:**
 - **No court markers** (FTs not tracked on court)
@@ -128,6 +131,7 @@ Complete rollback of the last action with full state restoration.
 - Triggered: U hotkey or Undo button
 - References: Markers stored in `state.history[].marker`
 - Cleanup: `marker.remove()` + array splice
+- Undo does not create a separate "Undo Last Event" action log entry.
 
 ### 4.1 Action Row Delete = Targeted Undo
 
@@ -173,7 +177,8 @@ Keyboard shortcuts for rapid game logging.
 
 | Key | Action | Cursor Required |
 |-----|--------|----------------|
-| G | Log Foul (opens fouler picker modal) | Yes |
+| A | Log Team A foul (committer = Team A active player) | Yes |
+| B | Log Team B foul (committer = Team B active player) | Yes |
 | Tab | Switch Active Player | No |
 | S | Swap Active Teammate (tag mode) | No |
 | P | Pause/Resume | No |
@@ -181,9 +186,9 @@ Keyboard shortcuts for rapid game logging.
 
 #### Foul Attribution Flow
 
-- Pressing foul buttons or hotkey `G` opens a foul picker modal.
-- Modal shows active player names for Team A and Team B.
-- Selected player is recorded as the fouling player in stats, marker metadata, and action log label.
+- Pressing Team A/Team B foul controls (or hotkeys `A` / `B`) immediately logs the foul for that team's active player.
+- The opposing active player is represented as the fouled player in marker rendering.
+- Action history labels keep fouling-player identity.
 
 #### Zone Contradiction Warnings
 
@@ -253,10 +258,10 @@ state = {
   active: 'A',
   A: { twoPM, twoPA, threePM, threePA, fourPM, fourPA, ftM, ftA, fouls },
   B: { twoPM, twoPA, threePM, threePA, fourPM, fourPA, ftM, ftA, fouls },
-  history: [{ kind, team, shotType, result, marker, actionId, playerId, pos, persisted }],
+  history: [{ kind, team, shotType, result, marker, secondaryMarker, actionId, playerId, pos, persisted }],
   actionHistory: {
-    A: [{ id, teamKey, playerId, playerName, label, type, timeLabel, highlighted, note, markerId }],
-    B: [{ id, teamKey, playerId, playerName, label, type, timeLabel, highlighted, note, markerId }]
+    A: [{ id, teamKey, playerId, playerName, label, type, gameSeconds, timeLabel, highlighted, note, markerId }],
+    B: [{ id, teamKey, playerId, playerName, label, type, gameSeconds, timeLabel, highlighted, note, markerId }]
   }
 }
 ```
@@ -271,9 +276,9 @@ state = {
 
 **Foul Management:**
 - `incrementFoul(teamKey)` - Records foul with selected player/team identity
-- `addFoulMarker(teamKey, pos)` - Creates foul marker at cursor position
-- `openFoulModal()` - Opens player picker modal for foul attribution
-- `logFoulToHistory(teamKey, pos)` - Logs foul with marker and player-named action entry
+- `addFoulMarker(teamKey, pos, role)` - Creates role-specific foul marker at cursor position
+- `logFoulToHistory(teamKey, pos)` - Logs committed foul marker and action entry
+- `logFoulForTeam(teamKey)` - Direct Team A/Team B foul logging path for buttons/hotkeys
 
 **Action History:**
 - `addActionEntry(teamKey, entry)` - Adds to action history array
