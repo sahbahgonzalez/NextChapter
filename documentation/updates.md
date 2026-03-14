@@ -380,6 +380,27 @@ removeActionEntryById(teamKey, actionId);
 
 ---
 
+### 26. Standalone Live Shot Chart Page + Click-To-Enlarge Replay
+**Date**: March 14, 2026  
+**Files Modified**: `frontend/games.html`, `frontend/js/games.js`, `frontend/live-shot-chart.html`, `frontend/js/live-shot-chart.js`
+
+**Changes:**
+- Added a dedicated live shot-chart page (`live-shot-chart.html`) so live chart viewing is separate from the report page.
+- Live game cards now support opening this page directly (card click + Shot Charts action).
+- Added Team View / Individual View toggle on the live shot-chart page.
+- Added click-to-enlarge chart interaction:
+  - Clicking any chart card opens a large modal court view.
+  - Modal includes replay controls: `Prev`, `Play/Pause`, `Next`, `Close`.
+  - Replay timeline advances every **1.5 seconds** and highlights/auto-scrolls active steps.
+- Replay includes shot and foul events with existing marker semantics preserved:
+  - made shots = player color
+  - missed shots = red
+  - foul committed = yellow triangle
+  - got fouled = yellow square
+- Replay modal remains in sync with live refresh updates while open.
+
+---
+
 ## January 2026 - Game Tracker Enhancements
 
 ### 1. Action History System
