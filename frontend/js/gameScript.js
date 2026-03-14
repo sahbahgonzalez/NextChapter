@@ -430,6 +430,8 @@ document.addEventListener("DOMContentLoaded", async () => {
     active: 'A',
     A: { twoPA: 0, twoPM: 0, threePA: 0, threePM: 0, fourPA: 0, fourPM: 0, ftA: 0, ftM: 0, fouls: 0 },
     B: { twoPA: 0, twoPM: 0, threePA: 0, threePM: 0, fourPA: 0, fourPM: 0, ftA: 0, ftM: 0, fouls: 0 },
+    playerStats: {},
+    statsView: { A: 'player', B: 'player' },
     history: [],
     shotHistory: {
       A: [],  // Store all of player A's shots
@@ -447,6 +449,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     events.forEach(event => {
       const teamKey = event.team === 'team_a' ? 'A' : 'B';
       const team = state[teamKey];
+      const eventPlayerId = event.player_id?._id ? String(event.player_id._id) : String(event.player_id || '');
 
       if (event.type === 'shot') {
         if (event.points === 4) {
@@ -459,11 +462,20 @@ document.addEventListener("DOMContentLoaded", async () => {
           team.twoPA += 1;
           if (event.made) team.twoPM += 1;
         }
+        if (eventPlayerId) {
+          applyPlayerShotDelta(eventPlayerId, event.points === 4 ? '4pt' : event.points === 3 ? '3pt' : '2pt', event.made ? 'made' : 'missed', 1);
+        }
       } else if (event.type === 'free_throw') {
         team.ftA += 1;
         if (event.made) team.ftM += 1;
+        if (eventPlayerId) {
+          applyPlayerShotDelta(eventPlayerId, 'ft', event.made ? 'made' : 'missed', 1);
+        }
       } else if (event.type === 'foul') {
         team.fouls += 1;
+        if (eventPlayerId) {
+          applyPlayerFoulDelta(eventPlayerId, 1);
+        }
       }
 
       seedActionFromEvent(event, teamKey);
@@ -515,7 +527,11 @@ document.addEventListener("DOMContentLoaded", async () => {
     teamAActivePlayer: document.getElementById('teamAActivePlayer'),
     teamBActivePlayer: document.getElementById('teamBActivePlayer'),
     teamAActivePicker: document.getElementById('teamAActivePicker'),
-    teamBActivePicker: document.getElementById('teamBActivePicker')
+    teamBActivePicker: document.getElementById('teamBActivePicker'),
+    teamAStatsView: document.getElementById('teamAStatsView'),
+    teamBStatsView: document.getElementById('teamBStatsView'),
+    teamAStatsScope: document.getElementById('teamAStatsScope'),
+    teamBStatsScope: document.getElementById('teamBStatsScope')
   };
 
   // DEBUG: Log if all elements were found
@@ -880,12 +896,18 @@ document.addEventListener("DOMContentLoaded", async () => {
         if (team.ftA > 0) team.ftA -= 1;
         if (change.result === 'made' && team.ftM > 0) team.ftM -= 1;
       }
+      if (change.playerId) {
+        applyPlayerShotDelta(change.playerId, change.shotType, change.result, -1);
+      }
       return;
     }
 
     if (change.kind === 'foul') {
       const team = change.team === 'A' ? state.A : state.B;
       if (team.fouls > 0) team.fouls -= 1;
+      if (change.playerId) {
+        applyPlayerFoulDelta(change.playerId, -1);
+      }
     }
   }
 
@@ -1494,6 +1516,69 @@ document.addEventListener("DOMContentLoaded", async () => {
     return t.twoPM * 2 + t.threePM * 3 + t.fourPM * 4 + t.ftM * 1;
   }
 
+  function createEmptyStats() {
+    return { twoPA: 0, twoPM: 0, threePA: 0, threePM: 0, fourPA: 0, fourPM: 0, ftA: 0, ftM: 0, fouls: 0 };
+  }
+
+  function getOrCreatePlayerStats(playerId) {
+    const id = String(playerId || '');
+    if (!id) return null;
+    if (!state.playerStats[id]) {
+      state.playerStats[id] = createEmptyStats();
+    }
+    return state.playerStats[id];
+  }
+
+  function applyPlayerShotDelta(playerId, shotType, result, delta = 1) {
+    const stats = getOrCreatePlayerStats(playerId);
+    if (!stats) return;
+
+    if (shotType === '4pt') {
+      stats.fourPA = Math.max(0, stats.fourPA + delta);
+      if (result === 'made') stats.fourPM = Math.max(0, stats.fourPM + delta);
+      return;
+    }
+    if (shotType === '3pt') {
+      stats.threePA = Math.max(0, stats.threePA + delta);
+      if (result === 'made') stats.threePM = Math.max(0, stats.threePM + delta);
+      return;
+    }
+    if (shotType === '2pt') {
+      stats.twoPA = Math.max(0, stats.twoPA + delta);
+      if (result === 'made') stats.twoPM = Math.max(0, stats.twoPM + delta);
+      return;
+    }
+    if (shotType === 'ft') {
+      stats.ftA = Math.max(0, stats.ftA + delta);
+      if (result === 'made') stats.ftM = Math.max(0, stats.ftM + delta);
+    }
+  }
+
+  function applyPlayerFoulDelta(playerId, delta = 1) {
+    const stats = getOrCreatePlayerStats(playerId);
+    if (!stats) return;
+    stats.fouls = Math.max(0, stats.fouls + delta);
+  }
+
+  function getDisplayStatsForTeam(teamKey) {
+    const viewMode = state.statsView[teamKey] || 'player';
+    if (viewMode === 'team') {
+      return {
+        stats: teamKey === 'A' ? state.A : state.B,
+        scopeLabel: `Showing: ${getTeamDisplayName(teamKey)} Team Totals`
+      };
+    }
+
+    const activePlayer = getActivePlayerForTeam(teamKey);
+    const playerId = activePlayer ? String(activePlayer._id || activePlayer) : '';
+    const stats = playerId ? (state.playerStats[playerId] || createEmptyStats()) : createEmptyStats();
+    const playerName = activePlayer?.name || `Team ${teamKey} Active Player`;
+    return {
+      stats,
+      scopeLabel: `Showing: ${playerName} (Individual)`
+    };
+  }
+
   function getFGPercentage(t) {
     const totalFG = t.twoPA + t.threePA + t.fourPA;
     if (totalFG === 0) return 0;
@@ -1524,6 +1609,8 @@ document.addEventListener("DOMContentLoaded", async () => {
     
     const pointsA = computePoints(A);
     const pointsB = computePoints(B);
+    const displayA = getDisplayStatsForTeam('A');
+    const displayB = getDisplayStatsForTeam('B');
     
     console.log(`Updating UI - A: ${pointsA} pts, B: ${pointsB} pts`);
     console.log(`Elements check - els.a.pts:`, els.a.pts, 'els.b.pts:',  els.b.pts);
@@ -1546,22 +1633,26 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
     
     // Team A stats
-    if (els.a.pts) els.a.pts.textContent = pointsA;
-    if (els.a.s4) els.a.s4.textContent = `${A.fourPM}/${A.fourPA} (${get4PPercentage(A)}%)`;
-    if (els.a.s3) els.a.s3.textContent = `${A.threePM}/${A.threePA} (${get3PPercentage(A)}%)`;
-    if (els.a.s2) els.a.s2.textContent = `${A.twoPM}/${A.twoPA} (${getFGPercentage(A)}%)`;
-    if (els.a.ft) els.a.ft.textContent = `${A.ftM}/${A.ftA} (${getFTPercentage(A)}%)`;
-    if (els.a.fouls) els.a.fouls.textContent = A.fouls;
+    if (els.a.pts) els.a.pts.textContent = computePoints(displayA.stats);
+    if (els.a.s4) els.a.s4.textContent = `${displayA.stats.fourPM}/${displayA.stats.fourPA} (${get4PPercentage(displayA.stats)}%)`;
+    if (els.a.s3) els.a.s3.textContent = `${displayA.stats.threePM}/${displayA.stats.threePA} (${get3PPercentage(displayA.stats)}%)`;
+    if (els.a.s2) els.a.s2.textContent = `${displayA.stats.twoPM}/${displayA.stats.twoPA} (${getFGPercentage(displayA.stats)}%)`;
+    if (els.a.ft) els.a.ft.textContent = `${displayA.stats.ftM}/${displayA.stats.ftA} (${getFTPercentage(displayA.stats)}%)`;
+    if (els.a.fouls) els.a.fouls.textContent = displayA.stats.fouls;
     if (els.a.score) els.a.score.textContent = pointsA;
+    if (els.teamAStatsScope) els.teamAStatsScope.textContent = displayA.scopeLabel;
+    if (els.teamAStatsView) els.teamAStatsView.value = state.statsView.A || 'player';
 
     // Team B stats
-    if (els.b.pts) els.b.pts.textContent = pointsB;
-    if (els.b.s4) els.b.s4.textContent = `${B.fourPM}/${B.fourPA} (${get4PPercentage(B)}%)`;
-    if (els.b.s3) els.b.s3.textContent = `${B.threePM}/${B.threePA} (${get3PPercentage(B)}%)`;
-    if (els.b.s2) els.b.s2.textContent = `${B.twoPM}/${B.twoPA} (${getFGPercentage(B)}%)`;
-    if (els.b.ft) els.b.ft.textContent = `${B.ftM}/${B.ftA} (${getFTPercentage(B)}%)`;
-    if (els.b.fouls) els.b.fouls.textContent = B.fouls;
+    if (els.b.pts) els.b.pts.textContent = computePoints(displayB.stats);
+    if (els.b.s4) els.b.s4.textContent = `${displayB.stats.fourPM}/${displayB.stats.fourPA} (${get4PPercentage(displayB.stats)}%)`;
+    if (els.b.s3) els.b.s3.textContent = `${displayB.stats.threePM}/${displayB.stats.threePA} (${get3PPercentage(displayB.stats)}%)`;
+    if (els.b.s2) els.b.s2.textContent = `${displayB.stats.twoPM}/${displayB.stats.twoPA} (${getFGPercentage(displayB.stats)}%)`;
+    if (els.b.ft) els.b.ft.textContent = `${displayB.stats.ftM}/${displayB.stats.ftA} (${getFTPercentage(displayB.stats)}%)`;
+    if (els.b.fouls) els.b.fouls.textContent = displayB.stats.fouls;
     if (els.b.score) els.b.score.textContent = pointsB;
+    if (els.teamBStatsScope) els.teamBStatsScope.textContent = displayB.scopeLabel;
+    if (els.teamBStatsView) els.teamBStatsView.value = state.statsView.B || 'player';
 
     // Show which player's stats are being tracked
     const activePlayer = state.active === 'A' ? playerNameA : playerNameB;
@@ -1640,6 +1731,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       team.ftA += 1;
       if (result === 'made') team.ftM += 1;
     }
+    applyPlayerShotDelta(playerId, shotType, result, 1);
     state.history.push(change);
 
     // DEBUG: Log the state after update
@@ -1703,6 +1795,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     const team = teamKey === 'A' ? state.A : state.B;
     team.fouls += 1;
+    applyPlayerFoulDelta(playerId, 1);
     
     const actionId = `action_${Date.now()}_${Math.random().toString(16).slice(2)}`;
 
@@ -2164,6 +2257,20 @@ document.addEventListener("DOMContentLoaded", async () => {
     });
   }
 
+  if (els.teamAStatsView) {
+    els.teamAStatsView.addEventListener('change', (e) => {
+      state.statsView.A = e.target.value === 'team' ? 'team' : 'player';
+      updateUI();
+    });
+  }
+
+  if (els.teamBStatsView) {
+    els.teamBStatsView.addEventListener('change', (e) => {
+      state.statsView.B = e.target.value === 'team' ? 'team' : 'player';
+      updateUI();
+    });
+  }
+
   if (modalEls.close) modalEls.close.addEventListener('click', closeModal);
   if (modalEls.overlay) modalEls.overlay.addEventListener('click', (e) => {
     if (e.target === modalEls.overlay) closeModal();
@@ -2377,6 +2484,8 @@ document.addEventListener("DOMContentLoaded", async () => {
     // Clear all game stats from previous game
     state.A = { twoPA: 0, twoPM: 0, threePA: 0, threePM: 0, fourPA: 0, fourPM: 0, ftA: 0, ftM: 0, fouls: 0 };
     state.B = { twoPA: 0, twoPM: 0, threePA: 0, threePM: 0, fourPA: 0, fourPM: 0, ftA: 0, ftM: 0, fouls: 0 };
+    state.playerStats = {};
+    state.statsView = { A: 'player', B: 'player' };
     state.history = [];
     state.active = 'A';
     isTimeout = false;
@@ -2431,6 +2540,8 @@ document.addEventListener("DOMContentLoaded", async () => {
     // Clear stats at the START of a new game (before first shot is logged)
     state.A = { twoPA: 0, twoPM: 0, threePA: 0, threePM: 0, fourPA: 0, fourPM: 0, ftA: 0, ftM: 0, fouls: 0 };
     state.B = { twoPA: 0, twoPM: 0, threePA: 0, threePM: 0, fourPA: 0, fourPM: 0, ftA: 0, ftM: 0, fouls: 0 };
+    state.playerStats = {};
+    state.statsView = { A: 'player', B: 'player' };
     state.history = [];
     state.shotHistory = { A: [], B: [] };  // Clear individual shot histories
     state.active = 'A';

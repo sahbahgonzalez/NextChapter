@@ -155,6 +155,14 @@
               <select id="teamAActivePlayer" class="form-control" style="margin-top: 4px;"></select>
             </div>
             <div id="teamAStats" class="player-stats">
+              <div style="display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:8px;">
+                <label for="teamAStatsView" style="font-size:11px; font-weight:700; color:#475569; text-transform:uppercase; letter-spacing:0.4px;">Stats View</label>
+                <select id="teamAStatsView" class="form-control" style="max-width:120px; height:30px; padding:2px 8px; font-size:12px;">
+                  <option value="player" selected>Player</option>
+                  <option value="team">Team</option>
+                </select>
+              </div>
+              <div id="teamAStatsScope" style="font-size:11px; font-weight:700; color:#334155; margin-bottom:6px;">Showing: Active Player</div>
               <div><strong>PTS: </strong><span id="teamAPts">0</span></div>
               <div>4PT: <span id="teamA4pt">0/0</span></div>
               <div>3PT: <span id="teamA3pt">0/0</span></div>
@@ -190,6 +198,14 @@
               <select id="teamBActivePlayer" class="form-control" style="margin-top: 4px;"></select>
             </div>
             <div id="teamBStats" class="player-stats">
+              <div style="display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:8px;">
+                <label for="teamBStatsView" style="font-size:11px; font-weight:700; color:#475569; text-transform:uppercase; letter-spacing:0.4px;">Stats View</label>
+                <select id="teamBStatsView" class="form-control" style="max-width:120px; height:30px; padding:2px 8px; font-size:12px;">
+                  <option value="player" selected>Player</option>
+                  <option value="team">Team</option>
+                </select>
+              </div>
+              <div id="teamBStatsScope" style="font-size:11px; font-weight:700; color:#334155; margin-bottom:6px;">Showing: Active Player</div>
               <div><strong>PTS: </strong><span id="teamBPts">0</span></div>
               <div>4PT: <span id="teamB4pt">0/0</span></div>
               <div>3PT: <span id="teamB3pt">0/0</span></div>
