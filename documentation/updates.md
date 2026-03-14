@@ -230,6 +230,24 @@ removeActionEntryById(teamKey, actionId);
 
 ---
 
+### 16. In-Game Stats View Toggle (Player Default + Team Option)
+**Date**: March 13, 2026  
+**Files Modified**: `frontend/game.html`, `frontend/js/gameScript.js`
+
+**Changes:**
+- Team A and Team B side stat panels now default to showing the **active player's individual stats**.
+- Added per-side selector to switch stat panel scope:
+  - `Player` (active player only)
+  - `Team` (team totals)
+- Added scope labels in each side panel to clarify what is being displayed.
+- Added per-player stat accumulation during live game tracking (shots, free throws, fouls), including undo/targeted delete rollback support.
+
+**Important Behavior:**
+- **Overall game score tracking is unchanged.**
+- The center scoreboard continues to use team totals; only the side stat panel view changes.
+
+---
+
 ## January 2026 - Game Tracker Enhancements
 
 ### 1. Action History System

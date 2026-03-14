@@ -8,6 +8,18 @@ The game tracker (`game.html` + `gameScript.js`) provides real-time basketball g
 ### 1. Action History System
 Every game event is logged with detailed information and displayed in action cards under each player.
 
+### 1.1 Stats Panel Scope (Player vs Team)
+
+Each side stat panel can now display either individual active-player stats or full team totals.
+
+**Behavior:**
+- Default mode is **Player** on both sides.
+- Per-side selector options:
+  - `Player`: active player's individual stats
+  - `Team`: team aggregate stats
+- Scope label is shown in each side panel to indicate the current view.
+- Center game score display remains team-based and is not affected by this toggle.
+
 **Features:**
 - **Timestamps**: Each action shows game time in MM:SS format
 - **Action Types**: Shots (2PT, 3PT, 4PT, FT), fouls, timeouts
@@ -258,6 +270,8 @@ state = {
   active: 'A',
   A: { twoPM, twoPA, threePM, threePA, fourPM, fourPA, ftM, ftA, fouls },
   B: { twoPM, twoPA, threePM, threePA, fourPM, fourPA, ftM, ftA, fouls },
+  playerStats: { [playerId]: { twoPM, twoPA, threePM, threePA, fourPM, fourPA, ftM, ftA, fouls } },
+  statsView: { A: 'player' | 'team', B: 'player' | 'team' },
   history: [{ kind, team, shotType, result, marker, secondaryMarker, actionId, playerId, pos, persisted }],
   actionHistory: {
     A: [{ id, teamKey, playerId, playerName, label, type, gameSeconds, timeLabel, highlighted, note, markerId }],
@@ -273,12 +287,18 @@ state = {
 - `addShotMarker(teamKey, shotType, result, pos)` - Creates visual marker on court
 - `inferShotTypeFromClick(evt)` - Detects zone from click event
 - `inferShotTypeFromPos(pos)` - Detects zone from coordinates
+- `applyPlayerShotDelta(playerId, shotType, result, delta)` - Updates individual player stat totals
 
 **Foul Management:**
 - `incrementFoul(teamKey)` - Records foul with selected player/team identity
 - `addFoulMarker(teamKey, pos, role)` - Creates role-specific foul marker at cursor position
 - `logFoulToHistory(teamKey, pos)` - Logs committed foul marker and action entry
 - `logFoulForTeam(teamKey)` - Direct Team A/Team B foul logging path for buttons/hotkeys
+- `applyPlayerFoulDelta(playerId, delta)` - Updates individual player foul totals
+
+**Stats Scope Rendering:**
+- `getDisplayStatsForTeam(teamKey)` - Resolves whether panel should show active player stats or team totals
+- `updateUI()` - Renders side panels from selected scope while keeping center scoreboard on team totals
 
 **Action History:**
 - `addActionEntry(teamKey, entry)` - Adds to action history array
