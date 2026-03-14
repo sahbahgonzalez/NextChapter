@@ -114,6 +114,62 @@ removeActionEntryById(teamKey, actionId);
 
 ---
 
+### 8. Player-Scoped Tracker Visibility + Individual Marker Colors
+**Date**: March 13, 2026  
+**Files Modified**: `frontend/js/gameScript.js`, `frontend/css/shared.css`
+
+**Changes:**
+- Court markers now use deterministic per-player colors instead of shared team color styling.
+- Tag-team tracker visibility is now player-scoped:
+  - Only the active team's markers are shown.
+  - In tag mode, only the currently active teammate's markers are visible.
+- Action and latest-shot panels are now filtered to the active individual player in tag mode.
+- Inactive team action panel is hidden with a placeholder state.
+- Court layout alignment was stabilized so adding action rows does not nudge the court position.
+
+---
+
+### 9. Team/Player Shot Chart Enhancements (Game Report)
+**Date**: March 13, 2026  
+**Files Modified**: `frontend/js/game-report.js`
+
+**Changes:**
+- Individual player shot charts now use unique player colors for made/missed markers and legends.
+- For multi-player teams, report includes team-combined shot charts where each shot still keeps the shooter's individual color.
+- Added per-team player color legends for combined charts.
+- Added explicit "Individual player shot chart" labeling for multi-player team player pages.
+
+---
+
+### 10. Foul Attribution Modal + Unified Foul Hotkey
+**Date**: March 13, 2026  
+**Files Modified**: `frontend/game.html`, `frontend/js/gameScript.js`
+
+**Changes:**
+- Replaced direct A/B foul assignment flow with a foul picker modal.
+- Foul action now asks who committed the foul using active player names for Team A and Team B.
+- Unified foul hotkey to a single key: `G`.
+- Top foul buttons and side foul buttons now open the same foul picker flow.
+- Action log entries now include foul labels with player identity (for example: `John Doe Foul`).
+
+---
+
+### 11. Hotkey Actions Logged to Action History
+**Date**: March 13, 2026  
+**Files Modified**: `frontend/js/gameScript.js`
+
+**Changes:**
+- Added action-log tracking for hotkey-driven control actions:
+  - Team switch (Tab)
+  - Teammate swap (S)
+  - Pause/Resume (P)
+  - Resume from timeout flow
+  - Undo (U)
+  - Timeout called (T flow)
+- Automatic possession flips on missed shots are not logged as manual/hotkey team-switch actions.
+
+---
+
 ## January 2026 - Game Tracker Enhancements
 
 ### 1. Action History System

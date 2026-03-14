@@ -11,6 +11,7 @@ Every game event is logged with detailed information and displayed in action car
 **Features:**
 - **Timestamps**: Each action shows game time in MM:SS format
 - **Action Types**: Shots (2PT, 3PT, 4PT, FT), fouls, timeouts
+- **Control Actions**: Team switch, teammate swap, pause/resume, timeout calls, and undo actions are also tracked in action history
 - **Interactive Elements**:
   - **Notes**: Add custom text descriptions to any action (button displays pencil icon)
   - **Highlight**: Mark important actions for post-game review (toggles between star outline and filled star)
@@ -20,7 +21,7 @@ Every game event is logged with detailed information and displayed in action car
 ```javascript
 {
   id: timestamp,
-  label: "4PT Made" | "3PT Made" | "2PT Missed" | "FT Made" | "Foul",
+  label: "4PT Made" | "3PT Made" | "2PT Missed" | "FT Made" | "[Player Name] Foul" | "Switched Active Team (Tab)",
   type: "4pt" | "3pt" | "2pt" | "ft" | "foul",
   timeLabel: "12:45",
   gameSeconds: 765,
@@ -87,17 +88,22 @@ Visual indicators placed on the court for all shots and fouls (except free throw
 
 **Shot Markers:**
 - Display player initials
-- Color-coded by team and result (made/missed)
+- Color-coded per player and result (made/missed)
 - Positioned at exact click/cursor location
 - Removed when action is undone
 - Created via `addShotMarker()`
 
 **Foul Markers:**
 - Display warning symbol (⚠) to visually distinguish fouls from shots
-- Orange border with team-specific glow
+- Uses selected fouling player's individual color styling
 - Positioned at exact cursor location
 - Removed when action is undone
 - Created via `addFoulMarker()`
+
+**Tag-Team Visibility Rules:**
+- Only the active team's markers are shown.
+- In tag-team mode, only the currently active teammate's markers are shown.
+- Action log and latest-shot panel are filtered to the active individual player.
 
 **Free Throw Handling:**
 - **No court markers** (FTs not tracked on court)
@@ -167,11 +173,17 @@ Keyboard shortcuts for rapid game logging.
 
 | Key | Action | Cursor Required |
 |-----|--------|----------------|
-| A | Foul on Team A | Yes |
-| B | Foul on Team B | Yes |
+| G | Log Foul (opens fouler picker modal) | Yes |
 | Tab | Switch Active Player | No |
+| S | Swap Active Teammate (tag mode) | No |
 | P | Pause/Resume | No |
 | U | Undo Last Action | No |
+
+#### Foul Attribution Flow
+
+- Pressing foul buttons or hotkey `G` opens a foul picker modal.
+- Modal shows active player names for Team A and Team B.
+- Selected player is recorded as the fouling player in stats, marker metadata, and action log label.
 
 #### Zone Contradiction Warnings
 
@@ -243,8 +255,8 @@ state = {
   B: { twoPM, twoPA, threePM, threePA, fourPM, fourPA, ftM, ftA, fouls },
   history: [{ kind, team, shotType, result, marker, actionId, playerId, pos, persisted }],
   actionHistory: {
-    A: [{ id, label, type, timeLabel, gameSeconds, highlighted, note, markerId }],
-    B: [{ id, label, type, timeLabel, gameSeconds, highlighted, note, markerId }]
+    A: [{ id, teamKey, playerId, playerName, label, type, timeLabel, highlighted, note, markerId }],
+    B: [{ id, teamKey, playerId, playerName, label, type, timeLabel, highlighted, note, markerId }]
   }
 }
 ```
@@ -258,9 +270,10 @@ state = {
 - `inferShotTypeFromPos(pos)` - Detects zone from coordinates
 
 **Foul Management:**
-- `incrementFoul(teamKey)` - Records foul with validation
+- `incrementFoul(teamKey)` - Records foul with selected player/team identity
 - `addFoulMarker(teamKey, pos)` - Creates foul marker at cursor position
-- `logFoulToHistory(teamKey, pos)` - Logs foul with marker and action entry
+- `openFoulModal()` - Opens player picker modal for foul attribution
+- `logFoulToHistory(teamKey, pos)` - Logs foul with marker and player-named action entry
 
 **Action History:**
 - `addActionEntry(teamKey, entry)` - Adds to action history array
@@ -281,6 +294,7 @@ state = {
 **Backend Sync:**
 - Live event sync can be toggled with `SYNC_LIVE_EVENTS_TO_BACKEND`.
 - When disabled, events are buffered in `state.history` and flushed at End Game.
+- Action-log UI events are local-only and are not posted as backend game events.
 - Finalization sends explicit `final_score` and `winner`.
 - If native 4PT backend event persistence is rejected, compatibility fallback persists equivalent total points (`3PT` + made `FT` for made 4PT).
 

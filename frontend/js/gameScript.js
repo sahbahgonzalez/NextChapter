@@ -223,6 +223,23 @@ function restoreGameEvents(game) {
   const shotMarkersEl = document.getElementById('shot_markers');
   if (!shotMarkersEl) return;
 
+  const palette = ['#2563EB', '#059669', '#D97706', '#7C3AED', '#DB2777', '#0891B2', '#65A30D', '#14B8A6'];
+  const idToColor = (id) => {
+    const source = String(id || 'player');
+    let hash = 0;
+    for (let i = 0; i < source.length; i += 1) {
+      hash = ((hash << 5) - hash) + source.charCodeAt(i);
+      hash |= 0;
+    }
+    return palette[Math.abs(hash) % palette.length];
+  };
+  const hexToRgba = (hex, alpha) => {
+    const r = parseInt(hex.slice(1, 3), 16);
+    const g = parseInt(hex.slice(3, 5), 16);
+    const b = parseInt(hex.slice(5, 7), 16);
+    return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+  };
+
   // Clear existing markers
   shotMarkersEl.innerHTML = '';
 
@@ -234,7 +251,8 @@ function restoreGameEvents(game) {
 
       // Determine which team this shot belongs to
       const teamKey = event.team === 'team_a' ? 'A' : 'B';
-      const player = gameContext.players[teamKey];
+      const eventPlayerId = event.player_id?._id ? String(event.player_id._id) : String(event.player_id || '');
+      const player = getAssignedPlayerById(eventPlayerId)?.key ? gameContext.players[getAssignedPlayerById(eventPlayerId).key] : null;
 
       // Determine shot type based on points
       let shotType = '2pt';
@@ -268,8 +286,21 @@ function restoreGameEvents(game) {
       marker.style.left = `${event.location.x}%`;
       marker.style.top = `${event.location.y}%`;
       marker.dataset.player = player?.name || teamKey;
+      marker.dataset.playerId = eventPlayerId;
       marker.dataset.shotType = shotType;
       marker.dataset.result = result;
+
+      const markerColor = idToColor(eventPlayerId);
+      marker.style.boxShadow = `0 0 0 2px ${hexToRgba(markerColor, 0.4)}, 0 2px 6px rgba(0,0,0,0.25)`;
+      if (result === 'made') {
+        marker.style.borderColor = hexToRgba(markerColor, 0.95);
+        marker.style.color = '#fff';
+        marker.style.background = hexToRgba(markerColor, 0.88);
+      } else {
+        marker.style.borderColor = 'rgba(198, 40, 40, 0.95)';
+        marker.style.color = '#b91c1c';
+        marker.style.background = 'rgba(239, 68, 68, 0.18)';
+      }
 
       shotMarkersEl.appendChild(marker);
     }
@@ -533,6 +564,68 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   const shotMarkersEl = document.getElementById('shot_markers');
 
+  const playerColorPalette = [
+    '#2563EB',
+    '#059669',
+    '#D97706',
+    '#7C3AED',
+    '#DB2777',
+    '#0891B2',
+    '#65A30D',
+    '#14B8A6'
+  ];
+
+  function hexToRgba(hex, alpha) {
+    if (!hex || typeof hex !== 'string' || !hex.startsWith('#')) {
+      return `rgba(37, 99, 235, ${alpha})`;
+    }
+    const normalized = hex.length === 4
+      ? `#${hex[1]}${hex[1]}${hex[2]}${hex[2]}${hex[3]}${hex[3]}`
+      : hex;
+    const r = parseInt(normalized.slice(1, 3), 16);
+    const g = parseInt(normalized.slice(3, 5), 16);
+    const b = parseInt(normalized.slice(5, 7), 16);
+    if ([r, g, b].some(Number.isNaN)) {
+      return `rgba(37, 99, 235, ${alpha})`;
+    }
+    return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+  }
+
+  function getPlayerColor(player) {
+    if (!player) return playerColorPalette[0];
+    const idSource = String(player._id || player.id || player.name || 'player');
+    let hash = 0;
+    for (let i = 0; i < idSource.length; i += 1) {
+      hash = ((hash << 5) - hash) + idSource.charCodeAt(i);
+      hash |= 0;
+    }
+    const idx = Math.abs(hash) % playerColorPalette.length;
+    return playerColorPalette[idx];
+  }
+
+  function styleShotMarker(marker, player, result) {
+    const color = getPlayerColor(player);
+    marker.style.boxShadow = `0 0 0 2px ${hexToRgba(color, 0.4)}, 0 2px 6px rgba(0,0,0,0.25)`;
+    if (result === 'made') {
+      marker.style.borderColor = hexToRgba(color, 0.95);
+      marker.style.color = '#fff';
+      marker.style.background = hexToRgba(color, 0.88);
+      return;
+    }
+
+    // Reserve red styling for missed shots.
+    marker.style.borderColor = 'rgba(198, 40, 40, 0.95)';
+    marker.style.color = '#b91c1c';
+    marker.style.background = 'rgba(239, 68, 68, 0.18)';
+  }
+
+  function styleFoulMarker(marker, player) {
+    const color = getPlayerColor(player);
+    marker.style.boxShadow = `0 0 0 2px ${hexToRgba(color, 0.4)}, 0 2px 6px rgba(0,0,0,0.25)`;
+    marker.style.borderColor = hexToRgba(color, 0.95);
+    marker.style.background = hexToRgba(color, 0.2);
+  }
+
   /**
    * Add a shot marker on the court overlay
    * @param {'A'|'B'} teamKey
@@ -555,11 +648,13 @@ document.addEventListener("DOMContentLoaded", async () => {
     marker.style.display = 'flex';
     marker.style.alignItems = 'center';
     marker.style.justifyContent = 'center';
+    styleFoulMarker(marker, player);
     
     marker.title = `${player?.name || teamKey} - Foul`;
     marker.style.left = `${pos.xPct}%`;
     marker.style.top = `${pos.yPct}%`;
     marker.dataset.player = player?.name || teamKey;
+    marker.dataset.playerId = player ? String(player._id || player) : '';
     marker.dataset.type = 'foul';
     shotMarkersEl.appendChild(marker);
     
@@ -582,12 +677,13 @@ document.addEventListener("DOMContentLoaded", async () => {
     marker.style.display = 'flex';
     marker.style.alignItems = 'center';
     marker.style.justifyContent = 'center';
-    marker.style.color = result === 'made' ? '#fff' : '#333';
+    styleShotMarker(marker, player, result);
 
     marker.title = `${player?.name || teamKey} - ${shotType.toUpperCase()} ${result}`;
     marker.style.left = `${pos.xPct}%`;
     marker.style.top = `${pos.yPct}%`;
     marker.dataset.player = player?.name || teamKey;
+    marker.dataset.playerId = player ? String(player._id || player) : '';
     marker.dataset.shotType = shotType;
     marker.dataset.result = result;
     shotMarkersEl.appendChild(marker);
@@ -624,6 +720,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     // Store shot in history for this player
     const shotEntry = {
       player: playerName,
+      playerId: player ? String(player._id || player) : '',
       teamKey: teamKey,
       shotType: shotLabel,
       result: result,
@@ -652,6 +749,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     // Store foul in history for this player
     const foulEntry = {
       player: playerName,
+      playerId: player ? String(player._id || player) : '',
       teamKey: teamKey,
       shotType: 'FOUL',
       result: 'recorded',
@@ -673,7 +771,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     // Also log to new action history system
     addActionEntry(teamKey, {
       id: actionId || undefined,
-      label: 'Foul',
+      label: `${playerName} Foul`,
       type: 'foul',
       gameSeconds: secondsElapsed,
       markerEl: foulMarker || null
@@ -701,10 +799,15 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   function addActionEntry(teamKey, entry) {
     if (!state.actionHistory[teamKey]) return;
+    const activePlayer = getActivePlayerForTeam(teamKey);
+    const resolvedPlayerId = entry.playerId || (activePlayer ? String(activePlayer._id || activePlayer) : '');
+    const resolvedPlayerName = entry.playerName || (activePlayer?.name || `Team ${teamKey}`);
     const actionId = entry.id || `action_${Date.now()}_${Math.random().toString(16).slice(2)}`;
     const action = {
       id: actionId,
       teamKey,
+      playerId: resolvedPlayerId,
+      playerName: resolvedPlayerName,
       label: entry.label,
       timeLabel: entry.timeLabel || formatGameTime(entry.gameSeconds),
       timestamp: entry.timestamp || Date.now(),
@@ -855,14 +958,25 @@ document.addEventListener("DOMContentLoaded", async () => {
     const container = teamKey === 'A' ? els.a.actions : els.b.actions;
     if (!container) return;
     const actions = state.actionHistory[teamKey] || [];
+    const activePlayer = getActivePlayerForTeam(teamKey);
+    const activePlayerId = activePlayer ? String(activePlayer._id || activePlayer) : '';
+    const isInactiveTeam = state.active !== teamKey;
+    const visibleActions = gameContext.ruleMode === 'tag-team-1v1'
+      ? actions.filter((action) => !activePlayerId || String(action.playerId || '') === activePlayerId)
+      : actions;
     container.innerHTML = '';
 
-    if (actions.length === 0) {
-      container.innerHTML = '<div class="action-item"><div class="action-item__content"><div class="action-item__label">No actions yet</div></div></div>';
+    if (isInactiveTeam) {
+      container.innerHTML = '<div class="action-item"><div class="action-item__content"><div class="action-item__label">Actions hidden while team is inactive</div></div></div>';
       return;
     }
 
-    const ordered = [...actions].reverse();
+    if (visibleActions.length === 0) {
+      container.innerHTML = '<div class="action-item"><div class="action-item__content"><div class="action-item__label">No actions for current player</div></div></div>';
+      return;
+    }
+
+    const ordered = [...visibleActions].reverse();
     ordered.forEach((action) => {
       const item = document.createElement('div');
       item.className = `action-item${action.highlighted ? ' highlighted' : ''}`;
@@ -889,6 +1003,9 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   function seedActionFromEvent(event, teamKey) {
     if (!teamKey) return;
+    const eventPlayerId = event.player_id?._id ? String(event.player_id._id) : String(event.player_id || '');
+    const assigned = getAssignedPlayerById(eventPlayerId);
+    const eventPlayerName = assigned?.key ? (gameContext.players[assigned.key]?.name || `Team ${teamKey}`) : `Team ${teamKey}`;
     if (event.type === 'shot') {
       const pointsLabel = event.points === 4 ? '4PT' : event.points === 3 ? '3PT' : '2PT';
       const label = `${pointsLabel} ${event.made ? 'Made' : 'Missed'}`;
@@ -896,7 +1013,9 @@ document.addEventListener("DOMContentLoaded", async () => {
         label,
         type: 'shot',
         timeLabel: formatTimestamp(event.timestamp),
-        timestamp: event.timestamp
+        timestamp: event.timestamp,
+        playerId: eventPlayerId,
+        playerName: eventPlayerName
       });
       return;
     }
@@ -906,7 +1025,9 @@ document.addEventListener("DOMContentLoaded", async () => {
         label,
         type: 'free_throw',
         timeLabel: formatTimestamp(event.timestamp),
-        timestamp: event.timestamp
+        timestamp: event.timestamp,
+        playerId: eventPlayerId,
+        playerName: eventPlayerName
       });
       return;
     }
@@ -915,9 +1036,40 @@ document.addEventListener("DOMContentLoaded", async () => {
         label: 'Foul',
         type: 'foul',
         timeLabel: formatTimestamp(event.timestamp),
-        timestamp: event.timestamp
+        timestamp: event.timestamp,
+        playerId: eventPlayerId,
+        playerName: eventPlayerName
       });
     }
+  }
+
+  function refreshVisibleMarkers() {
+    const teamAPlayer = getActivePlayerForTeam('A');
+    const teamBPlayer = getActivePlayerForTeam('B');
+    const teamAPlayerId = teamAPlayer ? String(teamAPlayer._id || teamAPlayer) : '';
+    const teamBPlayerId = teamBPlayer ? String(teamBPlayer._id || teamBPlayer) : '';
+    const isTagMode = gameContext.ruleMode === 'tag-team-1v1';
+
+    const applyVisibility = (selector, teamKey, activePlayerId) => {
+      document.querySelectorAll(selector).forEach((marker) => {
+        const isActiveTeam = state.active === teamKey;
+        if (!isActiveTeam) {
+          marker.style.display = 'none';
+          return;
+        }
+
+        if (!isTagMode) {
+          marker.style.display = 'flex';
+          return;
+        }
+
+        const markerPlayerId = String(marker.dataset.playerId || '');
+        marker.style.display = !activePlayerId || markerPlayerId === activePlayerId ? 'flex' : 'none';
+      });
+    };
+
+    applyVisibility('.shot-marker.team-a, .foul-marker.team-a', 'A', teamAPlayerId);
+    applyVisibility('.shot-marker.team-b, .foul-marker.team-b', 'B', teamBPlayerId);
   }
 
   function updateShotLogDisplay() {
@@ -925,13 +1077,18 @@ document.addEventListener("DOMContentLoaded", async () => {
     if (!shotLog) return;
     
     // Get shots for active player
-    const activeShots = state.shotHistory[state.active];
+    const activeTeamShots = state.shotHistory[state.active] || [];
+    const activePlayer = getActivePlayerForTeam(state.active);
+    const activePlayerId = activePlayer ? String(activePlayer._id || activePlayer) : '';
+    const activeShots = gameContext.ruleMode === 'tag-team-1v1'
+      ? activeTeamShots.filter((shot) => !activePlayerId || String(shot.playerId || '') === activePlayerId)
+      : activeTeamShots;
     
     // Clear the log
     shotLog.innerHTML = '';
     
     if (activeShots.length === 0) {
-      shotLog.innerHTML = '<div style="padding: 15px; text-align: center; color: #999; font-size: 12px;">No shots yet</div>';
+      shotLog.innerHTML = '<div style="padding: 15px; text-align: center; color: #999; font-size: 12px;">No shots for current player</div>';
       return;
     }
     
@@ -1115,10 +1272,19 @@ document.addEventListener("DOMContentLoaded", async () => {
     closeModal();
   }
 
-  function setActive(teamKey) {
+  function setActive(teamKey, options = {}) {
     state.active = teamKey;
     updateUI();
     updateShotLogDisplay();  // Update shot log to show this player's shots
+    if (options.logAction) {
+      addActionEntry(teamKey, {
+        label: options.label || 'Switched Active Team',
+        type: 'hotkey',
+        gameSeconds: secondsElapsed,
+        playerId: getPlayerId(teamKey),
+        playerName: getActivePlayerForTeam(teamKey)?.name || `Team ${teamKey}`
+      });
+    }
   }
 
   function swapActiveTeammate(teamKey = state.active) {
@@ -1129,6 +1295,13 @@ document.addEventListener("DOMContentLoaded", async () => {
     gameContext.activePlayerIndex[teamKey] = (gameContext.activePlayerIndex[teamKey] === 0) ? 1 : 0;
     updateUI();
     updateShotLogDisplay();
+    addActionEntry(teamKey, {
+      label: 'Swapped Active Teammate',
+      type: 'hotkey',
+      gameSeconds: secondsElapsed,
+      playerId: getPlayerId(teamKey),
+      playerName: getActivePlayerForTeam(teamKey)?.name || `Team ${teamKey}`
+    });
     return true;
   }
 
@@ -1407,11 +1580,12 @@ document.addEventListener("DOMContentLoaded", async () => {
       selectorEls.B.assignBtn2.classList.toggle('assigned', state.active === 'B' && gameContext.activePlayerIndex.B === 1 && !!gameContext.players.B2);
     }
 
-    // Show only the active player's shot markers on the court
-    const teamAMarkers = document.querySelectorAll('.shot-marker.team-a');
-    const teamBMarkers = document.querySelectorAll('.shot-marker.team-b');
-    teamAMarkers.forEach(marker => marker.style.display = state.active === 'A' ? 'flex' : 'none');
-    teamBMarkers.forEach(marker => marker.style.display = state.active === 'B' ? 'flex' : 'none');
+    // Show markers for the active team and active individual in tag mode
+    refreshVisibleMarkers();
+
+    renderActionLog('A');
+    renderActionLog('B');
+    updateShotLogDisplay();
 
     refreshRuleModeUI();
   }
@@ -1472,6 +1646,8 @@ document.addEventListener("DOMContentLoaded", async () => {
       label: actionLabel,
       type: shotType,
       gameSeconds: secondsElapsed,
+      playerId,
+      playerName: getActivePlayerForTeam(teamKey)?.name || `Team ${teamKey}`,
       markerEl: markerEl || null
     });
 
@@ -1671,13 +1847,33 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
 
     updateUI();
+
+    addActionEntry(state.active, {
+      label: 'Undo Last Event',
+      type: 'hotkey',
+      gameSeconds: secondsElapsed,
+      playerId: getPlayerId(state.active),
+      playerName: getActivePlayerForTeam(state.active)?.name || `Team ${state.active}`
+    });
+  }
+
+  function getDefendingTeamKey() {
+    return state.active === 'A' ? 'B' : 'A';
+  }
+
+  function logDefensiveFoul() {
+    openFoulModal();
   }
 
   // Wire buttons
   if (els.selectA) els.selectA.addEventListener('click', () => { if (!isGameRunning) return showStartError(`Assign ${requiredPlayersPerTeam()} player(s) to each team and press Start Game.`); controller.setActive('A'); });
   if (els.selectB) els.selectB.addEventListener('click', () => { if (!isGameRunning) return showStartError(`Assign ${requiredPlayersPerTeam()} player(s) to each team and press Start Game.`); controller.setActive('B'); });
-  if (els.a.foulPlus) els.a.foulPlus.addEventListener('click', () => { if (!isGameRunning) return showStartError(`Assign ${requiredPlayersPerTeam()} player(s) to each team and press Start Game.`); controller.incrementFoul('A'); });
-  if (els.b.foulPlus) els.b.foulPlus.addEventListener('click', () => { if (!isGameRunning) return showStartError(`Assign ${requiredPlayersPerTeam()} player(s) to each team and press Start Game.`); controller.incrementFoul('B'); });
+  if (els.a.foulPlus) els.a.foulPlus.addEventListener('click', () => logDefensiveFoul());
+  if (els.b.foulPlus) els.b.foulPlus.addEventListener('click', () => logDefensiveFoul());
+  const sideFoulABtn = document.getElementById('teamAFoulBtn');
+  const sideFoulBBtn = document.getElementById('teamBFoulBtn');
+  if (sideFoulABtn) sideFoulABtn.addEventListener('click', () => logDefensiveFoul());
+  if (sideFoulBBtn) sideFoulBBtn.addEventListener('click', () => logDefensiveFoul());
   if (els.a.ftBtn) els.a.ftBtn.addEventListener('click', () => controller.openFtModal('A'));
   if (els.b.ftBtn) els.b.ftBtn.addEventListener('click', () => controller.openFtModal('B'));
   if (els.undo) els.undo.addEventListener('click', () => controller.undoLast());
@@ -1699,6 +1895,63 @@ document.addEventListener("DOMContentLoaded", async () => {
   if (ftModal.overlay) ftModal.overlay.addEventListener('click', (e) => {
     if (e.target === ftModal.overlay) closeFtModal();
   });
+
+  const foulModal = {
+    overlay: document.getElementById('foulModal'),
+    playerABtn: document.getElementById('foulPlayerABtn'),
+    playerBBtn: document.getElementById('foulPlayerBBtn'),
+    closeBtn: document.getElementById('foulCloseBtn')
+  };
+
+  function closeFoulModal() {
+    if (foulModal.overlay) foulModal.overlay.style.display = 'none';
+  }
+
+  function openFoulModal() {
+    if (!isGameRunning) {
+      showStartError(`Assign ${requiredPlayersPerTeam()} player(s) to each team and press Start Game.`);
+      return;
+    }
+    if (isPaused || isTimeout) return;
+
+    const activeA = getActivePlayerForTeam('A');
+    const activeB = getActivePlayerForTeam('B');
+
+    if (!activeA || !activeB) {
+      showStartError('Both teams need an active player before logging a foul.');
+      return;
+    }
+
+    if (foulModal.playerABtn) {
+      foulModal.playerABtn.textContent = `${activeA.name || 'Player A'} (Team A)`;
+    }
+    if (foulModal.playerBBtn) {
+      foulModal.playerBBtn.textContent = `${activeB.name || 'Player B'} (Team B)`;
+    }
+
+    if (foulModal.overlay) foulModal.overlay.style.display = 'flex';
+  }
+
+  if (foulModal.playerABtn) {
+    foulModal.playerABtn.addEventListener('click', () => {
+      controller.incrementFoul('A');
+      closeFoulModal();
+    });
+  }
+
+  if (foulModal.playerBBtn) {
+    foulModal.playerBBtn.addEventListener('click', () => {
+      controller.incrementFoul('B');
+      closeFoulModal();
+    });
+  }
+
+  if (foulModal.closeBtn) foulModal.closeBtn.addEventListener('click', closeFoulModal);
+  if (foulModal.overlay) {
+    foulModal.overlay.addEventListener('click', (e) => {
+      if (e.target === foulModal.overlay) closeFoulModal();
+    });
+  }
 
   // Action log button handlers (delegation)
   if (els.a.actions) {
@@ -1867,6 +2120,13 @@ document.addEventListener("DOMContentLoaded", async () => {
       const playerName = getActivePlayerForTeam('A')?.name || 'Team A';
       console.log('Timeout called by', playerName);
       state.history.push({ type: 'timeout', team: 'A', timestamp: new Date() });
+      addActionEntry('A', {
+        label: 'Timeout Called',
+        type: 'timeout',
+        gameSeconds: secondsElapsed,
+        playerId: getPlayerId('A'),
+        playerName
+      });
       // Block stats but keep timer running
       isTimeout = true;
       if (pauseGameBtn) pauseGameBtn.innerHTML = 'Resume <span class="hotkey-hint">P</span>';
@@ -1880,6 +2140,13 @@ document.addEventListener("DOMContentLoaded", async () => {
       const playerName = getActivePlayerForTeam('B')?.name || 'Team B';
       console.log('Timeout called by', playerName);
       state.history.push({ type: 'timeout', team: 'B', timestamp: new Date() });
+      addActionEntry('B', {
+        label: 'Timeout Called',
+        type: 'timeout',
+        gameSeconds: secondsElapsed,
+        playerId: getPlayerId('B'),
+        playerName
+      });
       // Block stats but keep timer running
       isTimeout = true;
       if (pauseGameBtn) pauseGameBtn.innerHTML = 'Resume <span class="hotkey-hint">P</span>';
@@ -2395,6 +2662,13 @@ document.addEventListener("DOMContentLoaded", async () => {
       if (isTimeout && !isPaused) {
         isTimeout = false;
         pauseGameBtn.innerHTML = 'Pause <span class="hotkey-hint">P</span>';
+        addActionEntry(state.active, {
+          label: 'Resumed From Timeout',
+          type: 'hotkey',
+          gameSeconds: secondsElapsed,
+          playerId: getPlayerId(state.active),
+          playerName: getActivePlayerForTeam(state.active)?.name || `Team ${state.active}`
+        });
         return;
       }
 
@@ -2402,11 +2676,25 @@ document.addEventListener("DOMContentLoaded", async () => {
         stopTimer();
         pauseGameBtn.innerHTML = 'Play <span class="hotkey-hint">P</span>';
         isPaused = true;
+        addActionEntry(state.active, {
+          label: 'Paused Game',
+          type: 'hotkey',
+          gameSeconds: secondsElapsed,
+          playerId: getPlayerId(state.active),
+          playerName: getActivePlayerForTeam(state.active)?.name || `Team ${state.active}`
+        });
       } else {
         startTimer();
         pauseGameBtn.innerHTML = 'Pause <span class="hotkey-hint">P</span>';
         isPaused = false;
         isTimeout = false; // Clear timeout when resuming from pause
+        addActionEntry(state.active, {
+          label: 'Resumed Game',
+          type: 'hotkey',
+          gameSeconds: secondsElapsed,
+          playerId: getPlayerId(state.active),
+          playerName: getActivePlayerForTeam(state.active)?.name || `Team ${state.active}`
+        });
       }
     }
 
@@ -2473,9 +2761,11 @@ document.addEventListener("DOMContentLoaded", async () => {
     
     const assignModal = document.getElementById('assignPlayerModal');
     const timeoutModal = document.getElementById('timeoutModal');
+    const foulModalEl = document.getElementById('foulModal');
     const postGameModal = document.getElementById('postGameModal');
     const isModalOpen = (assignModal && assignModal.style.display === 'flex') ||
                         (timeoutModal && timeoutModal.style.display === 'flex') ||
+              (foulModalEl && foulModalEl.style.display === 'flex') ||
                         (postGameModal && postGameModal.style.display === 'flex');
     
     if (isModalOpen) return;
@@ -2489,7 +2779,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       if (!isGameRunning) return;
       const currentActive = state.active;
       const newActive = currentActive === 'A' ? 'B' : 'A';
-      setActive(newActive);
+      setActive(newActive, { logAction: true, label: 'Switched Active Team (Tab)' });
       return;
     }
 
@@ -2531,25 +2821,10 @@ document.addEventListener("DOMContentLoaded", async () => {
       return;
     }
     
-    // A - Foul on Team A
-    if (key === 'a') {
+    // G - Defensive foul (assigned to opposing team)
+    if (key === 'g') {
       e.preventDefault();
-      if (isPaused || isTimeout) return;
-      const foulBtn = document.getElementById('teamAFoulPlus');
-      if (foulBtn && !foulBtn.disabled) {
-        foulBtn.click();
-      }
-      return;
-    }
-
-    // B - Foul on Team B
-    if (key === 'b') {
-      e.preventDefault();
-      if (isPaused || isTimeout) return;
-      const foulBtn = document.getElementById('teamBFoulPlus');
-      if (foulBtn && !foulBtn.disabled) {
-        foulBtn.click();
-      }
+      logDefensiveFoul();
       return;
     }
     

@@ -2003,7 +2003,7 @@ body.dark-mode .games-table tr:hover {
 #court_section {
     display: flex;
     justify-content: center;
-    align-items: top;
+    align-items: flex-start;
     margin-top: 1rem;
 }
 
@@ -2036,11 +2036,11 @@ body.dark-mode .games-table tr:hover {
     width: 100%;
     max-width: 670px;
     display: flex;
-    margin: auto;
+    margin: 0 auto;
     background: transparent;
     border-radius: 12px;
     justify-content: center;
-    align-items: center;
+    align-items: flex-start;
 }
 
 #court_container {
