@@ -34,7 +34,7 @@ Each side stat panel can now display either individual active-player stats or fu
 ```javascript
 {
   id: timestamp,
-  label: "4PT Made" | "3PT Made" | "2PT Missed" | "FT Made" | "[Player Name] Foul" | "Switched Active Team (Tab)",
+  label: "4PT Made" | "3PT Made" | "2PT Missed" | "FT Made" | "Committed Foul on [Player Name]" | "Got Fouled by [Player Name]" | "Switched Active Team (Tab)",
   type: "4pt" | "3pt" | "2pt" | "ft" | "foul",
   timeLabel: "12:45",
   gameSeconds: 765,
@@ -148,6 +148,26 @@ Complete rollback of the last action with full state restoration.
 - Cleanup: `marker.remove()` + array splice
 - Undo does not create a separate "Undo Last Event" action log entry.
 
+---
+
+### 4.2 Playback Replay (Live Tracker)
+
+The game tracker includes team playback modals that replay logged events against a court overlay.
+
+**Behavior:**
+- Team-specific playback buttons open Team A or Team B replay.
+- Replay timeline advances every 1.5 seconds.
+- Left action list highlights the active step and auto-scrolls.
+- Court overlay draws progressive markers for replayed marker events.
+
+**Replay marker rules:**
+- Made shots keep unique player colors.
+- Missed shots remain red.
+- Fouls remain yellow.
+- Fouls use role-based shapes:
+  - Triangle: committed foul
+  - Square: got fouled
+
 ### 4.1 Action Row Delete = Targeted Undo
 
 Deleting an action from the Actions table now undoes that exact action instead of only removing the row.
@@ -203,7 +223,9 @@ Keyboard shortcuts for rapid game logging.
 
 - Pressing Team A/Team B foul controls (or hotkeys `A` / `B`) immediately logs the foul for that team's active player.
 - The opposing active player is represented as the fouled player in marker rendering.
-- Action history labels keep fouling-player identity.
+- Action history records both players with explicit labels:
+  - `Committed Foul on <Player Name>`
+  - `Got Fouled by <Player Name>`
 
 #### Zone Contradiction Warnings
 

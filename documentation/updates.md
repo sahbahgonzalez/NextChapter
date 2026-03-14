@@ -312,6 +312,74 @@ removeActionEntryById(teamKey, actionId);
 
 ---
 
+### 21. Playback UI + Replay Timeline Enhancements
+**Date**: March 14, 2026  
+**Files Modified**: `frontend/game.html`, `frontend/game-report.html`, `frontend/css/shared.css`, `frontend/js/gameScript.js`, `frontend/js/game-report.js`
+
+**Changes:**
+- Added Team A/Team B playback triggers to both game tracker and report pages.
+- Added playback modals with split layout:
+  - left: action timeline
+  - right: court image with replay marker overlay
+- Playback now advances at **1.5 second** intervals.
+- Active replay step auto-highlights and auto-scrolls in the action list.
+- Court overlay now renders progressive replay markers (all previous + active).
+
+**Visual Replay Rules Preserved:**
+- Made shots keep unique player color.
+- Missed shots remain red.
+- Fouls remain yellow.
+- Foul shapes remain role-based:
+  - triangle = committed foul
+  - square = got fouled
+
+---
+
+### 22. Live Playback Uses Full Action Events
+**Date**: March 14, 2026  
+**Files Modified**: `frontend/js/gameScript.js`
+
+**Changes:**
+- Live playback source changed from shot-history-only to full action history.
+- Replay now includes control and context events in the left timeline, not only shots/fouls.
+- Marker replay remains position-based and still renders for marker-bearing events.
+
+---
+
+### 23. Dual-Player Foul Action Labels
+**Date**: March 14, 2026  
+**Files Modified**: `frontend/js/gameScript.js`, `frontend/js/game-report.js`
+
+**Changes:**
+- Foul logging now records action rows for both participants.
+- Action labels now include explicit opponent context:
+  - `Committed Foul on <Player Name>`
+  - `Got Fouled by <Player Name>`
+- Snapshot-based report event reconstruction now carries both committed and drawn foul events when available.
+
+---
+
+### 24. Team Name Lock During Active Game
+**Date**: March 14, 2026  
+**Files Modified**: `frontend/js/gameScript.js`
+
+**Changes:**
+- Team name inputs are locked while a game is running.
+- Inputs automatically unlock when the game ends or tracker returns to non-running state.
+
+---
+
+### 25. Live Games Section Fallback From Active Local Snapshot
+**Date**: March 14, 2026  
+**Files Modified**: `frontend/js/games.js`
+
+**Changes:**
+- Games page now promotes the active local snapshot game into the **Live Games** tab when backend status has not yet switched to `live`/`in_progress`.
+- If backend game exists but is still non-live, it is rendered as live in the list while snapshot is active.
+- If only local snapshot context is available, a snapshot-only live card is synthesized so the game remains visible.
+
+---
+
 ## January 2026 - Game Tracker Enhancements
 
 ### 1. Action History System

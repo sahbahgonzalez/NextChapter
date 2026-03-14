@@ -12,6 +12,8 @@ The Games system manages basketball game records, tracks live game events, and s
   2. local live snapshot score (`tnc_live_game_state_active_v1`)
   3. existing score fallback
 - Live game cards include a **Live Report** action that opens `game-report.html?id=<gameId>&live=1`.
+- If an active local snapshot exists but backend status has not switched to `live`/`in_progress` yet, that game is promoted into the **Live Games** section.
+- If needed, a snapshot-only live card is synthesized so the currently running local game remains visible.
 
 ---
 
