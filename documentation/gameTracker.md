@@ -162,7 +162,7 @@ The game tracker includes team playback modals that replay logged events against
 
 **Replay marker rules:**
 - Made shots keep unique player colors.
-- Missed shots remain red.
+- Missed shots render as red X markers.
 - Fouls remain yellow.
 - Fouls use role-based shapes:
   - Triangle: committed foul
@@ -185,7 +185,7 @@ In addition to tracker/report playback, the Games page now routes live chart vie
 
 **Marker semantics are unchanged:**
 - Made shots keep player color
-- Missed shots remain red
+- Missed shots render as red X markers
 - Foul committed = yellow triangle
 - Got fouled = yellow square
 
