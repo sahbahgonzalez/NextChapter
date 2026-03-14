@@ -409,7 +409,7 @@ function restoreGameEvents(game) {
       marker.style.display = 'flex';
       marker.style.alignItems = 'center';
       marker.style.justifyContent = 'center';
-      marker.style.color = result === 'made' ? '#fff' : '#333';
+      styleShotMarker(marker, player, result);
 
       marker.title = `${player?.name || teamKey} - ${shotType.toUpperCase()} ${result}`;
       marker.style.left = `${event.location.x}%`;
@@ -418,18 +418,6 @@ function restoreGameEvents(game) {
       marker.dataset.playerId = eventPlayerId;
       marker.dataset.shotType = shotType;
       marker.dataset.result = result;
-
-      const markerColor = idToColor(eventPlayerId);
-      marker.style.boxShadow = `0 0 0 2px ${hexToRgba(markerColor, 0.4)}, 0 2px 6px rgba(0,0,0,0.25)`;
-      if (result === 'made') {
-        marker.style.borderColor = hexToRgba(markerColor, 0.95);
-        marker.style.color = '#fff';
-        marker.style.background = hexToRgba(markerColor, 0.88);
-      } else {
-        marker.style.borderColor = 'rgba(198, 40, 40, 0.95)';
-        marker.style.color = '#b91c1c';
-        marker.style.background = 'rgba(239, 68, 68, 0.18)';
-      }
 
       shotMarkersEl.appendChild(marker);
     }
@@ -967,13 +955,18 @@ document.addEventListener("DOMContentLoaded", async () => {
       marker.style.borderColor = hexToRgba(color, 0.95);
       marker.style.color = '#fff';
       marker.style.background = hexToRgba(color, 0.88);
+      marker.style.fontSize = '10px';
+      marker.style.fontWeight = '700';
       return;
     }
 
     // Misses are always red.
     marker.style.borderColor = 'rgba(198, 40, 40, 0.95)';
-    marker.style.color = '#b91c1c';
+    marker.style.color = 'rgba(198, 40, 40, 1)';
     marker.style.background = 'rgba(239, 68, 68, 0.18)';
+    marker.style.fontSize = '13px';
+    marker.style.fontWeight = '900';
+    marker.textContent = 'X';
   }
 
   function styleFoulMarker(marker, player) {
@@ -1042,7 +1035,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     // Add player initials to the marker
     const player = getActivePlayerForTeam(teamKey);
     const initials = player?.name ? player.name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) : teamKey;
-    marker.textContent = initials;
+    marker.textContent = result === 'made' ? initials : 'X';
     marker.style.fontSize = '10px';
     marker.style.fontWeight = 'bold';
     marker.style.display = 'flex';
