@@ -9,6 +9,12 @@ const STARRED_PLAYS_STORAGE_PREFIX = 'tnc_starred_plays_';
 const GAME_ACTIONS_STORAGE_PREFIX = 'tnc_game_actions_';
 const LIVE_GAME_STATE_KEY = 'tnc_live_game_state_active_v1';
 let liveReportRefreshTimer = null;
+let reportPlaybackTimer = null;
+let reportPlaybackTeam = null;
+let reportPlaybackSteps = [];
+let reportPlaybackIndex = 0;
+let reportPlaybackPlaying = false;
+const REPORT_PLAYBACK_INTERVAL_MS = 1500;
 
 const PLAYER_CHART_COLORS = [
     '#1D4ED8',
@@ -161,7 +167,7 @@ function buildLiveEventsFromSnapshot(snapshot) {
 
     return snapshot.state.history
         .filter((change) => !!change && (change.kind === 'shot' || change.kind === 'foul'))
-        .map((change, index) => {
+        .flatMap((change, index) => {
             const team = change.team === 'A' ? 'team_a' : 'team_b';
             const playerId = String(change.playerId || '');
             const playerName = names.get(playerId) || 'Player';
@@ -169,17 +175,37 @@ function buildLiveEventsFromSnapshot(snapshot) {
             const shotPoints = change.shotType === '4pt' ? 4 : change.shotType === '3pt' ? 3 : change.shotType === '2pt' ? 2 : 1;
 
             if (change.kind === 'foul') {
-                return {
+                const committedEvent = {
                     _id: String(change.actionId || `live_foul_${index}`),
                     type: 'foul',
                     team,
                     player_id: { _id: playerId, name: playerName },
                     timestamp: change.timestamp || Date.now(),
+                    foulRole: 'committed',
                     location: change.pos ? { x: change.pos.xPct, y: change.pos.yPct } : null
                 };
+
+                const secondaryPlayerId = String(change.secondaryPlayerId || '');
+                if (!secondaryPlayerId) {
+                    return [committedEvent];
+                }
+
+                const fouledTeam = team === 'team_a' ? 'team_b' : 'team_a';
+                const fouledName = names.get(secondaryPlayerId) || 'Player';
+                const drawnEvent = {
+                    _id: `${committedEvent._id}_drawn`,
+                    type: 'foul',
+                    team: fouledTeam,
+                    player_id: { _id: secondaryPlayerId, name: fouledName },
+                    timestamp: change.timestamp || Date.now(),
+                    foulRole: 'drawn',
+                    location: change.pos ? { x: change.pos.xPct, y: change.pos.yPct } : null
+                };
+
+                return [committedEvent, drawnEvent];
             }
 
-            return {
+            return [{
                 _id: String(change.actionId || `live_shot_${index}`),
                 type: isFt ? 'free_throw' : 'shot',
                 team,
@@ -188,7 +214,7 @@ function buildLiveEventsFromSnapshot(snapshot) {
                 made: change.result === 'made',
                 points: shotPoints,
                 location: change.pos ? { x: change.pos.xPct, y: change.pos.yPct } : null
-            };
+            }];
         });
 }
 
@@ -277,8 +303,237 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     await loadGameReport();
-    window.addEventListener('beforeunload', () => stopLiveReportAutoRefresh());
+    window.addEventListener('beforeunload', () => {
+        stopLiveReportAutoRefresh();
+        stopReportPlaybackTimer();
+    });
+    wireReportPlaybackControls();
 });
+
+function getReportPlaybackEls() {
+    return {
+        openA: document.getElementById('teamAReportPlaybackBtn'),
+        openB: document.getElementById('teamBReportPlaybackBtn'),
+        overlay: document.getElementById('reportPlaybackModal'),
+        close: document.getElementById('reportPlaybackClose'),
+        title: document.getElementById('reportPlaybackTitle'),
+        meta: document.getElementById('reportPlaybackMeta'),
+        current: document.getElementById('reportPlaybackCurrent'),
+        list: document.getElementById('reportPlaybackList'),
+        courtOverlay: document.getElementById('reportPlaybackCourtOverlay'),
+        prev: document.getElementById('reportPlaybackPrev'),
+        playPause: document.getElementById('reportPlaybackPlayPause'),
+        next: document.getElementById('reportPlaybackNext')
+    };
+}
+
+function stopReportPlaybackTimer() {
+    if (reportPlaybackTimer) {
+        clearInterval(reportPlaybackTimer);
+        reportPlaybackTimer = null;
+    }
+}
+
+function setReportPlaybackPlayState(playing) {
+    reportPlaybackPlaying = !!playing;
+    const els = getReportPlaybackEls();
+    if (els.playPause) {
+        els.playPause.textContent = reportPlaybackPlaying ? 'Pause' : 'Play';
+    }
+}
+
+function buildReportPlaybackPlayerColorMap() {
+    const colorMap = new Map();
+    const reportPlayers = getReportPlayers();
+    reportPlayers.forEach((player, index) => {
+        const playerId = String(player?._id || player?.id || '');
+        if (!playerId) return;
+        colorMap.set(playerId, PLAYER_CHART_COLORS[index % PLAYER_CHART_COLORS.length]);
+    });
+    return colorMap;
+}
+
+function buildReportPlaybackSteps(teamKey) {
+    const events = getEffectiveGameEvents();
+    const nameLookup = getPlayerNameLookup();
+    const playerColorMap = buildReportPlaybackPlayerColorMap();
+    const filtered = events.filter((event) => {
+        if (!event) return false;
+        if (event.type !== 'shot' && event.type !== 'free_throw' && event.type !== 'foul') return false;
+        return event.team === teamKey;
+    });
+
+    filtered.sort((a, b) => Number(new Date(a.timestamp || 0)) - Number(new Date(b.timestamp || 0)));
+
+    let runningPoints = 0;
+    return filtered.map((event) => {
+        const playerId = getEventPlayerId(event);
+        const resolvedName = event.player_id?.name || event.player_name || nameLookup.get(playerId) || (teamKey === 'team_b' ? 'Team B' : 'Team A');
+        const isFoul = event.type === 'foul';
+        const made = !!event.made;
+        const points = Number(event.points || (event.type === 'free_throw' ? 1 : 2));
+        if (!isFoul && made) runningPoints += points;
+        const shotType = isFoul ? 'FOUL' : (event.type === 'free_throw' ? 'FT' : `${points}PT`);
+        const timeLabel = event.timestamp ? formatDate(event.timestamp).split(' ')[1] || '—' : '—';
+        return {
+            playerName: resolvedName,
+            playerColor: playerColorMap.get(playerId) || PLAYER_CHART_COLORS[0],
+            actionType: isFoul ? 'foul' : 'shot',
+            foulRole: event.foulRole === 'drawn' ? 'drawn' : 'committed',
+            shotType,
+            result: isFoul ? 'Foul' : (made ? 'Made' : 'Missed'),
+            timeLabel,
+            pointsAfter: runningPoints,
+            pos: event.location && typeof event.location === 'object'
+                ? {
+                    xPct: Number(event.location.x ?? event.location.xPct),
+                    yPct: Number(event.location.y ?? event.location.yPct)
+                }
+                : null
+        };
+    });
+}
+
+function clampReportPercent(value) {
+    const numeric = Number(value);
+    if (!Number.isFinite(numeric)) return 50;
+    return Math.max(0, Math.min(100, numeric));
+}
+
+function renderReportPlaybackCourt() {
+    const els = getReportPlaybackEls();
+    if (!els.courtOverlay) return;
+
+    if (!reportPlaybackSteps.length) {
+        els.courtOverlay.innerHTML = '';
+        return;
+    }
+
+    const visibleShots = reportPlaybackSteps
+        .slice(0, reportPlaybackIndex + 1)
+        .filter((step) => step.pos && Number.isFinite(Number(step.pos.xPct)) && Number.isFinite(Number(step.pos.yPct)));
+
+    els.courtOverlay.innerHTML = visibleShots.map((step, idx) => {
+        const isActive = idx === visibleShots.length - 1;
+        const shotClass = step.actionType === 'foul'
+            ? `is-foul ${step.foulRole === 'drawn' ? 'is-foul-drawn' : 'is-foul-committed'}`
+            : (step.result === 'Made' ? 'is-made' : 'is-missed');
+        const left = clampReportPercent(step.pos.xPct);
+        const top = clampReportPercent(step.pos.yPct);
+        const madeColorStyle = step.actionType === 'shot' && step.result === 'Made' && step.playerColor
+            ? `--playback-made-color:${step.playerColor};`
+            : '';
+        return `<div class="playback-court-shot ${shotClass} ${isActive ? 'active' : ''}" style="left:${left}%; top:${top}%; ${madeColorStyle}" title="${step.playerName} - ${step.shotType} ${step.result}"></div>`;
+    }).join('');
+}
+
+function renderReportPlaybackState() {
+    const els = getReportPlaybackEls();
+    if (!els.meta || !els.current || !els.list) return;
+
+    const total = reportPlaybackSteps.length;
+    const current = total > 0 ? reportPlaybackSteps[reportPlaybackIndex] : null;
+    const teamName = reportPlaybackTeam === 'team_b'
+        ? (gameData?.teams?.team_b?.name || 'Team B')
+        : (gameData?.teams?.team_a?.name || 'Team A');
+
+    els.meta.textContent = total > 0
+        ? `${teamName} • Step ${reportPlaybackIndex + 1} of ${total}`
+        : `${teamName} • No shots recorded`;
+
+    els.current.textContent = current
+        ? `${current.timeLabel} • ${current.playerName} • ${current.shotType} ${current.result} • Team PTS: ${current.pointsAfter}`
+        : 'No shot sequence available for this team.';
+
+    if (els.prev) els.prev.disabled = total === 0 || reportPlaybackIndex <= 0;
+    if (els.next) els.next.disabled = total === 0 || reportPlaybackIndex >= total - 1;
+    if (els.playPause) els.playPause.disabled = total <= 1;
+
+    els.list.innerHTML = total > 0
+        ? reportPlaybackSteps.map((step, idx) => `
+            <div class="playback-step-item ${idx === reportPlaybackIndex ? 'active' : ''}">
+                ${idx + 1}. ${step.timeLabel} • ${step.playerName} • ${step.shotType} ${step.result} • Team PTS: ${step.pointsAfter}
+            </div>
+        `).join('')
+        : '<div class="playback-step-item">No shots recorded for this team.</div>';
+
+    const activeEl = els.list.querySelector('.playback-step-item.active');
+    if (activeEl) {
+        activeEl.scrollIntoView({ block: 'nearest' });
+    }
+    renderReportPlaybackCourt();
+}
+
+function stepReportPlayback(delta) {
+    if (!reportPlaybackSteps.length) return;
+    reportPlaybackIndex = Math.max(0, Math.min(reportPlaybackSteps.length - 1, reportPlaybackIndex + delta));
+    renderReportPlaybackState();
+}
+
+function startReportPlaybackAuto() {
+    if (reportPlaybackSteps.length <= 1) return;
+    stopReportPlaybackTimer();
+    setReportPlaybackPlayState(true);
+    reportPlaybackTimer = setInterval(() => {
+        if (reportPlaybackIndex >= reportPlaybackSteps.length - 1) {
+            stopReportPlaybackTimer();
+            setReportPlaybackPlayState(false);
+            return;
+        }
+        stepReportPlayback(1);
+    }, REPORT_PLAYBACK_INTERVAL_MS);
+}
+
+function openReportPlayback(teamKey) {
+    reportPlaybackTeam = teamKey;
+    reportPlaybackSteps = buildReportPlaybackSteps(teamKey);
+    reportPlaybackIndex = 0;
+    stopReportPlaybackTimer();
+    setReportPlaybackPlayState(false);
+
+    const els = getReportPlaybackEls();
+    const teamName = teamKey === 'team_b'
+        ? (gameData?.teams?.team_b?.name || 'Team B')
+        : (gameData?.teams?.team_a?.name || 'Team A');
+    if (els.title) els.title.textContent = `${teamName} Playback`;
+    renderReportPlaybackState();
+    if (els.overlay) els.overlay.style.display = 'flex';
+}
+
+function closeReportPlayback() {
+    stopReportPlaybackTimer();
+    setReportPlaybackPlayState(false);
+    const els = getReportPlaybackEls();
+    if (els.overlay) els.overlay.style.display = 'none';
+}
+
+function wireReportPlaybackControls() {
+    const els = getReportPlaybackEls();
+    if (els.openA) els.openA.addEventListener('click', () => openReportPlayback('team_a'));
+    if (els.openB) els.openB.addEventListener('click', () => openReportPlayback('team_b'));
+    if (els.close) els.close.addEventListener('click', closeReportPlayback);
+    if (els.overlay) els.overlay.addEventListener('click', (e) => {
+        if (e.target === els.overlay) closeReportPlayback();
+    });
+    if (els.prev) els.prev.addEventListener('click', () => {
+        stopReportPlaybackTimer();
+        setReportPlaybackPlayState(false);
+        stepReportPlayback(-1);
+    });
+    if (els.next) els.next.addEventListener('click', () => {
+        stopReportPlaybackTimer();
+        setReportPlaybackPlayState(false);
+        stepReportPlayback(1);
+    });
+    if (els.playPause) els.playPause.addEventListener('click', () => {
+        if (reportPlaybackPlaying) {
+            stopReportPlaybackTimer();
+            setReportPlaybackPlayState(false);
+            return;
+        }
+        startReportPlaybackAuto();
+    });
+}
 
 function getGameIdFromUrl() {
     const params = new URLSearchParams(window.location.search);

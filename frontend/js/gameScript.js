@@ -665,7 +665,9 @@ document.addEventListener("DOMContentLoaded", async () => {
     teamAStatsView: document.getElementById('teamAStatsView'),
     teamBStatsView: document.getElementById('teamBStatsView'),
     teamAStatsScope: document.getElementById('teamAStatsScope'),
-    teamBStatsScope: document.getElementById('teamBStatsScope')
+    teamBStatsScope: document.getElementById('teamBStatsScope'),
+    teamAPlaybackBtn: document.getElementById('teamAPlaybackBtn'),
+    teamBPlaybackBtn: document.getElementById('teamBPlaybackBtn')
   };
 
   // DEBUG: Log if all elements were found
@@ -712,6 +714,26 @@ document.addEventListener("DOMContentLoaded", async () => {
     missBtn: document.getElementById('shotMissBtn')
   };
 
+  const playbackModal = {
+    overlay: document.getElementById('playbackModal'),
+    close: document.getElementById('playbackClose'),
+    title: document.getElementById('playbackTitle'),
+    meta: document.getElementById('playbackMeta'),
+    current: document.getElementById('playbackCurrent'),
+    list: document.getElementById('playbackList'),
+    courtOverlay: document.getElementById('playbackCourtOverlay'),
+    prevBtn: document.getElementById('playbackPrev'),
+    playPauseBtn: document.getElementById('playbackPlayPause'),
+    nextBtn: document.getElementById('playbackNext')
+  };
+
+  let playbackTimer = null;
+  let playbackTeamKey = null;
+  let playbackSteps = [];
+  let playbackIndex = 0;
+  let playbackIsPlaying = false;
+  const PLAYBACK_INTERVAL_MS = 1500;
+
   const shotMarkersEl = document.getElementById('shot_markers');
 
   function applyPlayerAssignmentsToButtons() {
@@ -719,6 +741,18 @@ document.addEventListener("DOMContentLoaded", async () => {
     if (selectorEls.B.assignBtn) selectorEls.B.assignBtn.textContent = gameContext.players.B?.name || 'Assign Player';
     if (selectorEls.A.assignBtn2) selectorEls.A.assignBtn2.textContent = gameContext.players.A2?.name || 'Assign Tag Partner';
     if (selectorEls.B.assignBtn2) selectorEls.B.assignBtn2.textContent = gameContext.players.B2?.name || 'Assign Tag Partner';
+  }
+
+  function setTeamNameInputsLocked(locked) {
+    const shouldLock = !!locked;
+    if (els.teamANameInput) {
+      els.teamANameInput.disabled = shouldLock;
+      els.teamANameInput.readOnly = shouldLock;
+    }
+    if (els.teamBNameInput) {
+      els.teamBNameInput.disabled = shouldLock;
+      els.teamBNameInput.readOnly = shouldLock;
+    }
   }
 
   function createMarkerFromSnapshot(snapshot) {
@@ -996,7 +1030,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     shotMarkersEl.appendChild(marker);
 
     // Log to shot history
-    logShotToHistory(teamKey, shotType, result);
+    logShotToHistory(teamKey, shotType, result, pos);
 
     return marker;
   }
@@ -1007,8 +1041,9 @@ document.addEventListener("DOMContentLoaded", async () => {
    * @param {'A'|'B'} teamKey
   * @param {'2pt'|'3pt'|'4pt'|'ft'} shotType
    * @param {'made'|'missed'} result
+    * @param {{xPct:number,yPct:number}|null} pos
    */
-  function logShotToHistory(teamKey, shotType, result) {
+    function logShotToHistory(teamKey, shotType, result, pos = null) {
     const shotLog = document.getElementById('shot_log');
     if (!shotLog) return;
     
@@ -1035,6 +1070,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       resultColor: resultColor,
       shotEmoji: shotEmoji,
       timestamp: secondsElapsed,
+      pos: pos ? { xPct: Number(pos.xPct), yPct: Number(pos.yPct) } : null,
       type: 'shot'
     };
     
@@ -1044,8 +1080,8 @@ document.addEventListener("DOMContentLoaded", async () => {
     updateShotLogDisplay();
   }
 
-  function logFoulToHistory(teamKey, pos = null, actionId = null) {
-    const player = getActivePlayerForTeam(teamKey);
+  function logFoulToHistory(teamKey, pos = null, actionId = null, foulRole = 'committed', playerOverride = null, logAction = true, counterpartName = '') {
+    const player = playerOverride || getActivePlayerForTeam(teamKey);
     const playerName = player?.name || `Team ${teamKey}`;
     
     // Use game timer
@@ -1060,11 +1096,12 @@ document.addEventListener("DOMContentLoaded", async () => {
       teamKey: teamKey,
       shotType: 'FOUL',
       result: 'recorded',
-      foulRole: 'committed',
+      foulRole: foulRole === 'drawn' ? 'drawn' : 'committed',
       gameTime: gameTime,
       resultColor: '#ff6f00',
       shotEmoji: '🚫',
       timestamp: secondsElapsed,
+      pos: pos ? { xPct: Number(pos.xPct), yPct: Number(pos.yPct) } : null,
       type: 'foul'
     };
     
@@ -1073,17 +1110,25 @@ document.addEventListener("DOMContentLoaded", async () => {
     // Add foul marker on court if position is available
     let foulMarker = null;
     if (pos) {
-      foulMarker = addFoulMarker(teamKey, pos, 'committed');
+      foulMarker = addFoulMarker(teamKey, pos, foulEntry.foulRole);
     }
     
     // Also log to new action history system
-    addActionEntry(teamKey, {
-      id: actionId || undefined,
-      label: `${playerName} Foul`,
-      type: 'foul',
-      gameSeconds: secondsElapsed,
-      markerEl: foulMarker || null
-    });
+    if (logAction) {
+      const relatedName = String(counterpartName || '').trim();
+      const label = foulEntry.foulRole === 'drawn'
+        ? `Got Fouled${relatedName ? ` by ${relatedName}` : ''}`
+        : `Committed Foul${relatedName ? ` on ${relatedName}` : ''}`;
+      addActionEntry(teamKey, {
+        id: actionId || undefined,
+        label,
+        type: 'foul',
+        gameSeconds: secondsElapsed,
+        playerId: foulEntry.playerId,
+        playerName,
+        markerEl: foulMarker || null
+      });
+    }
     
     // Update display for current active player
     updateShotLogDisplay();
@@ -1103,6 +1148,210 @@ document.addEventListener("DOMContentLoaded", async () => {
     const date = new Date(ts);
     if (Number.isNaN(date.getTime())) return '—';
     return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  }
+
+  function stopPlaybackTimer() {
+    if (playbackTimer) {
+      clearInterval(playbackTimer);
+      playbackTimer = null;
+    }
+  }
+
+  function setPlaybackPlayState(isPlaying) {
+    playbackIsPlaying = !!isPlaying;
+    if (playbackModal.playPauseBtn) {
+      playbackModal.playPauseBtn.textContent = playbackIsPlaying ? 'Pause' : 'Play';
+    }
+  }
+
+  function resolvePlaybackPlayerName(entry, teamKey) {
+    if (entry?.player && String(entry.player).trim()) {
+      return String(entry.player).trim();
+    }
+    const assigned = entry?.playerId ? getAssignedPlayerById(entry.playerId) : null;
+    if (assigned?.key && gameContext.players[assigned.key]?.name) {
+      return gameContext.players[assigned.key].name;
+    }
+    return getTeamDisplayName(teamKey);
+  }
+
+  function resolvePlaybackPlayerColor(entry) {
+    const assigned = entry?.playerId ? getAssignedPlayerById(entry.playerId) : null;
+    const playerRef = assigned?.key
+      ? gameContext.players[assigned.key]
+      : { _id: entry?.playerId || '', name: entry?.player || 'Player' };
+    return getPlayerColor(playerRef);
+  }
+
+  function parseMarkerPosition(markerEl) {
+    if (!markerEl) return null;
+    const left = Number.parseFloat(String(markerEl.style.left || '').replace('%', ''));
+    const top = Number.parseFloat(String(markerEl.style.top || '').replace('%', ''));
+    if (!Number.isFinite(left) || !Number.isFinite(top)) return null;
+    return { xPct: left, yPct: top };
+  }
+
+  function getActionMarkerElement(action) {
+    if (action?.markerEl) return action.markerEl;
+    if (!action?.markerId || !shotMarkersEl) return null;
+    return shotMarkersEl.querySelector(`[data-marker-id="${action.markerId}"]`);
+  }
+
+  function getPlaybackPointValue(action) {
+    const type = String(action?.type || '').toLowerCase();
+    const label = String(action?.label || '').toUpperCase();
+    if (type === '4pt' || label.includes('4PT')) return 4;
+    if (type === '3pt' || label.includes('3PT')) return 3;
+    if (type === '2pt' || label.includes('2PT')) return 2;
+    if (type === 'ft' || type === 'free_throw' || label.includes('FT')) return 1;
+    return 0;
+  }
+
+  function getPlaybackResultLabel(action) {
+    const label = String(action?.label || '').toLowerCase();
+    if (label.includes('made')) return 'Made';
+    if (label.includes('missed')) return 'Missed';
+    return '';
+  }
+
+  function buildTeamPlaybackSteps(teamKey) {
+    const timeline = [...(state.actionHistory[teamKey] || [])];
+    let runningPoints = 0;
+
+    return timeline.map((action) => {
+      const markerEl = getActionMarkerElement(action);
+      const actionType = action.type === 'foul'
+        ? 'foul'
+        : (getPlaybackResultLabel(action) ? 'shot' : 'event');
+      const resultLabel = getPlaybackResultLabel(action);
+      const points = resultLabel === 'Made' ? getPlaybackPointValue(action) : 0;
+      runningPoints += points;
+
+      const playerEntry = {
+        player: action.playerName,
+        playerId: action.playerId,
+        foulRole: markerEl?.dataset?.foulRole || 'committed'
+      };
+
+      return {
+        playerName: resolvePlaybackPlayerName(playerEntry, teamKey),
+        playerColor: resolvePlaybackPlayerColor(playerEntry),
+        actionType,
+        foulRole: playerEntry.foulRole === 'drawn' ? 'drawn' : 'committed',
+        label: action.label || 'Action',
+        result: resultLabel,
+        gameTime: action.timeLabel || formatGameTime(action.gameSeconds),
+        pointsAfter: runningPoints,
+        pos: parseMarkerPosition(markerEl)
+      };
+    });
+  }
+
+  function clampPercent(value) {
+    const numeric = Number(value);
+    if (!Number.isFinite(numeric)) return 50;
+    return Math.max(0, Math.min(100, numeric));
+  }
+
+  function renderPlaybackCourt() {
+    if (!playbackModal.courtOverlay) return;
+
+    if (!playbackSteps.length) {
+      playbackModal.courtOverlay.innerHTML = '';
+      return;
+    }
+
+    const visibleShots = playbackSteps
+      .slice(0, playbackIndex + 1)
+      .filter((step) => step.actionType === 'shot' || step.actionType === 'foul')
+      .filter((step) => step.pos && Number.isFinite(Number(step.pos.xPct)) && Number.isFinite(Number(step.pos.yPct)));
+
+    playbackModal.courtOverlay.innerHTML = visibleShots.map((step, idx) => {
+      const isActive = idx === visibleShots.length - 1;
+      const shotClass = step.actionType === 'foul'
+        ? `is-foul ${step.foulRole === 'drawn' ? 'is-foul-drawn' : 'is-foul-committed'}`
+        : (step.result === 'Made' ? 'is-made' : 'is-missed');
+      const left = clampPercent(step.pos.xPct);
+      const top = clampPercent(step.pos.yPct);
+      const madeColorStyle = step.actionType === 'shot' && step.result === 'Made' && step.playerColor
+        ? `--playback-made-color:${step.playerColor};`
+        : '';
+      return `<div class="playback-court-shot ${shotClass} ${isActive ? 'active' : ''}" style="left:${left}%; top:${top}%; ${madeColorStyle}" title="${step.playerName} - ${step.label}${step.result ? ` ${step.result}` : ''}"></div>`;
+    }).join('');
+  }
+
+  function renderPlaybackModalState() {
+    if (!playbackModal.meta || !playbackModal.current || !playbackModal.list) return;
+    const total = playbackSteps.length;
+    const currentStep = total > 0 ? playbackSteps[playbackIndex] : null;
+    const teamName = playbackTeamKey ? getTeamDisplayName(playbackTeamKey) : 'Team';
+
+    playbackModal.meta.textContent = total > 0
+      ? `${teamName} • Step ${playbackIndex + 1} of ${total}`
+      : `${teamName} • No actions recorded`;
+
+    playbackModal.current.textContent = currentStep
+      ? `${currentStep.gameTime} • ${currentStep.playerName} • ${currentStep.label}${currentStep.result ? ` ${currentStep.result}` : ''} • Team PTS: ${currentStep.pointsAfter}`
+      : 'No action sequence available for this team yet.';
+
+    if (playbackModal.prevBtn) playbackModal.prevBtn.disabled = total === 0 || playbackIndex <= 0;
+    if (playbackModal.nextBtn) playbackModal.nextBtn.disabled = total === 0 || playbackIndex >= total - 1;
+    if (playbackModal.playPauseBtn) playbackModal.playPauseBtn.disabled = total <= 1;
+
+    playbackModal.list.innerHTML = total > 0
+      ? playbackSteps.map((step, idx) => `
+          <div class="playback-step-item ${idx === playbackIndex ? 'active' : ''}">
+            ${idx + 1}. ${step.gameTime} • ${step.playerName} • ${step.label}${step.result ? ` ${step.result}` : ''} • Team PTS: ${step.pointsAfter}
+          </div>
+        `).join('')
+      : '<div class="playback-step-item">No actions recorded for this team.</div>';
+
+    const activeEl = playbackModal.list.querySelector('.playback-step-item.active');
+    if (activeEl) {
+      activeEl.scrollIntoView({ block: 'nearest' });
+    }
+    renderPlaybackCourt();
+  }
+
+  function stepPlayback(delta) {
+    if (!playbackSteps.length) return;
+    const next = Math.max(0, Math.min(playbackSteps.length - 1, playbackIndex + delta));
+    playbackIndex = next;
+    renderPlaybackModalState();
+  }
+
+  function startPlaybackAuto() {
+    if (playbackSteps.length <= 1) return;
+    stopPlaybackTimer();
+    setPlaybackPlayState(true);
+    playbackTimer = setInterval(() => {
+      if (playbackIndex >= playbackSteps.length - 1) {
+        stopPlaybackTimer();
+        setPlaybackPlayState(false);
+        return;
+      }
+      stepPlayback(1);
+    }, PLAYBACK_INTERVAL_MS);
+  }
+
+  function closePlaybackModal() {
+    stopPlaybackTimer();
+    setPlaybackPlayState(false);
+    if (playbackModal.overlay) playbackModal.overlay.style.display = 'none';
+  }
+
+  function openPlaybackModal(teamKey) {
+    playbackTeamKey = teamKey;
+    playbackSteps = buildTeamPlaybackSteps(teamKey);
+    playbackIndex = 0;
+    stopPlaybackTimer();
+    setPlaybackPlayState(false);
+
+    if (playbackModal.title) {
+      playbackModal.title.textContent = `${getTeamDisplayName(teamKey)} Playback`;
+    }
+    renderPlaybackModalState();
+    if (playbackModal.overlay) playbackModal.overlay.style.display = 'flex';
   }
 
   function addActionEntry(teamKey, entry) {
@@ -1925,6 +2174,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     if (els.teamBNameInput && els.teamBNameInput.value !== (gameContext.customTeamNames.B || '')) {
       els.teamBNameInput.value = gameContext.customTeamNames.B || '';
     }
+    setTeamNameInputsLocked(isGameRunning);
     if (els.teamAScoreName) {
       els.teamAScoreName.textContent = getTeamDisplayName('A') || 'Player A';
     }
@@ -2107,9 +2357,14 @@ document.addEventListener("DOMContentLoaded", async () => {
     const fouledTeamKey = teamKey === 'A' ? 'B' : 'A';
 
     // Log committing foul to shot history and marker
-    const foulMarker = logFoulToHistory(teamKey, lastCursorPos, actionId);
-    // Draw victim marker on opposing active player
-    const fouledMarker = addFoulMarker(fouledTeamKey, lastCursorPos, 'drawn');
+    const fouledPlayer = getActivePlayerForTeam(fouledTeamKey);
+    const foulingPlayer = getActivePlayerForTeam(teamKey);
+    const fouledPlayerName = fouledPlayer?.name || getTeamDisplayName(fouledTeamKey);
+    const foulingPlayerName = foulingPlayer?.name || getTeamDisplayName(teamKey);
+
+    // Draw and log both foul markers so playback can replay triangle+square accurately.
+    const foulMarker = logFoulToHistory(teamKey, lastCursorPos, actionId, 'committed', foulingPlayer, true, fouledPlayerName);
+    const fouledMarker = logFoulToHistory(fouledTeamKey, lastCursorPos, null, 'drawn', fouledPlayer, true, foulingPlayerName);
     
     // Store in history with marker reference
     state.history.push({
@@ -2119,6 +2374,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       secondaryMarker: fouledMarker || null,
       actionId,
       playerId,
+      secondaryPlayerId: fouledPlayer ? String(fouledPlayer._id || fouledPlayer) : '',
       pos: lastCursorPos ? { ...lastCursorPos } : null,
       persisted: false
     });
@@ -2285,6 +2541,31 @@ document.addEventListener("DOMContentLoaded", async () => {
   if (els.a.ftBtn) els.a.ftBtn.addEventListener('click', () => controller.openFtModal('A'));
   if (els.b.ftBtn) els.b.ftBtn.addEventListener('click', () => controller.openFtModal('B'));
   if (els.undo) els.undo.addEventListener('click', () => controller.undoLast());
+  if (els.teamAPlaybackBtn) els.teamAPlaybackBtn.addEventListener('click', () => openPlaybackModal('A'));
+  if (els.teamBPlaybackBtn) els.teamBPlaybackBtn.addEventListener('click', () => openPlaybackModal('B'));
+
+  if (playbackModal.close) playbackModal.close.addEventListener('click', closePlaybackModal);
+  if (playbackModal.overlay) playbackModal.overlay.addEventListener('click', (e) => {
+    if (e.target === playbackModal.overlay) closePlaybackModal();
+  });
+  if (playbackModal.prevBtn) playbackModal.prevBtn.addEventListener('click', () => {
+    stopPlaybackTimer();
+    setPlaybackPlayState(false);
+    stepPlayback(-1);
+  });
+  if (playbackModal.nextBtn) playbackModal.nextBtn.addEventListener('click', () => {
+    stopPlaybackTimer();
+    setPlaybackPlayState(false);
+    stepPlayback(1);
+  });
+  if (playbackModal.playPauseBtn) playbackModal.playPauseBtn.addEventListener('click', () => {
+    if (playbackIsPlaying) {
+      stopPlaybackTimer();
+      setPlaybackPlayState(false);
+      return;
+    }
+    startPlaybackAuto();
+  });
 
   // FT modal wiring
   if (ftModal.makeBtn) ftModal.makeBtn.addEventListener('click', () => {
@@ -2796,6 +3077,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     state.active = 'A';
     isTimeout = false;
     clearLiveGameSnapshot();
+    closePlaybackModal();
     
     // Clear shot markers from court
     const shotMarkersEl = document.getElementById('shot_markers');
@@ -2854,6 +3136,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     state.shotHistory = { A: [], B: [] };  // Clear individual shot histories
     state.active = 'A';
     clearLiveGameSnapshot();
+    closePlaybackModal();
     
     // Clear shot markers
     const shotMarkersEl = document.getElementById('shot_markers');
@@ -2972,6 +3255,8 @@ document.addEventListener("DOMContentLoaded", async () => {
     if (els.undo) els.undo.disabled = !enabled;
     if (pauseGameBtn) pauseGameBtn.disabled = !enabled;
     if (timeoutBtn) timeoutBtn.disabled = !enabled;
+    if (els.teamAPlaybackBtn) els.teamAPlaybackBtn.disabled = !enabled;
+    if (els.teamBPlaybackBtn) els.teamBPlaybackBtn.disabled = !enabled;
   }
 
   /**
@@ -3043,6 +3328,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         startGameBtn.classList.remove('btn-primary');
         startGameBtn.classList.add('btn-danger');
         isGameRunning = true;
+        setTeamNameInputsLocked(true);
         setActionsEnabled(true);
         refreshRuleModeUI();
         persistLiveGameSnapshot('game-started');
@@ -3107,6 +3393,7 @@ document.addEventListener("DOMContentLoaded", async () => {
           isPaused = false;
           isTimeout = false;
           isGameRunning = false;
+          setTeamNameInputsLocked(false);
           setActionsEnabled(false);
           refreshRuleModeUI();
           clearLiveGameSnapshot();

@@ -42,6 +42,48 @@ function getLiveSnapshotForGame(gameId) {
     }
 }
 
+function getActiveLiveSnapshot() {
+    try {
+        const raw = localStorage.getItem(LIVE_GAME_STATE_KEY);
+        if (!raw) return null;
+        const snapshot = JSON.parse(raw);
+        if (!snapshot?.runtime?.isGameRunning) return null;
+        if (!snapshot?.gameContext?.gameId) return null;
+        return snapshot;
+    } catch (err) {
+        console.warn('Failed to parse active live snapshot.', err);
+        return null;
+    }
+}
+
+function buildSnapshotOnlyGame(snapshot) {
+    if (!snapshot?.gameContext?.gameId) return null;
+
+    const teamAPlayers = Object.values(snapshot.gameContext.players || {}).filter(Boolean).filter((player, index) => index < 2);
+    const teamBPlayers = Object.values(snapshot.gameContext.players || {}).filter(Boolean).filter((player, index) => index >= 2);
+
+    return {
+        _id: snapshot.gameContext.gameId,
+        status: 'live',
+        game_type: snapshot.gameContext.ruleMode === 'tag-team-1v1' ? 'tag-team-1v1' : '1v1',
+        createdAt: snapshot.updatedAt || Date.now(),
+        current_score: {
+            team_a: computePointsFromStats(snapshot.state?.A),
+            team_b: computePointsFromStats(snapshot.state?.B)
+        },
+        teams: {
+            team_a: {
+                name: snapshot.gameContext.customTeamNames?.A || 'Team A',
+                players: teamAPlayers
+            },
+            team_b: {
+                name: snapshot.gameContext.customTeamNames?.B || 'Team B',
+                players: teamBPlayers
+            }
+        }
+    };
+}
+
 function resolveDisplayedScore(game) {
     if (!game) return { teamA: 0, teamB: 0 };
 
@@ -180,22 +222,32 @@ async function loadGames() {
 }
 
 function categorizeAndRenderGames() {
-    const now = new Date();
     const live = [];
     const scheduled = [];
     const completed = [];
+    const activeSnapshot = getActiveLiveSnapshot();
+    const activeSnapshotGameId = String(activeSnapshot?.gameContext?.gameId || '');
+    let snapshotMatched = false;
 
     allGames.forEach(game => {
-        const gameDate = new Date(game.createdAt);
+        const hasActiveSnapshot = activeSnapshotGameId && String(game._id || '') === activeSnapshotGameId;
 
         if (game.status === 'finished') {
             completed.push(game);
-        } else if (game.status === 'live' || game.status === 'in_progress') {
-            live.push(game);
+        } else if (game.status === 'live' || game.status === 'in_progress' || hasActiveSnapshot) {
+            if (hasActiveSnapshot) snapshotMatched = true;
+            live.push(hasActiveSnapshot ? { ...game, status: 'live' } : game);
         } else {
             scheduled.push(game);
         }
     });
+
+    if (activeSnapshot && !snapshotMatched) {
+        const snapshotOnlyGame = buildSnapshotOnlyGame(activeSnapshot);
+        if (snapshotOnlyGame) {
+            live.unshift(snapshotOnlyGame);
+        }
+    }
 
     renderGameSection(live, 'liveGamesContainer', 'liveEmptyState');
     renderGameSection(scheduled, 'scheduledGamesContainer', 'scheduledEmptyState');

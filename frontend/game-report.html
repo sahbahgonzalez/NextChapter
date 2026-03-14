@@ -452,6 +452,8 @@
             <!-- Action Buttons -->
             <div class="action-buttons">
                 <button class="btn btn-primary" onclick="generatePDF()">Download PDF</button>
+                <button class="btn btn-secondary playback-trigger-btn" id="teamAReportPlaybackBtn">Team A Playback</button>
+                <button class="btn btn-secondary playback-trigger-btn" id="teamBReportPlaybackBtn">Team B Playback</button>
                 <button class="btn btn-secondary" onclick="window.print()">Print</button>
                 <button class="btn btn-secondary" onclick="window.history.back()">Back</button>
             </div>
@@ -493,6 +495,32 @@
                 <p><strong>The Next Chapter - Game Statistics Report</strong></p>
                 <p id="generatedDate">Generated on -- at --</p>
                 <p>For more information, visit: www.thenextchapter.app</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Report playback modal -->
+    <div id="reportPlaybackModal" class="modal-overlay" style="display:none;">
+        <div class="modal-card" style="max-width:900px; width:min(900px, 100%);">
+            <div class="modal-header">
+                <span id="reportPlaybackTitle">Team Playback</span>
+                <button id="reportPlaybackClose" class="btn btn-sm" aria-label="Close">&#10005;</button>
+            </div>
+            <div class="modal-body" style="gap:10px;">
+                <div id="reportPlaybackMeta" style="font-size:0.9rem; color:#475569; font-weight:600;">Step 0 of 0</div>
+                <div id="reportPlaybackCurrent" style="padding:10px; background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; font-weight:600; color:#0f172a; min-height:48px; display:flex; align-items:center;">No sequence loaded.</div>
+                <div style="display:flex; gap:8px; justify-content:center; flex-wrap:wrap;">
+                    <button id="reportPlaybackPrev" class="btn btn-secondary">Prev</button>
+                    <button id="reportPlaybackPlayPause" class="btn btn-primary">Play</button>
+                    <button id="reportPlaybackNext" class="btn btn-secondary">Next</button>
+                </div>
+                <div class="playback-layout">
+                    <div id="reportPlaybackList" class="playback-list-panel"></div>
+                    <div class="playback-court-panel">
+                        <img src="assets/basketballcourt.svg" alt="Replay Court" class="playback-court-image" />
+                        <div id="reportPlaybackCourtOverlay" class="playback-court-overlay"></div>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
