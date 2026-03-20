@@ -109,9 +109,6 @@ class DataManager {
     }
 }
 
-// ==================== THEME MANAGER ====================
-// ThemeManager removed; single theme for TNC-like aesthetics.
-
 // ==================== AUTH MANAGER ====================
 /**
  * AuthManager

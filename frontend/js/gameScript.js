@@ -13,6 +13,9 @@ let liveSaveDebounceTimer = null;
 // Keep scoreboard authoritative in frontend and persist final score/winner at game end.
 const SYNC_LIVE_EVENTS_TO_BACKEND = false;
 const LIVE_GAME_STATE_KEY = 'tnc_live_game_state_active_v1';
+const DEFAULT_COURT_IMAGE_SRC = 'assets/default-court-image.svg';
+const CUSTOM_COURT_IMAGE_STORAGE_PREFIX = 'tnc_game_court_image_v1_';
+const MAX_CUSTOM_COURT_IMAGE_BYTES = 1.5 * 1024 * 1024;
 
 const timerDisplay = document.getElementById("gameTimer");
 const startGameBtn = document.getElementById("startGameBtn");
@@ -50,7 +53,8 @@ const gameContext = {
   activePlayerIndex: { A: 0, B: 0 },
   ruleMode: '1v1',
   customTeamNames: { A: '', B: '' },
-  teams: { team_a: [], team_b: [] }
+  teams: { team_a: [], team_b: [] },
+  courtImageSrc: ''
 };
 let liveState = null;
 
@@ -164,7 +168,8 @@ function persistLiveGameSnapshot(reason = 'auto') {
       players: safeClone(gameContext.players, { A: null, A2: null, B: null, B2: null }),
       activePlayerIndex: safeClone(gameContext.activePlayerIndex, { A: 0, B: 0 }),
       ruleMode: gameContext.ruleMode || '1v1',
-      customTeamNames: safeClone(gameContext.customTeamNames, { A: '', B: '' })
+      customTeamNames: safeClone(gameContext.customTeamNames, { A: '', B: '' }),
+      courtImageSrc: isCustomCourtImageSrc(gameContext.courtImageSrc) ? gameContext.courtImageSrc : ''
     },
     runtime: {
       secondsElapsed,
@@ -249,6 +254,58 @@ function getTeamDisplayName(teamKey) {
   return players.map((p) => p?.name || 'Player').join(' & ');
 }
 
+function isCustomCourtImageSrc(value) {
+  return typeof value === 'string' && value.trim().startsWith('data:image/');
+}
+
+function getCourtImageStorageKey(gameId) {
+  if (!gameId) return null;
+  return `${CUSTOM_COURT_IMAGE_STORAGE_PREFIX}${gameId}`;
+}
+
+function loadCustomCourtImageForGame(gameId) {
+  const key = getCourtImageStorageKey(gameId);
+  if (!key) return '';
+  try {
+    const value = localStorage.getItem(key);
+    return isCustomCourtImageSrc(value) ? value : '';
+  } catch (err) {
+    console.warn('Failed to load custom court image.', err);
+    return '';
+  }
+}
+
+function persistCustomCourtImageForGame(gameId, imageSrc) {
+  const key = getCourtImageStorageKey(gameId);
+  if (!key) return;
+  if (!isCustomCourtImageSrc(imageSrc)) {
+    try {
+      localStorage.removeItem(key);
+    } catch (err) {
+      console.warn('Failed to clear custom court image.', err);
+    }
+    return;
+  }
+
+  try {
+    localStorage.setItem(key, imageSrc);
+  } catch (err) {
+    console.warn('Failed to persist custom court image.', err);
+  }
+}
+
+function resolveCourtImageSourceForGame(game) {
+  const backendImage = isCustomCourtImageSrc(game?.custom_court_image) ? game.custom_court_image : '';
+  const storedImage = loadCustomCourtImageForGame(game?._id || gameContext.gameId);
+  return backendImage || storedImage || DEFAULT_COURT_IMAGE_SRC;
+}
+
+function applyCourtImageToGameUI(src) {
+  const imageEl = document.getElementById('court_image');
+  const resolved = isCustomCourtImageSrc(src) ? src : DEFAULT_COURT_IMAGE_SRC;
+  if (imageEl) imageEl.src = resolved;
+}
+
 // Placeholder - actual handlers will be set up in DOMContentLoaded
 
 /**
@@ -265,6 +322,10 @@ async function loadGameData(gameId) {
     gameContext.teams = game.teams || { team_a: [], team_b: [] };
     gameContext.customTeamNames.A = game.teams?.team_a?.name || '';
     gameContext.customTeamNames.B = game.teams?.team_b?.name || '';
+    const resolvedCourtImage = resolveCourtImageSourceForGame(game);
+    gameContext.courtImageSrc = isCustomCourtImageSrc(resolvedCourtImage) ? resolvedCourtImage : '';
+    applyCourtImageToGameUI(resolvedCourtImage);
+    persistCustomCourtImageForGame(gameContext.gameId, gameContext.courtImageSrc);
 
     // Store loaded game for reference
     gameContext.loadedGame = game;
@@ -534,6 +595,8 @@ document.addEventListener("DOMContentLoaded", async () => {
     gameContext.players.A2 = null;
     gameContext.players.B = null;
     gameContext.players.B2 = null;
+    gameContext.courtImageSrc = '';
+    applyCourtImageToGameUI(DEFAULT_COURT_IMAGE_SRC);
     // Ensure button is disabled until both players are assigned
     if (startGameBtn) startGameBtn.disabled = true;
     showStartError(`Assign ${requiredPlayersPerTeam()} player(s) to each team before starting the game.`);
@@ -839,6 +902,9 @@ document.addEventListener("DOMContentLoaded", async () => {
     gameContext.activePlayerIndex = safeClone(parsed.gameContext.activePlayerIndex, gameContext.activePlayerIndex);
     gameContext.ruleMode = parsed.gameContext.ruleMode === 'tag-team-1v1' ? 'tag-team-1v1' : '1v1';
     gameContext.customTeamNames = safeClone(parsed.gameContext.customTeamNames, gameContext.customTeamNames);
+    gameContext.courtImageSrc = isCustomCourtImageSrc(parsed.gameContext.courtImageSrc) ? parsed.gameContext.courtImageSrc : '';
+    applyCourtImageToGameUI(gameContext.courtImageSrc);
+    persistCustomCourtImageForGame(gameContext.gameId, gameContext.courtImageSrc);
 
     const savedState = parsed.state;
     state.A = safeClone(savedState.A, state.A);
@@ -2870,6 +2936,8 @@ document.addEventListener("DOMContentLoaded", async () => {
     });
   }
 
+
+
   if (els.teamAStatsView) {
     els.teamAStatsView.addEventListener('change', (e) => {
       state.statsView.A = e.target.value === 'team' ? 'team' : 'player';
@@ -3073,6 +3141,188 @@ document.addEventListener("DOMContentLoaded", async () => {
     });
   }
 
+  // ===== Court Image Picker Modal (Game Logger) =====
+  const gameCourtImageModal = document.getElementById('gameCourtImageModal');
+  const gameCourtImageUploadInput = document.getElementById('gameCourtImageUploadInput');
+  const gameCourtImageOptions = document.getElementById('gameCourtImageOptions');
+  const gameCourtImageCloseBtn = document.getElementById('gameCourtImageCloseBtn');
+  
+  let gameSelectedCourtImageSrc = DEFAULT_COURT_IMAGE_SRC;
+
+  function getReusableGameCourtImages() {
+    const reusableImages = new Set();
+    
+    // Add default court
+    reusableImages.add(DEFAULT_COURT_IMAGE_SRC);
+    
+    // Load previously uploaded court images from localStorage
+    try {
+      const key = 'tnc_custom_court_images_v1';
+      const stored = localStorage.getItem(key);
+      if (stored) {
+        const images = JSON.parse(stored);
+        if (Array.isArray(images)) {
+          images.forEach(img => {
+            if (isCustomCourtImageSrc(img)) {
+              reusableImages.add(img);
+            }
+          });
+        }
+      }
+    } catch (err) {
+      console.error('Failed to load saved court images:', err);
+    }
+    
+    return Array.from(reusableImages);
+  }
+
+  function renderGameCourtImageOptions() {
+    gameCourtImageOptions.innerHTML = '';
+    const images = getReusableGameCourtImages();
+    
+    images.forEach((imageSrc, index) => {
+      const option = document.createElement('div');
+      option.className = 'court-image-option' + (imageSrc === gameSelectedCourtImageSrc ? ' selected' : '');
+      
+      const img = document.createElement('img');
+      img.src = imageSrc;
+      img.alt = `Court image ${index + 1}`;
+      
+      const label = document.createElement('div');
+      label.className = 'label';
+      label.textContent = imageSrc === DEFAULT_COURT_IMAGE_SRC ? 'Default Court' : `Court ${index}`;
+      
+      option.appendChild(img);
+      option.appendChild(label);
+      
+      option.addEventListener('click', () => {
+        document.querySelectorAll('#gameCourtImageOptions .court-image-option').forEach(el => {
+          el.classList.remove('selected');
+        });
+        option.classList.add('selected');
+        gameSelectedCourtImageSrc = imageSrc;
+        applyGameCourtImage();
+      });
+      
+      gameCourtImageOptions.appendChild(option);
+    });
+  }
+
+  function handleGameCourtImageUpload(event) {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      alert('Please select a valid image file.');
+      return;
+    }
+
+    if (file.size > MAX_CUSTOM_COURT_IMAGE_BYTES) {
+      alert(`Image must be under 1.5MB. Your file is ${(file.size / 1024 / 1024).toFixed(2)}MB.`);
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (readerEvent) => {
+      const dataUrl = readerEvent.target?.result;
+      if (typeof dataUrl === 'string') {
+        gameSelectedCourtImageSrc = dataUrl;
+        
+        // Re-render with new image
+        gameCourtImageOptions.innerHTML = '';
+        const images = getReusableGameCourtImages();
+        images.push(dataUrl); // Add uploaded image to selection
+        
+        images.forEach((imageSrc, index) => {
+          const option = document.createElement('div');
+          option.className = 'court-image-option' + (imageSrc === gameSelectedCourtImageSrc ? ' selected' : '');
+          
+          const img = document.createElement('img');
+          img.src = imageSrc;
+          img.alt = `Court image ${index + 1}`;
+          
+          const label = document.createElement('div');
+          label.className = 'label';
+          label.textContent = imageSrc === DEFAULT_COURT_IMAGE_SRC ? 'Default' : imageSrc === dataUrl ? 'Your Upload' : `Court ${index}`;
+          
+          option.appendChild(img);
+          option.appendChild(label);
+          
+          option.addEventListener('click', () => {
+            document.querySelectorAll('#gameCourtImageOptions .court-image-option').forEach(el => {
+              el.classList.remove('selected');
+            });
+            option.classList.add('selected');
+            gameSelectedCourtImageSrc = imageSrc;
+            applyGameCourtImage();
+          });
+          
+          gameCourtImageOptions.appendChild(option);
+        });
+        
+        applyGameCourtImage();
+      }
+    };
+    reader.readAsDataURL(file);
+  }
+
+  function applyGameCourtImage() {
+    gameContext.courtImageSrc = gameSelectedCourtImageSrc;
+    const courtImg = document.getElementById('court_image');
+    if (courtImg) {
+      courtImg.src = gameSelectedCourtImageSrc;
+    }
+    
+    // Save uploaded image to localStorage for future use
+    if (isCustomCourtImageSrc(gameSelectedCourtImageSrc)) {
+      try {
+        const key = 'tnc_custom_court_images_v1';
+        const stored = localStorage.getItem(key);
+        const images = stored ? JSON.parse(stored) : [];
+        
+        // Add if not already stored
+        if (!images.includes(gameSelectedCourtImageSrc)) {
+          images.push(gameSelectedCourtImageSrc);
+          localStorage.setItem(key, JSON.stringify(images));
+        }
+        
+        // Also save to current game context for backend persistence
+        if (gameContext.gameId) {
+          persistCustomCourtImageForGame(gameContext.gameId, gameSelectedCourtImageSrc);
+        }
+      } catch (err) {
+        console.error('Failed to save court image:', err);
+      }
+    }
+  }
+
+  function closeGameCourtImageModal() {
+    if (gameCourtImageModal) gameCourtImageModal.style.display = 'none';
+  }
+
+  function openGameCourtImageModal() {
+    if (gameCourtImageModal) {
+      gameCourtImageModal.style.display = 'flex';
+      gameSelectedCourtImageSrc = DEFAULT_COURT_IMAGE_SRC;
+      renderGameCourtImageOptions();
+    }
+  }
+
+  // Wire up court image modal handlers
+  if (gameCourtImageUploadInput) {
+    gameCourtImageUploadInput.addEventListener('change', handleGameCourtImageUpload);
+  }
+
+  if (gameCourtImageCloseBtn) {
+    gameCourtImageCloseBtn.addEventListener('click', closeGameCourtImageModal);
+  }
+
+  if (gameCourtImageModal) {
+    gameCourtImageModal.addEventListener('click', (e) => {
+      if (e.target === gameCourtImageModal) closeGameCourtImageModal();
+    });
+  }
+
   function generateGamePDF() {
     if (!gameContext.gameId) {
       alert('No completed game report is available yet.');
@@ -3148,6 +3398,11 @@ document.addEventListener("DOMContentLoaded", async () => {
     // Disable start button until players assigned
     startGameBtn.disabled = true;
     startGameBtn.textContent = "Start Game";
+    
+    // Enable change court image button when game ends
+    const changeCourtImageBtn = document.getElementById('changeCourtImageBtn');
+    if (changeCourtImageBtn) changeCourtImageBtn.disabled = false;
+    
     refreshRuleModeUI();
     showStartError(`Assign ${requiredPlayersPerTeam()} player(s) to each team before starting the game.`);
   }
@@ -3318,28 +3573,36 @@ document.addEventListener("DOMContentLoaded", async () => {
 
             const gameType = gameContext.ruleMode === 'tag-team-1v1' ? '2v2' : '1v1';
             let newGame;
+            const createPayloadLegacy = {
+              game_type: gameType,
+              team_a: teamAPlayers,
+              team_b: teamBPlayers,
+              score_to_win: 50
+            };
+            const createPayloadTeams = {
+              game_type: gameType,
+              teams: {
+                team_a: teamAPlayers,
+                team_b: teamBPlayers
+              },
+              score_to_win: 50
+            };
+
+            if (isCustomCourtImageSrc(gameContext.courtImageSrc)) {
+              createPayloadLegacy.custom_court_image = gameContext.courtImageSrc;
+              createPayloadTeams.custom_court_image = gameContext.courtImageSrc;
+            }
 
             // Try legacy payload first, then fallback to nested teams payload.
             try {
-              newGame = await apiClient.createGame({
-                game_type: gameType,
-                team_a: teamAPlayers,
-                team_b: teamBPlayers,
-                score_to_win: 50
-              });
+              newGame = await apiClient.createGame(createPayloadLegacy);
             } catch (legacyErr) {
               console.warn('Legacy create game payload failed, retrying with teams object:', legacyErr);
-              newGame = await apiClient.createGame({
-                game_type: gameType,
-                teams: {
-                  team_a: teamAPlayers,
-                  team_b: teamBPlayers
-                },
-                score_to_win: 50
-              });
+              newGame = await apiClient.createGame(createPayloadTeams);
             }
 
             gameContext.gameId = newGame._id;
+            persistCustomCourtImageForGame(gameContext.gameId, gameContext.courtImageSrc);
             console.log('Created new game:', newGame._id);
           }
         } catch (err) {
@@ -3358,6 +3621,11 @@ document.addEventListener("DOMContentLoaded", async () => {
         setTeamNameInputsLocked(true);
         setActionsEnabled(true);
         refreshRuleModeUI();
+        
+        // Disable change court image button during game
+        const changeCourtImageBtn = document.getElementById('changeCourtImageBtn');
+        if (changeCourtImageBtn) changeCourtImageBtn.disabled = true;
+        
         persistLiveGameSnapshot('game-started');
       } else {
         // End Game - finalize and save to database
@@ -3530,6 +3798,9 @@ document.addEventListener("DOMContentLoaded", async () => {
   controller.state = state;
   controller.gameContext = gameContext;
 
+  // Open court image picker on page load
+  openGameCourtImageModal();
+
   const autosaveIntervalMs = 5000;
   setInterval(() => {
     if (isGameRunning) {
@@ -3611,6 +3882,15 @@ document.addEventListener("DOMContentLoaded", async () => {
       e.preventDefault();
       if (pauseGameBtn && !pauseGameBtn.disabled) {
         pauseGameBtn.click();
+      }
+      return;
+    }
+
+    // C - Change court image (only when game is not running)
+    if (key === 'c') {
+      e.preventDefault();
+      if (!isGameRunning) {
+        openGameCourtImageModal();
       }
       return;
     }
@@ -3764,6 +4044,16 @@ document.addEventListener("DOMContentLoaded", async () => {
       return;
     }
   });
+  
+  // Change court image button handler
+  const changeCourtImageBtn = document.getElementById('changeCourtImageBtn');
+  if (changeCourtImageBtn) {
+    changeCourtImageBtn.addEventListener('click', () => {
+      if (!isGameRunning) {
+        openGameCourtImageModal();
+      }
+    });
+  }
   
   // Hotkey toggle functionality
   const hotkeyToggleBtn = document.getElementById('hotkeyToggleBtn');

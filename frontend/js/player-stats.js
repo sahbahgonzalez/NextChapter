@@ -220,7 +220,7 @@ function renderPlayerStats() {
             <div style="width: 100%; max-width: 550px;">
                 <h2 style="text-align: center; margin-top: 0;">All-Time Shot Chart</h2>
                 <div style="position: relative; width: 100%; display: inline-block;">
-                    <img src="assets/basketballcourt.svg" alt="Basketball Court" style="width: 100%; height: auto; display: block; border-radius: 8px;">
+                    <img src="assets/default-court-image.svg" alt="Basketball Court" style="width: 100%; height: auto; display: block; border-radius: 8px;">
                     <svg id="heatmapOverlay" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; cursor: pointer; border-radius: 8px;" viewBox="0 0 550 503" preserveAspectRatio="xMidYMid meet"></svg>
                 </div>
                 <div class="heatmap-legend">

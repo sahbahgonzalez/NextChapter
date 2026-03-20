@@ -16,10 +16,6 @@
             text-overflow: ellipsis;
         }
 
-        body.dark-mode .team-players {
-            color: var(--dark-text-muted);
-        }
-
         .stat-item {
             text-align: center;
         }
@@ -32,6 +28,63 @@
         .live-card-clickable:hover {
             transform: translateY(-2px);
             box-shadow: 0 10px 24px rgba(14, 43, 98, 0.18);
+        }
+
+        .court-image-picker-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+            gap: 12px;
+            margin-top: 12px;
+        }
+
+        .court-image-option {
+            border: 2px solid var(--border-color);
+            border-radius: 10px;
+            background: #fff;
+            overflow: hidden;
+            cursor: pointer;
+            transition: transform 0.12s ease, border-color 0.12s ease, box-shadow 0.12s ease;
+        }
+
+        .court-image-option:hover {
+            transform: translateY(-1px);
+            border-color: var(--light-blue);
+            box-shadow: 0 8px 18px rgba(58, 71, 143, 0.12);
+        }
+
+        .court-image-option.selected {
+            border-color: var(--primary-blue);
+            box-shadow: 0 0 0 2px rgba(58, 71, 143, 0.2);
+        }
+
+        .court-image-option img {
+            width: 100%;
+            aspect-ratio: 1;
+            object-fit: cover;
+            display: block;
+            background: #f8fafc;
+        }
+
+        .court-image-option .label {
+            font-size: 0.8rem;
+            padding: 8px;
+            color: var(--text-dark);
+            font-weight: 600;
+            text-align: center;
+        }
+
+        .court-image-upload-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+            margin-top: 8px;
+            flex-wrap: wrap;
+        }
+
+        .court-image-help {
+            font-size: 0.82rem;
+            color: var(--text-muted);
         }
 
         @media (max-width: 768px) {
@@ -169,7 +222,24 @@
         </div>
     </div>
 
-    <!-- Dark mode toggle removed -->
+    <!-- Court Image Picker Modal -->
+    <div id="courtImageModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Choose Court Image</h2>
+            </div>
+            <div class="court-image-upload-row">
+                <label for="courtImageUploadInput" class="btn btn-secondary" style="cursor:pointer;">Upload New Court Image</label>
+                <input id="courtImageUploadInput" type="file" accept="image/*" style="display:none;" />
+                <span class="court-image-help">Upload under 1.5MB or select a previously used court image.</span>
+            </div>
+            <div id="courtImageOptions" class="court-image-picker-grid"></div>
+            <div class="modal-actions" style="margin-top: 14px;">
+                <button type="button" id="confirmCourtImageBtn" class="btn btn-primary">Use Selected Image</button>
+                <button type="button" id="cancelCourtImageBtn" class="btn btn-secondary">Cancel</button>
+            </div>
+        </div>
+    </div>
 
     <!-- Login Modal -->
     <div id="login-modal" class="login-modal">

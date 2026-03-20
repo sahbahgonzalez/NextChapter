@@ -8,6 +8,8 @@ let gameData = null;
 const STARRED_PLAYS_STORAGE_PREFIX = 'tnc_starred_plays_';
 const GAME_ACTIONS_STORAGE_PREFIX = 'tnc_game_actions_';
 const LIVE_GAME_STATE_KEY = 'tnc_live_game_state_active_v1';
+const DEFAULT_COURT_IMAGE_SRC = 'assets/default-court-image.svg';
+const CUSTOM_COURT_IMAGE_STORAGE_PREFIX = 'tnc_game_court_image_v1_';
 let liveReportRefreshTimer = null;
 let liveReportLocalRefreshTimer = null;
 let reportPlaybackTimer = null;
@@ -112,6 +114,39 @@ function loadLiveSnapshotForGame() {
         console.warn('Failed to load live snapshot for report.', err);
         return null;
     }
+}
+
+function isCustomCourtImageSrc(value) {
+    return typeof value === 'string' && value.trim().startsWith('data:image/');
+}
+
+function getCourtImageStorageKey(id) {
+    if (!id) return null;
+    return `${CUSTOM_COURT_IMAGE_STORAGE_PREFIX}${id}`;
+}
+
+function loadCustomCourtImageForGame(id) {
+    const key = getCourtImageStorageKey(id);
+    if (!key) return '';
+    try {
+        const value = localStorage.getItem(key);
+        return isCustomCourtImageSrc(value) ? value : '';
+    } catch (err) {
+        console.warn('Failed to load custom court image for report.', err);
+        return '';
+    }
+}
+
+function resolveCourtImageForReport() {
+    const backendValue = isCustomCourtImageSrc(gameData?.custom_court_image) ? gameData.custom_court_image : '';
+    const storedValue = loadCustomCourtImageForGame(gameData?._id || gameId);
+    return backendValue || storedValue || DEFAULT_COURT_IMAGE_SRC;
+}
+
+function applyPlaybackCourtImage() {
+    const resolved = resolveCourtImageForReport();
+    const playbackImage = document.getElementById('reportPlaybackCourtImage');
+    if (playbackImage) playbackImage.src = resolved;
 }
 
 function resolveDisplayedScore() {
@@ -725,6 +760,7 @@ function renderReport() {
         : `Generated on ${now.toLocaleDateString()} at ${now.toLocaleTimeString()}`;
 
     renderStarredPlaysSection();
+    applyPlaybackCourtImage();
 
     // Render player reports
     renderPlayerReports();
@@ -953,6 +989,7 @@ function renderPlayerReports() {
     teamBPlayerIds.forEach((id) => teamMembership.set(id, 'team_b'));
     const playerColorMap = new Map();
     const playerNameMap = new Map();
+    const courtImageSrc = resolveCourtImageForReport();
 
     allPlayers.forEach((player, index) => {
         const playerId = String(player?._id || player?.id || index);
@@ -1005,8 +1042,8 @@ function renderPlayerReports() {
         `;
 
         container.innerHTML += combinedChartsHtml;
-        drawShotsOnSVG('overlay-team_a', getTeamShots('team_a', playerColorMap));
-        drawShotsOnSVG('overlay-team_b', getTeamShots('team_b', playerColorMap));
+        drawShotsOnSVG('overlay-team_a', getTeamShots('team_a', playerColorMap), undefined, courtImageSrc);
+        drawShotsOnSVG('overlay-team_b', getTeamShots('team_b', playerColorMap), undefined, courtImageSrc);
     }
 
     allPlayers.forEach((player, index) => {
@@ -1162,7 +1199,7 @@ function renderPlayerReports() {
         container.innerHTML += reportHtml;
 
         // Draw shot chart for this player
-        drawShotsOnSVG(`overlay-${player._id}`, getPlayerShots(player._id), getPlayerChartColors(playerColor));
+        drawShotsOnSVG(`overlay-${player._id}`, getPlayerShots(player._id), getPlayerChartColors(playerColor), courtImageSrc);
     });
 }
 
@@ -1263,7 +1300,7 @@ function getTeamShots(teamKey, playerColorMap) {
     return shots;
 }
 
-function drawShotsOnSVG(overlayId, shots, colorSet = getPlayerChartColors('#38A169')) {
+function drawShotsOnSVG(overlayId, shots, colorSet = getPlayerChartColors('#38A169'), courtImageSrc = DEFAULT_COURT_IMAGE_SRC) {
     const overlay = document.getElementById(overlayId);
     if (!overlay) return;
 
@@ -1277,7 +1314,7 @@ function drawShotsOnSVG(overlayId, shots, colorSet = getPlayerChartColors('#38A1
 
     // Draw court background using the court image
     const courtImage = document.createElementNS('http://www.w3.org/2000/svg', 'image');
-    courtImage.setAttribute('href', 'assets/basketballcourt.svg');
+    courtImage.setAttribute('href', isCustomCourtImageSrc(courtImageSrc) ? courtImageSrc : DEFAULT_COURT_IMAGE_SRC);
     courtImage.setAttribute('x', '0');
     courtImage.setAttribute('y', '0');
     courtImage.setAttribute('width', '500');

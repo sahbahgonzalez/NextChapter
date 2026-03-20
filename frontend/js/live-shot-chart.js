@@ -152,7 +152,7 @@ function drawShotsOnSvg(svg, shots) {
     const svgNs = 'http://www.w3.org/2000/svg';
 
     const bg = document.createElementNS(svgNs, 'image');
-    bg.setAttribute('href', 'assets/basketballcourt.svg');
+    bg.setAttribute('href', 'assets/default-court-image.svg');
     bg.setAttribute('x', '0');
     bg.setAttribute('y', '0');
     bg.setAttribute('width', '500');

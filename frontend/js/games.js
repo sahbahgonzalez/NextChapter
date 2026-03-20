@@ -6,8 +6,12 @@
 let allGames = [];
 let currentEditingId = null;
 const LIVE_GAME_STATE_KEY = 'tnc_live_game_state_active_v1';
+const DEFAULT_COURT_IMAGE_SRC = 'assets/default-court-image.svg';
+const MAX_CUSTOM_COURT_IMAGE_BYTES = 1.5 * 1024 * 1024;
 let liveGamesRefreshInterval = null;
 let liveStatsRefreshInterval = null;
+let pendingGamePayload = null;
+let selectedCourtImageSrc = DEFAULT_COURT_IMAGE_SRC;
 
 // Initialize
 document.addEventListener('DOMContentLoaded', () => {
@@ -184,6 +188,20 @@ function setupEventListeners() {
     document.getElementById('createGameBtn').addEventListener('click', openCreateGameModal);
     document.getElementById('gameForm').addEventListener('submit', handleGameFormSubmit);
     document.getElementById('searchInput').addEventListener('input', handleSearch);
+
+    const uploadInput = document.getElementById('courtImageUploadInput');
+    const confirmBtn = document.getElementById('confirmCourtImageBtn');
+    const cancelBtn = document.getElementById('cancelCourtImageBtn');
+
+    if (uploadInput) {
+        uploadInput.addEventListener('change', handleCourtImageUpload);
+    }
+    if (confirmBtn) {
+        confirmBtn.addEventListener('click', confirmCourtImageAndSaveGame);
+    }
+    if (cancelBtn) {
+        cancelBtn.addEventListener('click', closeCourtImageModal);
+    }
 
     // Tab switching
     document.querySelectorAll('.tab-button').forEach(button => {
@@ -412,6 +430,8 @@ function openLiveShotCharts(id) {
 
 function openCreateGameModal() {
     currentEditingId = null;
+    pendingGamePayload = null;
+    selectedCourtImageSrc = DEFAULT_COURT_IMAGE_SRC;
     document.getElementById('modalTitle').textContent = 'Schedule New Game';
     document.getElementById('gameForm').reset();
     document.getElementById('gameModal').classList.add('active');
@@ -420,6 +440,148 @@ function openCreateGameModal() {
 function closeGameModal() {
     document.getElementById('gameModal').classList.remove('active');
     currentEditingId = null;
+}
+
+function closeCourtImageModal() {
+    document.getElementById('courtImageModal').classList.remove('active');
+    const uploadInput = document.getElementById('courtImageUploadInput');
+    if (uploadInput) uploadInput.value = '';
+    pendingGamePayload = null;
+}
+
+function getReusableCourtImages() {
+    const unique = new Set();
+    const reusable = [];
+
+    // Add default court image
+    reusable.push(DEFAULT_COURT_IMAGE_SRC);
+    unique.add(DEFAULT_COURT_IMAGE_SRC);
+
+    // Load images from existing games
+    allGames.forEach((game) => {
+        const value = typeof game?.custom_court_image === 'string' ? game.custom_court_image.trim() : '';
+        if (!value || !value.startsWith('data:image/')) return;
+        if (unique.has(value)) return;
+        unique.add(value);
+        reusable.push(value);
+    });
+
+    // Load previously uploaded images from localStorage (from game logger)
+    try {
+        const key = 'tnc_custom_court_images_v1';
+        const stored = localStorage.getItem(key);
+        if (stored) {
+            const images = JSON.parse(stored);
+            if (Array.isArray(images)) {
+                images.forEach(img => {
+                    if (typeof img === 'string' && img.startsWith('data:image/') && !unique.has(img)) {
+                        unique.add(img);
+                        reusable.push(img);
+                    }
+                });
+            }
+        }
+    } catch (err) {
+        console.error('Failed to load saved court images from storage:', err);
+    }
+
+    return reusable;
+}
+
+function renderCourtImageOptions() {
+    const container = document.getElementById('courtImageOptions');
+    if (!container) return;
+
+    const reusableImages = getReusableCourtImages();
+    const options = [DEFAULT_COURT_IMAGE_SRC, ...reusableImages];
+
+    container.innerHTML = options.map((src, idx) => {
+        const isDefault = idx === 0;
+        const selectedClass = src === selectedCourtImageSrc ? ' selected' : '';
+        const label = isDefault ? 'Default Court' : `Saved Court ${idx}`;
+        return `
+            <button type="button" class="court-image-option${selectedClass}" data-court-src="${encodeURIComponent(src)}" title="${label}">
+                <img src="${src}" alt="${label}">
+                <div class="label">${label}</div>
+            </button>
+        `;
+    }).join('');
+
+    container.querySelectorAll('.court-image-option').forEach((btn) => {
+        btn.addEventListener('click', () => {
+            const encoded = btn.getAttribute('data-court-src') || '';
+            selectedCourtImageSrc = decodeURIComponent(encoded);
+            renderCourtImageOptions();
+        });
+    });
+}
+
+function openCourtImageModal(gamePayload) {
+    pendingGamePayload = gamePayload;
+    selectedCourtImageSrc = DEFAULT_COURT_IMAGE_SRC;
+    renderCourtImageOptions();
+    document.getElementById('courtImageModal').classList.add('active');
+}
+
+function handleCourtImageUpload(event) {
+    const file = event.target?.files?.[0];
+    if (!file) return;
+
+    if (!String(file.type || '').startsWith('image/')) {
+        showError('Please upload a valid image file.');
+        event.target.value = '';
+        return;
+    }
+
+    if (file.size > MAX_CUSTOM_COURT_IMAGE_BYTES) {
+        const maxMb = (MAX_CUSTOM_COURT_IMAGE_BYTES / (1024 * 1024)).toFixed(1);
+        showError(`Image too large. Please use a file under ${maxMb}MB.`);
+        event.target.value = '';
+        return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = () => {
+        const result = typeof reader.result === 'string' ? reader.result : '';
+        if (!result.startsWith('data:image/')) {
+            showError('Failed to read image. Please try another file.');
+            event.target.value = '';
+            return;
+        }
+        selectedCourtImageSrc = result;
+        renderCourtImageOptions();
+        event.target.value = '';
+    };
+    reader.readAsDataURL(file);
+}
+
+async function confirmCourtImageAndSaveGame() {
+    if (!pendingGamePayload) {
+        closeCourtImageModal();
+        return;
+    }
+
+    const payload = { ...pendingGamePayload };
+    if (selectedCourtImageSrc && selectedCourtImageSrc.startsWith('data:image/')) {
+        payload.custom_court_image = selectedCourtImageSrc;
+    } else {
+        payload.custom_court_image = null;
+    }
+
+    try {
+        if (currentEditingId) {
+            await apiClient.updateGame(currentEditingId, payload);
+            showSuccess('Game updated successfully');
+        } else {
+            await apiClient.createGame(payload);
+            showSuccess('Game scheduled successfully');
+        }
+        closeCourtImageModal();
+        closeGameModal();
+        loadGames();
+    } catch (error) {
+        showError(error.message || 'Failed to save game');
+    }
 }
 
 async function handleGameFormSubmit(e) {
@@ -439,19 +601,7 @@ async function handleGameFormSubmit(e) {
         notes: document.getElementById('gameNotes').value
     };
 
-    try {
-        if (currentEditingId) {
-            await apiClient.updateGame(currentEditingId, gameData);
-            showSuccess('Game updated successfully');
-        } else {
-            await apiClient.createGame(gameData);
-            showSuccess('Game scheduled successfully');
-        }
-        closeGameModal();
-        loadGames();
-    } catch (error) {
-        showError(error.message || 'Failed to save game');
-    }
+    openCourtImageModal(gameData);
 }
 
 async function deleteGame(id) {
@@ -502,5 +652,11 @@ function showError(message) {
 document.getElementById('gameModal').addEventListener('click', (e) => {
     if (e.target === document.getElementById('gameModal')) {
         closeGameModal();
+    }
+});
+
+document.getElementById('courtImageModal').addEventListener('click', (e) => {
+    if (e.target === document.getElementById('courtImageModal')) {
+        closeCourtImageModal();
     }
 });
