@@ -37,12 +37,113 @@
             font-weight: 600;
         }
 
+        .final-score-section {
+            background: #ffffff;
+            color: #0f172a;
+            border: 1px solid #dbe3f2;
+            box-shadow: 0 14px 32px rgba(15, 23, 42, 0.08);
+            border-radius: 16px;
+            padding: 24px;
+        }
+
         .final-score-section h2 {
-            color: white;
+            color: #334155;
+            font-size: 0.95rem;
+            text-transform: uppercase;
+            letter-spacing: 1.6px;
+            margin-bottom: 16px;
+            font-weight: 700;
+        }
+
+        .score-display {
+            display: grid;
+            grid-template-columns: 1fr auto 1fr;
+            gap: 12px;
+            align-items: stretch;
         }
 
         .team-score {
-            flex: 1;
+            background: linear-gradient(180deg, #f8fbff 0%, #eef4ff 100%);
+            border: 1px solid #d6e2ff;
+            border-radius: 14px;
+            padding: 18px 16px;
+            min-height: 140px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .team-score-label {
+            color: #475569;
+            font-size: 0.9rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.8px;
+            margin-bottom: 8px;
+            text-align: center;
+        }
+
+        .team-score-value {
+            color: #0f172a;
+            font-size: clamp(3rem, 6vw, 4.4rem);
+            font-weight: 900;
+            line-height: 0.95;
+            font-variant-numeric: tabular-nums;
+        }
+
+        .vs-divider {
+            align-self: center;
+            justify-self: center;
+            width: 44px;
+            height: 44px;
+            border-radius: 50%;
+            background: #e2e8f0;
+            color: #334155;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.85rem;
+            font-weight: 800;
+            letter-spacing: 0.4px;
+            text-transform: uppercase;
+        }
+
+        .winner-badge {
+            margin-top: 16px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 999px;
+            border: 1px solid #bbf7d0;
+            background: #ecfdf3;
+            color: #166534;
+            font-weight: 800;
+            font-size: 0.86rem;
+            letter-spacing: 0.6px;
+            text-transform: uppercase;
+            padding: 8px 14px;
+        }
+
+        @media (max-width: 700px) {
+            .final-score-section {
+                padding: 18px;
+            }
+
+            .score-display {
+                grid-template-columns: 1fr;
+                gap: 10px;
+            }
+
+            .vs-divider {
+                width: 36px;
+                height: 36px;
+                margin: 2px auto;
+            }
+
+            .team-score {
+                min-height: 118px;
+            }
         }
 
         /* Stats Section */
@@ -171,6 +272,131 @@
             padding: 40px;
             font-size: 1.1rem;
         }
+
+        .starred-plays-section {
+            margin-bottom: 32px;
+            padding: 20px;
+            background: #fff;
+            border: 1px solid #e5e7eb;
+            border-radius: 12px;
+            box-shadow: 0 8px 20px rgba(15, 23, 42, 0.05);
+        }
+
+        .starred-plays-section h3 {
+            font-size: 1.2rem;
+            color: #1f2937;
+            margin-bottom: 14px;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 0.4px;
+        }
+
+        .starred-plays-list {
+            display: grid;
+            gap: 10px;
+        }
+
+        .starred-play-item {
+            border: 1px solid #e5e7eb;
+            border-left: 4px solid #f59e0b;
+            border-radius: 10px;
+            padding: 10px 12px;
+            background: #fffbeb;
+        }
+
+        .starred-play-head {
+            display: flex;
+            justify-content: space-between;
+            gap: 10px;
+            align-items: center;
+            margin-bottom: 4px;
+        }
+
+        .starred-play-title {
+            font-weight: 700;
+            color: #92400e;
+        }
+
+        .starred-play-time {
+            font-family: 'Courier New', monospace;
+            font-weight: 700;
+            color: #374151;
+            background: #fff;
+            border: 1px solid #e5e7eb;
+            border-radius: 999px;
+            padding: 2px 8px;
+            font-size: 0.85rem;
+        }
+
+        .starred-play-comment {
+            color: #374151;
+            font-size: 0.95rem;
+        }
+
+        .game-actions-section {
+            margin: 36px 0 24px;
+            padding: 20px;
+            background: #fff;
+            border: 1px solid #e5e7eb;
+            border-radius: 12px;
+            box-shadow: 0 8px 20px rgba(15, 23, 42, 0.05);
+        }
+
+        .game-actions-section h3 {
+            font-size: 1.2rem;
+            color: #1f2937;
+            margin-bottom: 14px;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 0.4px;
+        }
+
+        .game-actions-list {
+            display: grid;
+            gap: 10px;
+        }
+
+        .game-action-item {
+            border: 1px solid #e5e7eb;
+            border-radius: 10px;
+            padding: 10px 12px;
+            background: #f8fafc;
+        }
+
+        .game-action-head {
+            display: flex;
+            justify-content: space-between;
+            gap: 10px;
+            align-items: center;
+            margin-bottom: 4px;
+        }
+
+        .game-action-title {
+            font-weight: 700;
+            color: #0f172a;
+        }
+
+        .game-action-time {
+            font-family: 'Courier New', monospace;
+            font-weight: 700;
+            color: #374151;
+            background: #fff;
+            border: 1px solid #e5e7eb;
+            border-radius: 999px;
+            padding: 2px 8px;
+            font-size: 0.85rem;
+        }
+
+        .game-action-meta {
+            color: #64748b;
+            font-size: 0.85rem;
+            margin-bottom: 4px;
+        }
+
+        .game-action-comment {
+            color: #374151;
+            font-size: 0.95rem;
+        }
     </style>
 </head>
 <body>
@@ -226,6 +452,8 @@
             <!-- Action Buttons -->
             <div class="action-buttons">
                 <button class="btn btn-primary" onclick="generatePDF()">Download PDF</button>
+                <button class="btn btn-secondary playback-trigger-btn" id="teamAReportPlaybackBtn">Team A Playback</button>
+                <button class="btn btn-secondary playback-trigger-btn" id="teamBReportPlaybackBtn">Team B Playback</button>
                 <button class="btn btn-secondary" onclick="window.print()">Print</button>
                 <button class="btn btn-secondary" onclick="window.history.back()">Back</button>
             </div>
@@ -247,14 +475,52 @@
                 <div class="winner-badge" id="winnerBadge">Team A Wins</div>
             </div>
 
+            <!-- Starred Plays -->
+            <div id="starredPlaysSection" class="starred-plays-section" style="display: none;">
+                <h3>Starred Plays</h3>
+                <div id="starredPlaysList" class="starred-plays-list"></div>
+            </div>
+
             <!-- Player Reports -->
             <div id="playerReportsContainer"></div>
+
+            <!-- Game Actions (bottom) -->
+            <div id="gameActionsSection" class="game-actions-section" style="display: none;">
+                <h3>Game Actions</h3>
+                <div id="gameActionsList" class="game-actions-list"></div>
+            </div>
 
             <!-- Footer -->
             <div class="report-footer">
                 <p><strong>The Next Chapter - Game Statistics Report</strong></p>
                 <p id="generatedDate">Generated on -- at --</p>
                 <p>For more information, visit: www.thenextchapter.app</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Report playback modal -->
+    <div id="reportPlaybackModal" class="modal-overlay" style="display:none;">
+        <div class="modal-card" style="max-width:900px; width:min(900px, 100%);">
+            <div class="modal-header">
+                <span id="reportPlaybackTitle">Team Playback</span>
+                <button id="reportPlaybackClose" class="btn btn-sm" aria-label="Close">&#10005;</button>
+            </div>
+            <div class="modal-body" style="gap:10px;">
+                <div id="reportPlaybackMeta" style="font-size:0.9rem; color:#475569; font-weight:600;">Step 0 of 0</div>
+                <div id="reportPlaybackCurrent" style="padding:10px; background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; font-weight:600; color:#0f172a; min-height:48px; display:flex; align-items:center;">No sequence loaded.</div>
+                <div style="display:flex; gap:8px; justify-content:center; flex-wrap:wrap;">
+                    <button id="reportPlaybackPrev" class="btn btn-secondary">Prev</button>
+                    <button id="reportPlaybackPlayPause" class="btn btn-primary">Play</button>
+                    <button id="reportPlaybackNext" class="btn btn-secondary">Next</button>
+                </div>
+                <div class="playback-layout">
+                    <div id="reportPlaybackList" class="playback-list-panel"></div>
+                    <div class="playback-court-panel">
+                        <img id="reportPlaybackCourtImage" src="assets/default-court-image.svg" alt="Replay Court" class="playback-court-image" />
+                        <div id="reportPlaybackCourtOverlay" class="playback-court-overlay"></div>
+                    </div>
+                </div>
             </div>
         </div>
     </div>

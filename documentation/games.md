@@ -4,6 +4,35 @@
 
 The Games system manages basketball game records, tracks live game events, and stores final statistics. Games can be in various states (in progress, finished, canceled) and support multiple game formats (1v1, 2v2, 3v3, 5v5).
 
+### Live UI Behavior
+
+- Live game cards on the Games page refresh periodically and display live scores.
+- Live score display uses this fallback order:
+  1. backend `current_score`
+  2. local live snapshot score (`tnc_live_game_state_active_v1`)
+  3. existing score fallback
+- Live game cards include a **Live Report** action that opens `game-report.html?id=<gameId>&live=1`.
+- Live game cards include a **Shot Charts** action that opens `live-shot-chart.html?id=<gameId>&live=1`.
+- Live game cards are clickable and open the live shot-chart page directly.
+- If an active local snapshot exists but backend status has not switched to `live`/`in_progress` yet, that game is promoted into the **Live Games** section.
+- If needed, a snapshot-only live card is synthesized so the currently running local game remains visible.
+
+### Live Shot Chart Page Behavior
+
+- The live shot-chart page supports two render modes:
+  1. Team View
+  2. Individual View
+- Any shot-chart card can be clicked to open an enlarged replay modal.
+- Replay controls include `Prev`, `Play/Pause`, `Next`, and `Close`.
+- Replay tick interval is **1.5 seconds**.
+- Timeline list highlights the active step and auto-scrolls while replay runs.
+- Replay marker semantics are consistent with tracker/report rules:
+  - made shot: player color
+  - missed shot: red X
+  - foul committed: yellow triangle
+  - got fouled: yellow square
+- If the game is live, replay data continues updating from backend/snapshot refresh loops.
+
 ---
 
 ## Game Structure
@@ -137,7 +166,7 @@ POST /game
     y: Number             // Percentage (0-100)
   },
   made: Boolean,          // For shots/free throws
-  points: Number,         // 1, 2, or 3 for scoring events
+  points: Number,         // 1, 2, 3, or 4 for scoring events
   rebound_type: String,   // 'offensive' or 'defensive'
   turnover_type: String   // Classification of turnover
 }
@@ -165,6 +194,21 @@ POST /game/:id/event
 }
 ```
 
+**4PT Shot Example:**
+```json
+{
+  "type": "shot",
+  "player_id": "player_id",
+  "team": "team_a",
+  "location": {
+    "x": 41.0,
+    "y": 27.4
+  },
+  "made": true,
+  "points": 4
+}
+```
+
 **Free Throw Example:**
 ```json
 {
@@ -188,6 +232,10 @@ POST /game/:id/event
   }
 }
 ```
+
+**Compatibility Note:**
+- Some backend environments may reject native `points: 4` event writes.
+- Frontend game tracking includes a compatibility fallback path to preserve total points during end-game sync.
 
 ---
 
@@ -299,6 +347,37 @@ Array of game objects with basic information
 ```
 GET /game/:id
 ```
+
+---
+
+## Live Report Mode
+
+The report page supports both finished and active games.
+
+### URL
+
+```
+game-report.html?id=<gameId>&live=1
+```
+
+### Behavior
+
+- Live reports auto-refresh on an interval while game status is `live` or `in_progress`.
+- Header displays live update context (auto-updating indicator + updated timestamp).
+- Score section uses live score resolution (backend first, local snapshot fallback).
+- Event/shot rendering uses backend events when available, with snapshot-based reconstruction fallback for active games.
+- PDF auto-download flow remains intended for completed reports (live mode is for monitoring).
+
+### Local Snapshot Fallback
+
+If backend live events/scores are delayed or unavailable, live report pages can use local active-game snapshot data from the tracker:
+
+- Storage key: `tnc_live_game_state_active_v1`
+- Includes:
+  - team/player stats
+  - action history
+  - timeline metadata
+  - marker/event reconstruction data
 
 **Response:**
 Complete game object including:

@@ -1,0 +1,351 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Live Shot Charts | The Next Chapter</title>
+    <link rel="stylesheet" href="css/shared.css">
+    <style>
+        body { padding: 20px; }
+
+        .live-chart-header {
+            margin-bottom: 16px;
+            display: flex;
+            justify-content: space-between;
+            gap: 12px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        .live-chart-title {
+            font-size: 1.5rem;
+            font-weight: 800;
+            color: #0f172a;
+        }
+
+        .live-chart-subtitle {
+            color: #64748b;
+            font-weight: 600;
+        }
+
+        .view-toggle {
+            display: inline-flex;
+            border: 1px solid #cbd5e1;
+            border-radius: 999px;
+            overflow: hidden;
+            background: #fff;
+        }
+
+        .view-toggle button {
+            border: none;
+            background: transparent;
+            padding: 8px 14px;
+            font-weight: 700;
+            color: #334155;
+            cursor: pointer;
+        }
+
+        .view-toggle button.active {
+            background: #1f6feb;
+            color: #fff;
+        }
+
+        .charts-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+            gap: 16px;
+        }
+
+        .chart-card {
+            background: #fff;
+            border: 1px solid #dbe2ef;
+            border-radius: 12px;
+            padding: 14px;
+            cursor: zoom-in;
+            transition: transform 0.16s ease, box-shadow 0.16s ease, border-color 0.16s ease;
+        }
+
+        .chart-card:hover {
+            transform: translateY(-2px);
+            border-color: #94a3b8;
+            box-shadow: 0 8px 22px rgba(15, 23, 42, 0.12);
+        }
+
+        .chart-card h3 {
+            margin-bottom: 10px;
+            color: #0f172a;
+            font-size: 1rem;
+        }
+
+        .chart-wrapper {
+            position: relative;
+            width: 100%;
+            aspect-ratio: 500 / 470;
+            border-radius: 10px;
+            overflow: hidden;
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+        }
+
+        .chart-svg {
+            width: 100%;
+            height: 100%;
+            display: block;
+        }
+
+        .legend {
+            margin-top: 10px;
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+            color: #475569;
+            font-size: 0.86rem;
+            font-weight: 600;
+        }
+
+        .legend-item {
+            display: inline-flex;
+            gap: 6px;
+            align-items: center;
+        }
+
+        .dot {
+            width: 14px;
+            height: 14px;
+            border-radius: 50%;
+            display: inline-block;
+        }
+
+        .legend-x {
+            width: 14px;
+            height: 14px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            color: rgba(220, 38, 38, 0.95);
+            font-weight: 900;
+            font-size: 16px;
+            line-height: 1;
+        }
+
+        .error-state {
+            margin-top: 12px;
+            color: #b91c1c;
+            font-weight: 700;
+        }
+
+        .replay-modal {
+            position: fixed;
+            inset: 0;
+            background: rgba(2, 6, 23, 0.65);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            padding: 18px;
+            z-index: 1100;
+        }
+
+        .replay-modal.open {
+            display: flex;
+        }
+
+        .replay-dialog {
+            width: min(1100px, 98vw);
+            max-height: 94vh;
+            overflow: hidden;
+            background: #fff;
+            border-radius: 16px;
+            border: 1px solid #cbd5e1;
+            box-shadow: 0 24px 60px rgba(15, 23, 42, 0.32);
+            display: grid;
+            grid-template-columns: minmax(320px, 1fr) minmax(300px, 360px);
+        }
+
+        .replay-left {
+            padding: 16px;
+            border-right: 1px solid #e2e8f0;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            min-height: 0;
+        }
+
+        .replay-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .replay-title {
+            color: #0f172a;
+            font-weight: 800;
+            font-size: 1.05rem;
+        }
+
+        .replay-controls {
+            display: inline-flex;
+            gap: 8px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        .replay-controls button {
+            border: 1px solid #94a3b8;
+            background: #f8fafc;
+            color: #0f172a;
+            border-radius: 8px;
+            padding: 6px 10px;
+            font-weight: 700;
+            cursor: pointer;
+        }
+
+        .replay-controls button:hover {
+            background: #e2e8f0;
+        }
+
+        .replay-step-label {
+            color: #334155;
+            font-weight: 700;
+            min-height: 24px;
+        }
+
+        .replay-court {
+            width: 100%;
+            aspect-ratio: 500 / 470;
+            border: 1px solid #e2e8f0;
+            border-radius: 12px;
+            overflow: hidden;
+            background: #f8fafc;
+        }
+
+        .replay-court svg {
+            width: 100%;
+            height: 100%;
+            display: block;
+        }
+
+        .replay-right {
+            padding: 16px;
+            display: flex;
+            flex-direction: column;
+            min-height: 0;
+        }
+
+        .replay-list-title {
+            color: #0f172a;
+            font-weight: 800;
+            margin-bottom: 10px;
+        }
+
+        .replay-list {
+            overflow: auto;
+            border: 1px solid #e2e8f0;
+            border-radius: 10px;
+            background: #f8fafc;
+            padding: 8px;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .replay-item {
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            background: #fff;
+            padding: 8px 10px;
+            color: #334155;
+            font-weight: 600;
+        }
+
+        .replay-item.active {
+            border-color: #1f6feb;
+            background: rgba(31, 111, 235, 0.12);
+            color: #0f172a;
+        }
+
+        .replay-empty {
+            color: #64748b;
+            font-weight: 700;
+            text-align: center;
+            padding: 14px;
+        }
+
+        @media (max-width: 980px) {
+            .replay-dialog {
+                grid-template-columns: 1fr;
+                max-height: 96vh;
+            }
+
+            .replay-left {
+                border-right: none;
+                border-bottom: 1px solid #e2e8f0;
+            }
+        }
+    </style>
+</head>
+<body>
+    <nav id="site-nav">
+        <div class="nav-inner">
+            <div class="brand-left">
+                <div class="nav-logo"><img src="assets/tnclogo.svg" alt="The Next Chapter" /></div>
+                <span class="brand-text">The Next Chapter</span>
+            </div>
+            <div class="nav-links">
+                <a href="index.html">Home</a>
+                <a href="index.html#stats">Stats</a>
+                <a href="player.html">Players</a>
+                <a href="games.html" style="font-weight: 600;">Games</a>
+                <a href="game.html" id="nav-log-game-link">Log Game</a>
+            </div>
+            <div class="nav-actions">
+                <button class="btn-outline-tnc" id="nav-sign-in">Sign In</button>
+                <button class="btn-outline-tnc" id="nav-sign-out" style="display:none;">Sign Out</button>
+            </div>
+        </div>
+    </nav>
+
+    <div class="page-container">
+        <div class="live-chart-header">
+            <div>
+                <div class="live-chart-title" id="liveChartTitle">Live Shot Charts</div>
+                <div class="live-chart-subtitle" id="liveChartSubtitle">Auto-updating from live game data</div>
+            </div>
+            <div class="view-toggle" role="tablist" aria-label="Shot chart view toggle">
+                <button id="teamViewBtn" class="active" type="button">Team View</button>
+                <button id="individualViewBtn" type="button">Individual View</button>
+            </div>
+        </div>
+
+        <div id="chartError" class="error-state" style="display:none;"></div>
+        <div id="chartsContainer" class="charts-grid"></div>
+    </div>
+
+    <div id="replayModal" class="replay-modal" aria-hidden="true">
+        <div class="replay-dialog" role="dialog" aria-modal="true" aria-labelledby="replayTitle">
+            <div class="replay-left">
+                <div class="replay-header">
+                    <div id="replayTitle" class="replay-title">Chart Replay</div>
+                    <div class="replay-controls">
+                        <button id="replayPrevBtn" type="button">Prev</button>
+                        <button id="replayPlayBtn" type="button">Play</button>
+                        <button id="replayNextBtn" type="button">Next</button>
+                        <button id="replayCloseBtn" type="button">Close</button>
+                    </div>
+                </div>
+                <div id="replayStepLabel" class="replay-step-label"></div>
+                <div class="replay-court">
+                    <svg id="replayChartSvg" preserveAspectRatio="xMidYMid meet"></svg>
+                </div>
+            </div>
+            <div class="replay-right">
+                <div class="replay-list-title">Replay Timeline</div>
+                <div id="replayList" class="replay-list"></div>
+            </div>
+        </div>
+    </div>
+
+    <script src="utils/api.js"></script>
+    <script src="js/live-shot-chart.js"></script>
+</body>
+</html>

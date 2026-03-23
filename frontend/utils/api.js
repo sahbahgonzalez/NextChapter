@@ -128,6 +128,9 @@
   // =============================================================
   // PLAYERS API
   // =============================================================
+  apiClient.listAllPlayers = async function(page = 1, limit = 25) {
+    return _fetchPublic(`/player/all?page=${page}&limit=${limit}`);
+  };
 
   apiClient.createPlayer = async function(playerData) {
     return _fetchWithToken('/player', 'POST', playerData);
@@ -206,8 +209,8 @@
     return _fetchWithToken(`/game/${gameId}/event`, 'POST', eventData);
   };
 
-  apiClient.finalizeGame = async function(gameId) {
-    return _fetchWithToken(`/game/${gameId}/finish`, 'PATCH');
+  apiClient.finalizeGame = async function(gameId, payload = null) {
+    return _fetchWithToken(`/game/${gameId}/finish`, 'PATCH', payload);
   };
 
   apiClient.cancelGame = async function(gameId) {

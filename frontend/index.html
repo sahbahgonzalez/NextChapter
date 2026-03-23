@@ -9,7 +9,6 @@
     <style>
         /* General Setup */
         :root {
-            /* LIGHT MODE COLORS (DEFAULT) */
             --primary-blue: #3A478F; 
             --light-blue: #6A7BC5; 
             --background-light: #F7F7F7; 
@@ -22,30 +21,6 @@
             --accent-green: #38A169; /* For positive percentages */
             --accent-red: #E53E3E;   /* For shot chart */
             --shot-chart-bg: #1A202C; /* Dark background for chart contrast */
-
-            /* DARK MODE COLORS */
-            --dark-background-color: #111827; 
-            --dark-card-color: #1F2937; 
-            --dark-text-color: #F9FAFB; 
-            --dark-text-muted: #9CA3AF; 
-            --dark-border-color: #374151; 
-            --dark-table-header-bg: #374151;
-        }
-        
-        /* DARK MODE STYLES */
-        body.dark-mode {
-            background-color: var(--dark-background-color);
-            color: var(--dark-text-color);
-        }
-        body.dark-mode .section,
-        body.dark-mode header,
-        body.dark-mode nav,
-        body.dark-mode .stat-card {
-            background-color: var(--dark-card-color);
-            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.5);
-        }
-        body.dark-mode .stat-card {
-            border: 1px solid var(--dark-border-color);
         }
         
         /* Leaders Board Styling */
@@ -99,19 +74,6 @@
             font-size: 0.95rem;
         }
         
-        body.dark-mode .leader-card {
-            background-color: var(--dark-card-color);
-            border-color: var(--dark-border-color);
-        }
-        
-        body.dark-mode .leader-item {
-            background-color: var(--dark-table-header-bg);
-        }
-        
-        body.dark-mode .leader-item .player-name {
-            color: var(--dark-text-color);
-        }
-        
         /* Video Grid */
         .video-section {
             max-width: 1200px;
@@ -146,46 +108,6 @@
         .video-meta .duration {
             color: var(--text-muted);
             font-size: 0.9rem;
-        }
-
-        body.dark-mode h2,
-        body.dark-mode h1,
-        body.dark-mode nav a.active {
-            color: var(--light-blue);
-        }
-
-        body.dark-mode .tagline,
-        body.dark-mode nav a,
-        body.dark-mode .text-muted,
-        body.dark-mode td {
-            color: var(--dark-text-muted) !important;
-        }
-
-        body.dark-mode nav a.active {
-            border-bottom-color: var(--light-blue) !important;
-        }
-        
-        body.dark-mode th {
-            background-color: var(--dark-table-header-bg);
-            color: var(--light-blue) !important; 
-        }
-
-        body.dark-mode th,
-        body.dark-mode td {
-            border-bottom: 1px solid var(--dark-border-color);
-        }
-
-        body.dark-mode .cta-button, 
-        body.dark-mode .action-button,
-        body.dark-mode .auth-button {
-            background-color: var(--primary-blue);
-            color: var(--button-text);
-        }
-
-        body.dark-mode input[type="text"] {
-            background-color: var(--dark-card-color) !important; 
-            color: var(--dark-text-color) !important;
-            border-color: var(--dark-border-color) !important;
         }
         
         /* BASE STYLES - Aesthetic */
@@ -289,10 +211,6 @@
         .player-name-link:hover {
             color: var(--light-blue) !important;
         }
-
-        body.dark-mode tr:hover {
-            background-color: rgba(106, 123, 197, 0.1); 
-        }
         
         /* Profile Detail Styling */
         .profile-header {
@@ -302,10 +220,6 @@
             padding-bottom: 20px;
             margin-bottom: 20px;
             border-bottom: 1px solid var(--border-color);
-        }
-        
-        body.dark-mode .profile-header {
-             border-bottom-color: var(--dark-border-color);
         }
 
         .profile-header h2 {
@@ -362,7 +276,7 @@
         }
         
         .shot-chart-title {
-            color: var(--dark-text-color);
+            color: var(--button-text);
             text-align: center;
             margin-bottom: 15px;
             font-weight: 600;
@@ -442,10 +356,6 @@
             fill: var(--primary-blue);
         }
         
-        body.dark-mode .back-button svg {
-            fill: var(--light-blue);
-        }
-        
         /* Delete Button */
         .delete-button {
             padding: 6px 12px;
@@ -461,10 +371,6 @@
 
         .delete-button:hover {
             background-color: #c41e1e;
-        }
-
-        body.dark-mode .delete-button:hover {
-            background-color: #ff6b6b;
         }
         
         /* ===== Login Modal Styling ===== */
@@ -494,22 +400,11 @@
         text-align: center;
         }
 
-        body.dark-mode .login-content {
-        background: var(--dark-card-color);
-        color: var(--dark-text-color);
-        }
-
         .login-content input {
         padding: 10px;
         border-radius: 6px;
         border: 1px solid var(--border-color);
         font-size: 1em;
-        }
-
-        body.dark-mode .login-content input {
-        background-color: var(--dark-background-color);
-        border-color: var(--dark-border-color);
-        color: var(--dark-text-color);
         }
 
         .login-buttons {
@@ -692,7 +587,7 @@
             <h3>Shot Chart Heatmap Placeholder</h3>
             <div class="shot-chart-container">
                 <div class="shot-chart-title">Shot Frequency vs. League Average</div>
-                <img src="assets/basketballcourt.svg" alt="Basketball Court" style="width: 100%; max-width: 500px; height: auto; display: block; margin: 0 auto; pointer-events: none; border-radius: 8px;">
+                <img src="assets/default-court-image.svg" alt="Basketball Court" style="width: 100%; max-width: 500px; height: auto; display: block; margin: 0 auto; pointer-events: none; border-radius: 8px;">
             </div>
         </div>
 

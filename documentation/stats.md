@@ -27,6 +27,11 @@ The statistics system tracks comprehensive basketball performance metrics for in
 - `3P%`: Three-point percentage = (3PM / 3PA) × 100
 - Tracks long-range shooting ability
 
+**Four-Pointers (4P) - Report Display**
+- Game report now shows per-player 4PT made/attempted.
+- Values are derived from event stream (`event.type === 'shot'` and `event.points === 4`).
+- This is currently a report-level derived metric and may not exist as a native backend summary field in `game_stats_summary`.
+
 **Two-Pointers (2P)**
 - `2PA`: Two-point attempts
 - `2PM`: Two-pointers made  
