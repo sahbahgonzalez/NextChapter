@@ -745,7 +745,10 @@ document.addEventListener("DOMContentLoaded", async () => {
     teamAStatsScope: document.getElementById('teamAStatsScope'),
     teamBStatsScope: document.getElementById('teamBStatsScope'),
     teamAPlaybackBtn: document.getElementById('teamAPlaybackBtn'),
-    teamBPlaybackBtn: document.getElementById('teamBPlaybackBtn')
+    teamBPlaybackBtn: document.getElementById('teamBPlaybackBtn'),
+    turnoverBtn: document.getElementById('turnoverBtn'),
+    stealBtn: document.getElementById('stealBtn'),
+    blockBtn: document.getElementById('blockBtn')
   };
 
   // DEBUG: Log if all elements were found
@@ -2079,6 +2082,16 @@ document.addEventListener("DOMContentLoaded", async () => {
       return;
     }
 
+    if (change.kind === 'turnover' || change.kind === 'steal' || change.kind === 'block') {
+      await apiClient.addGameEvent(gameContext.gameId, {
+        type: change.kind,
+        player_id: change.playerId,
+        team: teamField
+      });
+      change.persisted = true;
+      return;
+    }
+
     if (change.kind !== 'shot') return;
 
     const isFT = change.shotType === 'ft';
@@ -2131,7 +2144,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   async function flushBufferedEventsToBackend() {
     if (SYNC_LIVE_EVENTS_TO_BACKEND) return;
     const pending = state.history.filter((change) =>
-      (change.kind === 'shot' || change.kind === 'foul') && !change.persisted
+      (change.kind === 'shot' || change.kind === 'foul' || change.kind === 'turnover' || change.kind === 'steal' || change.kind === 'block') && !change.persisted
     );
 
     for (const change of pending) {
@@ -2623,6 +2636,62 @@ document.addEventListener("DOMContentLoaded", async () => {
     controller.incrementFoul(teamKey);
   }
 
+  async function logPossessionChangeEvent(eventType, label, forOtherTeam = false) {
+    if (!isGameRunning) {
+      showStartError(`Assign ${requiredPlayersPerTeam()} player(s) to each team and press Start Game.`);
+      return;
+    }
+    if (isPaused || isTimeout) return;
+
+    const otherTeam = state.active === 'A' ? 'B' : 'A';
+    // steal/block/takeover are credited to the non-active (defending) player
+    const teamKey = forOtherTeam ? otherTeam : state.active;
+    const playerId = getPlayerId(teamKey);
+    if (!playerId) {
+      alert(`Please assign a player for Team ${teamKey} before recording stats!`);
+      return;
+    }
+
+    const actionId = `action_${Date.now()}_${Math.random().toString(16).slice(2)}`;
+    const playerName = getActivePlayerForTeam(teamKey)?.name || `Team ${teamKey}`;
+
+    if (!state.teamPlayerIds[teamKey].includes(String(playerId))) {
+      state.teamPlayerIds[teamKey].push(String(playerId));
+    }
+
+    addActionEntry(teamKey, {
+      id: actionId,
+      label,
+      type: eventType,
+      gameSeconds: secondsElapsed,
+      playerId,
+      playerName
+    });
+
+    state.history.push({
+      kind: eventType,
+      team: teamKey,
+      actionId,
+      playerId,
+      persisted: false
+    });
+
+    // Switch selection to the team that gained possession (the defending team)
+    setActive(otherTeam);
+
+    try {
+      const persistResult = await persistGameEvent(teamKey, { type: eventType });
+      if (!persistResult?.skipped) {
+        const entry = state.history.find(h => h.actionId === actionId);
+        if (entry) entry.persisted = true;
+        console.log(`${label} recorded for Team ${teamKey}`);
+      }
+    } catch (err) {
+      console.error(`Failed to persist ${eventType} event (keeping local stats)`, err);
+      alert(`Saved locally. Network/database error: ${err.message}`);
+    }
+  }
+
   // Wire buttons
   if (els.selectA) els.selectA.addEventListener('click', () => { if (!isGameRunning) return showStartError(`Assign ${requiredPlayersPerTeam()} player(s) to each team and press Start Game.`); controller.setActive('A'); });
   if (els.selectB) els.selectB.addEventListener('click', () => { if (!isGameRunning) return showStartError(`Assign ${requiredPlayersPerTeam()} player(s) to each team and press Start Game.`); controller.setActive('B'); });
@@ -2637,6 +2706,9 @@ document.addEventListener("DOMContentLoaded", async () => {
   if (els.undo) els.undo.addEventListener('click', () => controller.undoLast());
   if (els.teamAPlaybackBtn) els.teamAPlaybackBtn.addEventListener('click', () => openPlaybackModal('A'));
   if (els.teamBPlaybackBtn) els.teamBPlaybackBtn.addEventListener('click', () => openPlaybackModal('B'));
+  if (els.turnoverBtn) els.turnoverBtn.addEventListener('click', () => logPossessionChangeEvent('turnover', 'Turnover', true));
+  if (els.stealBtn) els.stealBtn.addEventListener('click', () => logPossessionChangeEvent('steal', 'Steal', true));
+  if (els.blockBtn) els.blockBtn.addEventListener('click', () => logPossessionChangeEvent('block', 'Block', true));
 
   if (playbackModal.close) playbackModal.close.addEventListener('click', closePlaybackModal);
   if (playbackModal.overlay) playbackModal.overlay.addEventListener('click', (e) => {
@@ -3534,6 +3606,9 @@ document.addEventListener("DOMContentLoaded", async () => {
     if (els.b.foulPlus) els.b.foulPlus.disabled = !enabled;
     if (els.a.ftBtn) els.a.ftBtn.disabled = !enabled;
     if (els.b.ftBtn) els.b.ftBtn.disabled = !enabled;
+    if (els.turnoverBtn) els.turnoverBtn.disabled = !enabled;
+    if (els.stealBtn) els.stealBtn.disabled = !enabled;
+    if (els.blockBtn) els.blockBtn.disabled = !enabled;
     if (els.undo) els.undo.disabled = !enabled;
     if (pauseGameBtn) pauseGameBtn.disabled = !enabled;
     if (timeoutBtn) timeoutBtn.disabled = !enabled;
@@ -3917,7 +3992,28 @@ document.addEventListener("DOMContentLoaded", async () => {
       logFoulForTeam('B');
       return;
     }
-    
+
+    // V - Turnover (active player)
+    if (key === 'v') {
+      e.preventDefault();
+      logPossessionChangeEvent('turnover', 'Turnover', true);
+      return;
+    }
+
+    // E - Steal (other/defending player)
+    if (key === 'e') {
+      e.preventDefault();
+      logPossessionChangeEvent('steal', 'Steal', true);
+      return;
+    }
+
+    // K - Block (other/defending player)
+    if (key === 'k') {
+      e.preventDefault();
+      logPossessionChangeEvent('block', 'Block', true);
+      return;
+    }
+
     // M - Shot Made (auto-detect 2PT/3PT from cursor position)
     if (key === 'm') {
       e.preventDefault();
