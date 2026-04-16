@@ -1,24 +1,28 @@
 # NextChapter
 
-A full-stack basketball shot logging and player analytics application. Track player performance, log shots, and analyze game statistics in real-time.
+A frontend basketball shot logging and player analytics application. Track player performance, log shots in real-time, view live shot charts, and generate game reports.
 
 ## Table of Contents
 
 - [Features](#features)
 - [Tech Stack](#tech-stack)
 - [Project Structure](#project-structure)
-- [Installation](#installation)
-- [Configuration](#configuration)
 - [Usage](#usage)
+- [Pages](#pages)
 - [API Endpoints](#api-endpoints)
-- [Database](#database)
-- [Development](#development)
+- [Documentation](#documentation)
 
 ## Features
 
 - **Player Management**: Create, update, and manage player profiles
-- **Shot Logging**: Record shot attempts with coordinates, points, and game details
-- **Game Tracking**: Log complete games with multiple players and teams
+- **Real-Time Game Tracking**: Log complete games with multiple players and teams using an interactive basketball court
+- **Shot Logging**: Record shot attempts (2PT, 3PT, 4PT, FT) with coordinates and court zone detection
+- **Live Shot Chart**: Visual shot chart overlay on the court with make/miss indicators per player
+- **Action History**: Full action log per team with timestamps, notes, highlights, and targeted undo/delete
+- **Foul Tracking**: Log committed and received fouls between players
+- **Stats Panel**: Toggle between individual player stats and team totals per side
+- **Game Reports**: Auto-generated post-game reports with per-player stats and shot breakdowns
+- **PDF Export**: Download game reports as PDFs from the end-game modal or the report page
 - **Player Statistics**: View overall stats, shooting percentages, and performance metrics
 - **User Authentication**: Secure login with JWT tokens
 - **Responsive Design**: Works on desktop and mobile devices
@@ -26,150 +30,95 @@ A full-stack basketball shot logging and player analytics application. Track pla
 
 ## Tech Stack
 
-### Backend
-- **Node.js** with Express.js
-- **MongoDB Atlas** for database
-- **Mongoose** for ODM
-- **JWT** for authentication
-- **bcryptjs** for password hashing
-- **CORS** enabled for frontend communication
-
 ### Frontend
 - **HTML5** with responsive design
 - **Vanilla JavaScript** (no framework dependencies)
 - **Fetch API** for HTTP requests
+- **html2pdf.js** for PDF generation
+- **SVG** basketball court with interactive zone detection
+
+### Backend (Hosted separately)
+- **Node.js** with Express.js
+- **MongoDB Atlas** for database
+- **JWT** for authentication
+- Repo: [the-next-chapter-backend](https://github.com/Fedmichard/the-next-chapter-backend)
 
 ## Project Structure
 
 ```
 NextChapter/
-├── backend/
-│   ├── app.js                 # Express server entry point
-│   ├── package.json           # Node dependencies
-│   ├── .env                   # Environment variables
-│   ├── middleware/
-│   │   └── auth.js            # JWT authentication middleware
-│   ├── routes/
-│   │   ├── game.js            # Game endpoints
-│   │   ├── player.js          # Player endpoints
-│   │   └── user.js            # User authentication endpoints
-│   ├── tables/
-│   │   ├── game/
-│   │   │   ├── model.js       # Game schema
-│   │   │   └── controller.js  # Game logic
-│   │   ├── player/
-│   │   │   ├── model.js       # Player schema
-│   │   │   └── controller.js  # Player logic
-│   │   └── user/
-│   │       ├── model.js       # User schema
-│   │       └── controller.js  # User logic
-│   ├── migrations/
-│   │   └── migrate_players.js # Database migrations
-│   └── utils/
-│       └── hashPassword.js    # Password hashing utility
 ├── frontend/
-│   ├── index.html             # Main application page
-│   ├── game.html              # Game tracker page
-│   ├── games.html             # Games list page
-│   ├── player.html            # Player management page
-│   ├── player-stats.html      # Player statistics page
+│   ├── index.html                  # Home / player search page
+│   ├── game.html                   # Live game tracker
+│   ├── game-report.html            # Post-game report page
+│   ├── game-report-template.html   # PDF report template
+│   ├── games.html                  # Games list page
+│   ├── live-shot-chart.html        # Live shot chart overlay
+│   ├── player.html                 # Player management page
+│   ├── player-stats.html           # Player statistics page
 │   ├── css/
-│   │   └── shared.css         # Global styles
+│   │   └── shared.css              # Global styles
 │   ├── js/
-│   │   ├── gameScript.js      # Game tracker logic
-│   │   ├── games.js           # Games page logic
-│   │   ├── player.js          # Player page logic
-│   │   └── player-stats.js    # Player stats logic
+│   │   ├── gameScript.js           # Game tracker logic
+│   │   ├── game-report.js          # Game report logic
+│   │   ├── games.js                # Games list logic
+│   │   ├── live-shot-chart.js      # Live shot chart logic
+│   │   ├── player.js               # Player page logic
+│   │   └── player-stats.js         # Player stats logic
 │   ├── utils/
-│   │   ├── api.js             # API client wrapper
-│   │   └── app.js             # Frontend utilities
-│   └── assets/                # Static assets (images, SVGs)
-├── documentation/             # Project documentation
-└── README.md                  # This file
+│   │   ├── api.js                  # API client wrapper
+│   │   └── app.js                  # Frontend utilities
+│   └── assets/
+│       ├── basketballcourt.svg     # Interactive court SVG
+│       ├── default-court-image.svg # Fallback court image
+│       ├── tnc.png                 # App logo
+│       └── tnclogo.svg             # App logo SVG
+├── documentation/                  # Project documentation
+└── README.md                       # This file
 ```
-
-## Installation
-
-### Prerequisites
-- Node.js (v14 or higher)
-- MongoDB Atlas account
-- npm or yarn
-
-### Setup Steps
-
-1. **Clone the repository**
-   ```bash
-   git clone https://github.com/yourusername/NextChapter.git
-   cd NextChapter
-   ```
-
-2. **Install backend dependencies**
-   ```bash
-   cd backend
-   npm install
-   ```
-
-3. **Configure environment variables**
-   Create a `.env` file in the `backend` directory with:
-   ```
-   PORT=3000
-   MONGODB_URI=mongodb+srv://username:password@cluster.mongodb.net/?appName=Cluster0
-   JWT_SECRET=your_jwt_secret_key
-   ```
-
-4. **Start the backend server**
-   ```bash
-   npm start        # Production
-   npm run dev      # Development with nodemon
-   ```
-
-5. **Open the frontend**
-   - Navigate to `http://localhost:3000` in your browser
-   - The frontend files are served automatically by Express
-
-## Configuration
-
-### MongoDB Connection
-Update the `MONGODB_URI` in your `.env` file with your MongoDB Atlas connection string. Format:
-```
-mongodb+srv://username:password@cluster.mongodb.net/?appName=Cluster0
-```
-
-**Note**: Make sure your IP address is whitelisted in MongoDB Atlas Network Access settings.
-
-### JWT Secret
-Change the `JWT_SECRET` to a secure random string for production use.
-
-### Database Name
-The application uses the `nextChapterDb` database by default.
 
 ## Usage
 
-### Running the Application
+Open `frontend/index.html` in a browser or serve the `frontend/` directory with any static file server. The app connects to the configured backend API.
 
-**Development Mode** (with hot reload):
+### Quick Start with a local server
+
 ```bash
-cd backend
-npm run dev
+# Using Python
+python -m http.server 8080 --directory frontend
+
+# Using Node.js (npx)
+npx serve frontend
 ```
 
-**Production Mode**:
-```bash
-cd backend
-npm start
-```
+Then navigate to `http://localhost:8080`.
 
-### Testing Database Connection
-```bash
-cd backend
-node test-connection.js
-```
+## Pages
 
-### Running Migrations
-```bash
-cd backend
-npm run migrate:players
-```
+### Home (`index.html`)
+Search and browse players. Entry point for the app.
+
+### Game Tracker (`game.html`)
+Real-time game logging with:
+- Interactive basketball court with zone-based shot detection (2PT, 3PT, 4PT paint)
+- Dual team panels with active player selection
+- Action log per team (shots, fouls, timeouts, team switches)
+- Hotkeys for quick shot entry
+- Stats toggle between player view and team totals
+- Undo (global) and targeted delete per action row
+- End-game modal with PDF download
+
+### Live Shot Chart (`live-shot-chart.html`)
+Visual overlay of all shots taken during a game, per player, on the court SVG.
+
+### Game Report (`game-report.html`)
+Post-game summary with per-player stats, shot breakdowns, and PDF export support (`?autodownload=1` triggers automatic download).
+
+### Games List (`games.html`)
+Browse all logged games with scores and statuses.
+
+### Player Stats (`player-stats.html`)
+Career and per-game statistics for individual players.
 
 ## API Endpoints
 
@@ -192,67 +141,25 @@ npm run migrate:players
 - `PATCH /game/:id` - Update game (admin only)
 - `DELETE /game/:id` - Delete game (admin only)
 
-## Database
+## Documentation
 
-### Collections
+Detailed documentation lives in the `documentation/` folder:
 
-**Users**
-- Stores user accounts with hashed passwords
-- JWT authentication tokens generated on login
-
-**Players**
-- Player profiles with basic info (name, height, weight, hometown)
-- Instagram handle and profile image
-- Shot statistics and performance metrics
-
-**Games**
-- Game records with teams, scores, and status
-- References to all participating players
-- Shot data for performance tracking
-
-## Development
-
-### Adding New Features
-
-1. Create a new controller in `backend/tables/{entity}/controller.js`
-2. Define the schema in `backend/tables/{entity}/model.js`
-3. Add routes in `backend/routes/{entity}.js`
-4. Update the frontend API client in `frontend/utils/api.js`
-
-### Common Commands
-
-| Command | Description |
-|---------|-------------|
-| `npm start` | Start backend server |
-| `npm run dev` | Start with nodemon (auto-reload) |
-| `npm run migrate:players` | Run database migrations |
-| `node test-connection.js` | Test MongoDB connection |
-
-### Troubleshooting
-
-**MongoDB Connection Failed**
-- Verify your `.env` file has the correct `MONGODB_URI`
-- Check that your IP is whitelisted in MongoDB Atlas
-- Ensure the cluster is not paused
-- Verify username and password are correct
-
-**Port Already in Use**
-- Change the `PORT` in `.env` file
-- Or kill the process using port 3000
-
-**CORS Errors**
-- Ensure the frontend is served from the same origin as the API
-- Check that CORS is properly enabled in `app.js`
-
-## License
-
-ISC
+| File | Description |
+|------|-------------|
+| `gameTracker.md` | Game tracker features, court zones, action history, hotkeys |
+| `games.md` | Games list page behavior |
+| `stats.md` | Stats tracking and calculations |
+| `apiEndpoints.md` | Full API reference |
+| `updates.md` | Changelog and feature history |
 
 ## Authors
 
+- Daniel Arriaga (Team Lead)
 - Lazaro Loureiro
-- Daniel Arriaga-Franco
+- Gloria Mayo
+- Fedmichard Francois
 
 ---
 
-**Last Updated**: January 2026
+**Last Updated**: April 2026
