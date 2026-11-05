@@ -12,7 +12,8 @@
 (function(window) {
   'use strict';
 
-  const API_BASE_URL = 'https://the-next-chapter-backend.onrender.com';
+  const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InppcmhlanVqbnFiYnlpemd5ZGFlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTM4NDM3MDgsImV4cCI6MjEwOTQxOTcwOH0.jP2nJtrY3ahgpjW7-GLV_hhwpKfmdaisWbY8c5PYbwE';
+  const API_BASE_URL = 'https://zirhejujnqbbyizgydae.supabase.co/functions/v1/make-server-dcadf1e7';
 
   // -----------------------------------------------------------------
   // 2. CORE HELPER FUNCTIONS
@@ -71,7 +72,9 @@
    */
   async function _fetchPublic(endpoint) {
     try {
-      const response = await fetch(`${API_BASE_URL}${endpoint}`);
+      const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+        headers: { 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` }
+      });
       const data = await response.json();
 
       if (!response.ok) {
@@ -91,7 +94,10 @@
     // This is the only request that *doesn't* use the helper
     const response = await fetch(`${API_BASE_URL}/user/login`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${SUPABASE_ANON_KEY}`
+      },
       body: JSON.stringify({ email, password })
     });
 
