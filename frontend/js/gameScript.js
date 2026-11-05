@@ -3000,9 +3000,7 @@ document.addEventListener("DOMContentLoaded", async () => {
           return;
         }
         const pos = { ...lastCursorPos }; // Copy position before it changes
-        // Auto 2PT/3PT detection temporarily disabled.
-        // const shotType = inferShotTypeFromPos(pos);
-        const shotType = '2pt';
+        const shotType = inferShotTypeFromPos(pos);
         const markerEl = addShotMarker(controller.getActiveTeam(), shotType, result, pos);
         controller.applyShot(controller.getActiveTeam(), shotType, result, markerEl, pos);
       } else {
@@ -3023,9 +3021,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       // Left click = Make (button 0)
       if (evt.button === 0) {
         evt.preventDefault();
-        // Auto 2PT/3PT detection temporarily disabled.
-        // const shotType = inferShotTypeFromClick(evt);
-        const shotType = '2pt';
+        const shotType = inferShotTypeFromClick(evt);
         const result = 'made';
 
         if (lastCursorPos) {
@@ -3037,9 +3033,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       // Right click = Miss (button 2)
       else if (evt.button === 2) {
         evt.preventDefault();
-        // Auto 2PT/3PT detection temporarily disabled.
-        // const shotType = inferShotTypeFromClick(evt);
-        const shotType = '2pt';
+        const shotType = inferShotTypeFromClick(evt);
         const result = 'missed';
 
         if (lastCursorPos) {
@@ -3834,13 +3828,10 @@ document.addEventListener("DOMContentLoaded", async () => {
   document.addEventListener('keydown', (e) => {
     // Don't trigger if user is typing in an input field or if a modal is open
     if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+    if (e.repeat) return;
     
-    const assignModal = document.getElementById('assignPlayerModal');
-    const timeoutModal = document.getElementById('timeoutModal');
-    const postGameModal = document.getElementById('postGameModal');
-    const isModalOpen = (assignModal && assignModal.style.display === 'flex') ||
-                        (timeoutModal && timeoutModal.style.display === 'flex') ||
-                        (postGameModal && postGameModal.style.display === 'flex');
+    const isModalOpen = Array.from(document.querySelectorAll('.modal-overlay'))
+      .some((modal) => window.getComputedStyle(modal).display !== 'none');
     
     if (isModalOpen) return;
 
@@ -3864,6 +3855,15 @@ document.addEventListener("DOMContentLoaded", async () => {
       swapActiveTeammate(state.active);
       return;
     }
+
+    // C - Change court image before a game starts
+    if (key === 'c') {
+      e.preventDefault();
+      if (!isGameRunning) {
+        openGameCourtImageModal();
+      }
+      return;
+    }
     
     // Only allow other hotkeys when game is running
     if (!isGameRunning) return;
@@ -3882,15 +3882,6 @@ document.addEventListener("DOMContentLoaded", async () => {
       e.preventDefault();
       if (pauseGameBtn && !pauseGameBtn.disabled) {
         pauseGameBtn.click();
-      }
-      return;
-    }
-
-    // C - Change court image (only when game is not running)
-    if (key === 'c') {
-      e.preventDefault();
-      if (!isGameRunning) {
-        openGameCourtImageModal();
       }
       return;
     }
@@ -3927,9 +3918,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       // Must have cursor over court to record shot
       if (lastCursorPos) {
         const pos = { ...lastCursorPos }; // Copy position before it changes
-        // Auto 2PT/3PT detection temporarily disabled.
-        // const shotType = inferShotTypeFromPos(pos);
-        const shotType = '2pt';
+        const shotType = inferShotTypeFromPos(pos);
         const markerEl = addShotMarker(controller.getActiveTeam(), shotType, result, pos);
         controller.applyShot(controller.getActiveTeam(), shotType, result, markerEl, pos);
       } else {
@@ -3947,9 +3936,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       // Must have cursor over court to record shot
       if (lastCursorPos) {
         const pos = { ...lastCursorPos }; // Copy position before it changes
-        // Auto 2PT/3PT detection temporarily disabled.
-        // const shotType = inferShotTypeFromPos(pos);
-        const shotType = '2pt';
+        const shotType = inferShotTypeFromPos(pos);
         const markerEl = addShotMarker(controller.getActiveTeam(), shotType, result, pos);
         controller.applyShot(controller.getActiveTeam(), shotType, result, markerEl, pos);
       } else {
@@ -3972,15 +3959,11 @@ document.addEventListener("DOMContentLoaded", async () => {
       }
 
       const pos = { ...lastCursorPos }; // Copy position before it changes
-      // Zone contradiction warning temporarily disabled.
-      // const actualZone = inferShotTypeFromPos(pos);
-      // const warning = checkZoneContradiction(shotType, actualZone);
-      // if (warning) {
-      //   console.warn(warning);
-      //   if (!confirm(warning + '\n\nContinue logging anyway?')) {
-      //     return;
-      //   }
-      // }
+      const actualZone = inferShotTypeFromPos(pos);
+      const warning = checkZoneContradiction(shotType, actualZone);
+      if (warning && !confirm(`${warning}\n\nContinue logging anyway?`)) {
+        return;
+      }
       const markerEl = addShotMarker(controller.getActiveTeam(), shotType, result, pos);
       controller.applyShot(controller.getActiveTeam(), shotType, result, markerEl, pos);
       return;
@@ -4018,15 +4001,11 @@ document.addEventListener("DOMContentLoaded", async () => {
       }
 
       const pos = { ...lastCursorPos }; // Copy position before it changes
-      // Zone contradiction warning temporarily disabled.
-      // const actualZone = inferShotTypeFromPos(pos);
-      // const warning = checkZoneContradiction(shotType, actualZone);
-      // if (warning) {
-      //   console.warn(warning);
-      //   if (!confirm(warning + '\n\nContinue logging anyway?')) {
-      //     return;
-      //   }
-      // }
+      const actualZone = inferShotTypeFromPos(pos);
+      const warning = checkZoneContradiction(shotType, actualZone);
+      if (warning && !confirm(`${warning}\n\nContinue logging anyway?`)) {
+        return;
+      }
       const markerEl = addShotMarker(controller.getActiveTeam(), shotType, result, pos);
       controller.applyShot(controller.getActiveTeam(), shotType, result, markerEl, pos);
       return;

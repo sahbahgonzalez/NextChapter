@@ -87,11 +87,10 @@ Visual and detection zones for accurate shot tracking.
 - `inferShotTypeFromPos(pos)`: Detects zone from percentage coordinates
 - Priority: 2PT Rectangle → 2PT Semicircle → 3PT (fallback)
 
-#### Current Temporary Runtime Setting
+#### Current Runtime Setting
 - Warning header (`#startError`) is hidden in the game UI.
-- Auto 2PT/3PT detection is commented out in active shot logging paths.
-- "Auto" shot buttons/hotkeys currently record as `2pt` until detection is re-enabled.
-- Zone contradiction warning prompts are currently disabled.
+- `M`/`X`, auto-shot buttons, and direct court clicks infer 2PT or 3PT from the cursor location.
+- Forced 2PT/3PT hotkeys show a confirmation when the selected shot type conflicts with the cursor zone.
 
 ---
 
@@ -237,8 +236,10 @@ Keyboard shortcuts for rapid game logging.
 | B | Log Team B foul (committer = Team B active player) | Yes |
 | Tab | Switch Active Player | No |
 | S | Swap Active Teammate (tag mode) | No |
+| T | Log a timeout | No |
 | P | Pause/Resume | No |
 | U | Undo Last Action | No |
+| C | Change court image before the game starts | No |
 
 #### Foul Attribution Flow
 
