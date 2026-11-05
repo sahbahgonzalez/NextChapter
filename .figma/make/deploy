@@ -1,0 +1,14 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+build_dir=".figma/make/deploy-dist"
+rm -rf "$build_dir"
+mkdir -p "$build_dir"
+tar --exclude='.env' --exclude='.env.*' -C frontend -cf - . | tar -C "$build_dir" -xf -
+
+[[ -d "$build_dir" ]] || {
+  echo "Expected build output at $build_dir" >&2
+  exit 1
+}
+
+figma make deploy --build-dir "$build_dir"
